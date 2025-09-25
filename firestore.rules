@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Función para verificar si es super admin
+    function isSuperAdmin() {
+      return request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin';
+    }
+    
+    // Función para verificar si es residente, admin o super admin
+    function isResidentOrAdmin() {
+      return request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['residente', 'admin', 'super_admin'];
+    }
+    
+    // Función para verificar si es admin o super admin
+    function isAdminOrSuperAdmin() {
+      return request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+    }
+    
+    // Usuarios pueden leer/escribir su propio perfil
+    // Admins y super admins pueden leer/escribir todos los perfiles
+    match /users/{userId} {
+      allow read, write: if request.auth != null && 
+        (request.auth.uid == userId || isAdminOrSuperAdmin());
+    }
+    
+    // Reportes de pánico - residentes pueden crear, admins y super admins pueden leer todos
+    match /panicReports/{reportId} {
+      allow create: if isResidentOrAdmin();
+      allow read: if request.auth != null && 
+        (isAdminOrSuperAdmin() || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'residente');
+      allow write: if isAdminOrSuperAdmin();
+    }
+    
+    // Alertas comunitarias - residentes pueden crear, admins y super admins pueden gestionar
+    match /alerts/{alertId} {
+      allow create: if isResidentOrAdmin();
+      allow read: if request.auth != null;
+      allow write: if isAdminOrSuperAdmin();
+    }
+    
+    // Lugares - todos los usuarios autenticados pueden leer, admins y super admins pueden escribir
+    match /places/{placeId} {
+      allow read: if request.auth != null;
+      allow write: if isAdminOrSuperAdmin();
+    }
+    
+    // Servicios - todos los usuarios autenticados pueden leer, admins y super admins pueden escribir
+    match /services/{serviceId} {
+      allow read: if request.auth != null;
+      allow write: if isAdminOrSuperAdmin();
+    }
+    
+    // Cámaras - residentes, admins y super admins pueden leer, admins y super admins pueden escribir
+    match /cameras/{cameraId} {
+      allow read: if isResidentOrAdmin();
+      allow write: if isAdminOrSuperAdmin();
+    }
+    
+    // Configuración del sistema - solo super admins pueden acceder
+    match /systemConfig/{configId} {
+      allow read, write: if isSuperAdmin();
+    }
+    
+    // Solicitudes de registro - solo super admins pueden gestionar
+    match /registrationRequests/{requestId} {
+      allow read, write: if isSuperAdmin();
+    }
+  }
+}
+
+
