@@ -560,23 +560,47 @@ export const getPendingRegistrations = async (): Promise<RegistrationRequest[]> 
   }
 
   try {
-    const q = query(
-      collection(db, 'registrationRequests'),
-      where('status', '==', 'pending'),
-      orderBy('createdAt', 'desc')
-    );
-    
-    const snapshot = await getDocs(q);
-    const requests: RegistrationRequest[] = [];
-    
-    snapshot.forEach((doc) => {
-      requests.push({ id: doc.id, ...doc.data() } as RegistrationRequest & { id: string });
-    });
-    
-    return requests;
+    // Primero intentar con la consulta compuesta
+    try {
+      const q = query(
+        collection(db, 'registrationRequests'),
+        where('status', '==', 'pending'),
+        orderBy('createdAt', 'desc')
+      );
+      
+      const snapshot = await getDocs(q);
+      const requests: RegistrationRequest[] = [];
+      
+      snapshot.forEach((doc) => {
+        requests.push({ id: doc.id, ...doc.data() } as RegistrationRequest & { id: string });
+      });
+      
+      return requests;
+    } catch (indexError) {
+      console.warn('Índice compuesto no disponible, usando consulta simple:', indexError);
+      
+      // Fallback: obtener todas las solicitudes y filtrar en el cliente
+      const allRequestsSnapshot = await getDocs(collection(db, 'registrationRequests'));
+      const allRequests: RegistrationRequest[] = [];
+      
+      allRequestsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.status === 'pending') {
+          allRequests.push({ id: doc.id, ...data } as RegistrationRequest & { id: string });
+        }
+      });
+      
+      // Ordenar por fecha de creación (más reciente primero)
+      return allRequests.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      });
+    }
   } catch (error) {
     console.error('Error al obtener solicitudes pendientes:', error);
-    throw error;
+    // Retornar array vacío en lugar de lanzar error para que el dashboard funcione
+    return [];
   }
 };
 
