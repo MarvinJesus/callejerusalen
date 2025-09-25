@@ -18,7 +18,7 @@ Para que la eliminación completa de usuarios funcione correctamente, necesitas 
 Crea o actualiza tu archivo `.env.local` con las siguientes variables:
 
 ```env
-# Firebase Admin SDK
+# Firebase Admin SDK 
 FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@callejerusalen-a78aa.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYOUR_PRIVATE_KEY_HERE\n-----END PRIVATE KEY-----\n"
 ```
