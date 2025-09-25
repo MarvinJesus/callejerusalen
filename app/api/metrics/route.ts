@@ -127,8 +127,8 @@ export async function GET(request: NextRequest) {
         
         // Contar por rol
         const role = userData.role || 'visitante';
-        if (userMetrics.byRole[role] !== undefined) {
-          userMetrics.byRole[role]++;
+        if (role in userMetrics.byRole) {
+          (userMetrics.byRole as any)[role]++;
         }
         
         console.log(`👤 Usuario: ${userData.email}, Rol: ${role}, Estado: ${status}`);

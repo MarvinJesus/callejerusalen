@@ -70,61 +70,23 @@ const AdminDashboard: React.FC = () => {
     setConnectionStatus('connected');
     
     try {
-      // Obtener datos de usuarios primero (incluyendo todos los estados)
-      console.log('🔍 Iniciando obtención de usuarios...');
-      const usersData = await getAllUsers(true); // Incluir usuarios eliminados para conteo completo
-      console.log('📊 Usuarios obtenidos:', usersData.length);
-      console.log('📋 Detalles de usuarios:', usersData.map(u => ({ 
-        email: u.email, 
-        role: u.role, 
-        status: u.status, 
-        isActive: u.isActive,
-        uid: u.uid
-      })));
+      // Obtener métricas desde la API del servidor (más confiable)
+      console.log('🔍 Obteniendo métricas desde la API...');
+      const metricsResponse = await fetch('/api/metrics');
+      let serverMetrics = null;
       
-      // Verificación adicional
-      if (usersData.length === 0) {
-        console.warn('⚠️ No se encontraron usuarios. Verificando conexión...');
-      } else if (usersData.length === 1) {
-        console.warn('⚠️ Solo se encontró 1 usuario. Esto podría indicar un problema de permisos o filtrado.');
+      if (metricsResponse.ok) {
+        serverMetrics = await metricsResponse.json();
+        console.log('✅ Métricas del servidor obtenidas:', serverMetrics);
+      } else {
+        console.warn('⚠️ Error al obtener métricas del servidor:', metricsResponse.status);
       }
       
-      // Calcular métricas reales basadas en los datos de usuarios
-      const activeUsers = usersData.filter(user => user.status === 'active');
-      const inactiveUsers = usersData.filter(user => user.status === 'inactive');
-      const deletedUsers = usersData.filter(user => user.status === 'deleted');
+      // Obtener datos de usuarios para la tabla (incluyendo todos los estados)
+      console.log('🔍 Obteniendo usuarios para la tabla...');
+      const usersData = await getAllUsers(true); // Incluir usuarios eliminados para conteo completo
+      console.log('📊 Usuarios obtenidos para tabla:', usersData.length);
       
-      console.log('📊 Conteo de usuarios:', {
-        total: usersData.length,
-        active: activeUsers.length,
-        inactive: inactiveUsers.length,
-        deleted: deletedUsers.length
-      });
-      
-      const realMetrics = {
-        users: {
-          total: usersData.length,
-          active: activeUsers.length,
-          inactive: inactiveUsers.length,
-          deleted: deletedUsers.length,
-          byRole: {
-            visitante: usersData.filter(user => user.role === 'visitante').length,
-            comunidad: usersData.filter(user => user.role === 'comunidad').length,
-            admin: usersData.filter(user => user.role === 'admin').length,
-            super_admin: usersData.filter(user => user.role === 'super_admin').length
-          }
-        },
-        activity: {
-          actionsToday: 0, // Se calculará desde los logs
-          lastUpdated: new Date().toISOString()
-        },
-        system: {
-          uptime: process.uptime ? process.uptime() : 0,
-          memoryUsage: process.memoryUsage ? process.memoryUsage() : {},
-          nodeVersion: process.version || 'unknown'
-        }
-      };
-
       // Obtener datos de forma individual para mejor manejo de errores
       let registrationsData: RegistrationRequest[] = [];
       let logsData: ServerLog[] = [];
@@ -147,24 +109,42 @@ const AdminDashboard: React.FC = () => {
         setConnectionStatus('error');
       }
       
-      // Calcular acciones de hoy desde los logs
-      const today = new Date().toDateString();
-      const actionsToday = logsData.filter(log => {
-        const logDate = new Date(log.timestamp).toDateString();
-        return logDate === today;
-      }).length;
-      
-      realMetrics.activity.actionsToday = actionsToday;
+      // Usar métricas del servidor si están disponibles, sino calcular localmente
+      const finalMetrics = serverMetrics || {
+        users: {
+          total: usersData.length,
+          active: usersData.filter(user => user.status === 'active').length,
+          inactive: usersData.filter(user => user.status === 'inactive').length,
+          deleted: usersData.filter(user => user.status === 'deleted').length,
+          byRole: {
+            visitante: usersData.filter(user => user.role === 'visitante').length,
+            comunidad: usersData.filter(user => user.role === 'comunidad').length,
+            admin: usersData.filter(user => user.role === 'admin').length,
+            super_admin: usersData.filter(user => user.role === 'super_admin').length
+          }
+        },
+        activity: {
+          actionsToday: logsData.filter(log => {
+            const logDate = new Date(log.timestamp).toDateString();
+            return logDate === new Date().toDateString();
+          }).length,
+          lastUpdated: new Date().toISOString()
+        },
+        system: {
+          uptime: process.uptime ? process.uptime() : 0,
+          memoryUsage: process.memoryUsage ? process.memoryUsage() : {},
+          nodeVersion: process.version || 'unknown'
+        }
+      };
       
       setUsers(usersData);
       setPendingRegistrations(registrationsData);
       setSystemLogs(logsData);
-      setMetrics(realMetrics);
+      setMetrics(finalMetrics);
       
-      console.log('✅ Métricas calculadas:', realMetrics);
+      console.log('✅ Métricas finales establecidas:', finalMetrics);
       console.log('✅ Usuarios establecidos en estado:', usersData.length);
-      console.log('✅ Métricas establecidas en estado:', realMetrics.users.total);
-      console.log('✅ Usuarios detallados:', usersData.map(u => ({ email: u.email, role: u.role, status: u.status })));
+      console.log('✅ Métricas establecidas en estado:', finalMetrics.users.total);
     } catch (error) {
       console.error('Error al cargar datos del dashboard:', error);
       // En caso de error, establecer métricas por defecto
@@ -197,8 +177,27 @@ const AdminDashboard: React.FC = () => {
     return 'Hace unos segundos';
   };
 
-  // Calcular estadísticas directamente desde los datos de usuarios
+  // Calcular estadísticas usando las métricas del servidor (más confiables)
   const calculateStats = () => {
+    // Usar métricas del servidor si están disponibles
+    if (metrics?.users) {
+      return {
+        totalUsers: metrics.users.total || 0,
+        activeUsers: metrics.users.active || 0,
+        inactiveUsers: metrics.users.inactive || 0,
+        deletedUsers: metrics.users.deleted || 0,
+        usersByRole: {
+          super_admin: metrics.users.byRole?.super_admin || 0,
+          admin: metrics.users.byRole?.admin || 0,
+          comunidad: metrics.users.byRole?.comunidad || 0,
+          visitante: metrics.users.byRole?.visitante || 0
+        },
+        actionsToday: metrics.activity?.actionsToday || 0,
+        lastUpdated: metrics.activity?.lastUpdated || new Date().toISOString()
+      };
+    }
+    
+    // Fallback: calcular desde usuarios locales si no hay métricas del servidor
     const totalUsers = users.length;
     const activeUsers = users.filter(user => user.status === 'active').length;
     const inactiveUsers = users.filter(user => user.status === 'inactive').length;
