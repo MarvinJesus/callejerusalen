@@ -193,7 +193,7 @@ const PanicPage: React.FC = () => {
     );
   }
 
-  if (userProfile?.role !== 'residente') {
+  if (userProfile?.role !== 'comunidad') {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />

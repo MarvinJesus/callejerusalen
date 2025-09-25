@@ -84,6 +84,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       email: 'visitante@callejerusalen.com',
       displayName: 'Usuario Visitante',
       role: 'visitante',
+      status: 'active',
       createdAt: new Date(),
       updatedAt: new Date(),
       isActive: true

@@ -118,7 +118,7 @@ const Navbar: React.FC = () => {
                   </Link>
                 )}
 
-                {(userProfile?.role === 'visitante' || userProfile?.role === 'visitante') && (
+                {userProfile?.role === 'visitante' && (
                   <>
                     <Link 
                       href="/visitantes" 
@@ -225,7 +225,7 @@ const Navbar: React.FC = () => {
 
               {user ? (
                 <>
-                  {(userProfile?.role === 'visitante' || userProfile?.role === 'visitante') && (
+                  {userProfile?.role === 'visitante' && (
                     <>
                       <Link 
                         href="/visitantes" 

@@ -207,7 +207,7 @@ const AdminDashboard: React.FC = () => {
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         user.role === 'super_admin' ? 'bg-red-100 text-red-800' :
                         user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                        user.role === 'residente' ? 'bg-green-100 text-green-800' :
+                        user.role === 'comunidad' ? 'bg-green-100 text-green-800' :
                         user.role === 'visitante' ? 'bg-blue-100 text-blue-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>

@@ -306,7 +306,7 @@ const MapPage: React.FC = () => {
                 <span>Servicios ({stats.services})</span>
               </button>
 
-              {userProfile?.role === 'residente' && (
+              {userProfile?.role === 'comunidad' && (
                 <button
                   onClick={() => handleTypeToggle('camera')}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -320,7 +320,7 @@ const MapPage: React.FC = () => {
                 </button>
               )}
 
-              {userProfile?.role === 'residente' && (
+              {userProfile?.role === 'comunidad' && (
                 <button
                   onClick={() => handleTypeToggle('alert')}
                   className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
