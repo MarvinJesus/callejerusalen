@@ -23,6 +23,7 @@ import {
   UserProfile,
   RegistrationRequest
 } from '@/lib/auth';
+import { auth } from '@/lib/firebase';
 import { getServerLogs, getSystemMetrics, ServerLog } from '@/lib/server-logging';
 
 const AdminDashboard: React.FC = () => {
@@ -33,6 +34,7 @@ const AdminDashboard: React.FC = () => {
   const [pendingRegistrations, setPendingRegistrations] = useState<RegistrationRequest[]>([]);
   const [systemLogs, setSystemLogs] = useState<ServerLog[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline' | 'error'>('connected');
 
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: BarChart3 },
@@ -48,22 +50,135 @@ const AdminDashboard: React.FC = () => {
     }
   }, [userProfile]);
 
+  // Debug: Verificar cuando cambian las métricas
+  useEffect(() => {
+    if (metrics) {
+      console.log('🔄 Métricas actualizadas en estado:', metrics.users.total);
+    }
+  }, [metrics]);
+
+  // Debug: Verificar cuando cambian los usuarios
+  useEffect(() => {
+    console.log('🔄 Usuarios actualizados en estado:', users.length);
+    if (users.length > 0) {
+      console.log('🔄 Detalles de usuarios en estado:', users.map(u => ({ email: u.email, role: u.role, status: u.status })));
+    }
+  }, [users]);
+
   const loadDashboardData = async () => {
     setLoading(true);
+    setConnectionStatus('connected');
+    
     try {
-      const [usersData, registrationsData, logsData, metricsData] = await Promise.all([
-        getAllUsers(),
-        getPendingRegistrations(),
-        getServerLogs(50),
-        getSystemMetrics()
-      ]);
+      // Obtener datos de usuarios primero (incluyendo todos los estados)
+      console.log('🔍 Iniciando obtención de usuarios...');
+      const usersData = await getAllUsers(true); // Incluir usuarios eliminados para conteo completo
+      console.log('📊 Usuarios obtenidos:', usersData.length);
+      console.log('📋 Detalles de usuarios:', usersData.map(u => ({ 
+        email: u.email, 
+        role: u.role, 
+        status: u.status, 
+        isActive: u.isActive,
+        uid: u.uid
+      })));
+      
+      // Verificación adicional
+      if (usersData.length === 0) {
+        console.warn('⚠️ No se encontraron usuarios. Verificando conexión...');
+      } else if (usersData.length === 1) {
+        console.warn('⚠️ Solo se encontró 1 usuario. Esto podría indicar un problema de permisos o filtrado.');
+      }
+      
+      // Calcular métricas reales basadas en los datos de usuarios
+      const activeUsers = usersData.filter(user => user.status === 'active');
+      const inactiveUsers = usersData.filter(user => user.status === 'inactive');
+      const deletedUsers = usersData.filter(user => user.status === 'deleted');
+      
+      console.log('📊 Conteo de usuarios:', {
+        total: usersData.length,
+        active: activeUsers.length,
+        inactive: inactiveUsers.length,
+        deleted: deletedUsers.length
+      });
+      
+      const realMetrics = {
+        users: {
+          total: usersData.length,
+          active: activeUsers.length,
+          inactive: inactiveUsers.length,
+          deleted: deletedUsers.length,
+          byRole: {
+            visitante: usersData.filter(user => user.role === 'visitante').length,
+            comunidad: usersData.filter(user => user.role === 'comunidad').length,
+            admin: usersData.filter(user => user.role === 'admin').length,
+            super_admin: usersData.filter(user => user.role === 'super_admin').length
+          }
+        },
+        activity: {
+          actionsToday: 0, // Se calculará desde los logs
+          lastUpdated: new Date().toISOString()
+        },
+        system: {
+          uptime: process.uptime ? process.uptime() : 0,
+          memoryUsage: process.memoryUsage ? process.memoryUsage() : {},
+          nodeVersion: process.version || 'unknown'
+        }
+      };
+
+      // Obtener datos de forma individual para mejor manejo de errores
+      let registrationsData: RegistrationRequest[] = [];
+      let logsData: ServerLog[] = [];
+      
+      try {
+        registrationsData = await getPendingRegistrations();
+        console.log('📋 Solicitudes pendientes obtenidas:', registrationsData.length);
+      } catch (error) {
+        console.warn('⚠️ Error al obtener solicitudes pendientes, continuando sin ellas:', error);
+        registrationsData = [];
+        setConnectionStatus('error');
+      }
+      
+      try {
+        logsData = await getServerLogs(50);
+        console.log('📝 Logs obtenidos:', logsData.length);
+      } catch (error) {
+        console.warn('⚠️ Error al obtener logs, continuando sin ellos:', error);
+        logsData = [];
+        setConnectionStatus('error');
+      }
+      
+      // Calcular acciones de hoy desde los logs
+      const today = new Date().toDateString();
+      const actionsToday = logsData.filter(log => {
+        const logDate = new Date(log.timestamp).toDateString();
+        return logDate === today;
+      }).length;
+      
+      realMetrics.activity.actionsToday = actionsToday;
       
       setUsers(usersData);
       setPendingRegistrations(registrationsData);
       setSystemLogs(logsData);
-      setMetrics(metricsData);
+      setMetrics(realMetrics);
+      
+      console.log('✅ Métricas calculadas:', realMetrics);
+      console.log('✅ Usuarios establecidos en estado:', usersData.length);
+      console.log('✅ Métricas establecidas en estado:', realMetrics.users.total);
+      console.log('✅ Usuarios detallados:', usersData.map(u => ({ email: u.email, role: u.role, status: u.status })));
     } catch (error) {
       console.error('Error al cargar datos del dashboard:', error);
+      // En caso de error, establecer métricas por defecto
+      setMetrics({
+        users: { 
+          total: 0, 
+          active: 0, 
+          inactive: 0, 
+          deleted: 0, 
+          byRole: { visitante: 0, comunidad: 0, admin: 0, super_admin: 0 } 
+        },
+        activity: { actionsToday: 0, lastUpdated: new Date().toISOString() },
+        system: { uptime: 0, memoryUsage: {}, nodeVersion: 'unknown' }
+      });
     } finally {
       setLoading(false);
     }
@@ -82,16 +197,65 @@ const AdminDashboard: React.FC = () => {
     return 'Hace unos segundos';
   };
 
-  const stats = metrics ? [
-    { label: 'Usuarios Totales', value: metrics.users.total.toString(), icon: Users, color: 'text-blue-600' },
-    { label: 'Usuarios Activos', value: metrics.users.active.toString(), icon: UserCheck, color: 'text-green-600' },
-    { label: 'Solicitudes Pendientes', value: pendingRegistrations.length.toString(), icon: Clock, color: 'text-yellow-600' },
-    { label: 'Acciones Hoy', value: metrics.activity.actionsToday.toString(), icon: Activity, color: 'text-red-600' },
-  ] : [
-    { label: 'Usuarios Totales', value: '0', icon: Users, color: 'text-blue-600' },
-    { label: 'Usuarios Activos', value: '0', icon: UserCheck, color: 'text-green-600' },
-    { label: 'Solicitudes Pendientes', value: '0', icon: Clock, color: 'text-yellow-600' },
-    { label: 'Acciones Hoy', value: '0', icon: Activity, color: 'text-red-600' },
+  // Calcular estadísticas directamente desde los datos de usuarios
+  const calculateStats = () => {
+    const totalUsers = users.length;
+    const activeUsers = users.filter(user => user.status === 'active').length;
+    const inactiveUsers = users.filter(user => user.status === 'inactive').length;
+    const deletedUsers = users.filter(user => user.status === 'deleted').length;
+    
+    const usersByRole = {
+      super_admin: users.filter(user => user.role === 'super_admin').length,
+      admin: users.filter(user => user.role === 'admin').length,
+      comunidad: users.filter(user => user.role === 'comunidad').length,
+      visitante: users.filter(user => user.role === 'visitante').length
+    };
+    
+    const actionsToday = metrics?.activity?.actionsToday || 0;
+    const lastUpdated = metrics?.activity?.lastUpdated || new Date().toISOString();
+    
+    return {
+      totalUsers,
+      activeUsers,
+      inactiveUsers,
+      deletedUsers,
+      usersByRole,
+      actionsToday,
+      lastUpdated
+    };
+  };
+
+  const statsData = calculateStats();
+  
+  const stats = [
+    { 
+      label: 'Usuarios Totales', 
+      value: statsData.totalUsers.toString(), 
+      icon: Users, 
+      color: 'text-blue-600',
+      subtitle: `Activos: ${statsData.activeUsers} | Inactivos: ${statsData.inactiveUsers} | Eliminados: ${statsData.deletedUsers}`
+    },
+    { 
+      label: 'Usuarios Activos', 
+      value: statsData.activeUsers.toString(), 
+      icon: UserCheck, 
+      color: 'text-green-600',
+      subtitle: `Super Admin: ${statsData.usersByRole.super_admin} | Admin: ${statsData.usersByRole.admin} | Comunidad: ${statsData.usersByRole.comunidad} | Visitantes: ${statsData.usersByRole.visitante}`
+    },
+    { 
+      label: 'Solicitudes Pendientes', 
+      value: pendingRegistrations.length.toString(), 
+      icon: Clock, 
+      color: 'text-yellow-600',
+      subtitle: pendingRegistrations.length > 0 ? 'Requieren aprobación' : 'Sin solicitudes'
+    },
+    { 
+      label: 'Acciones Hoy', 
+      value: statsData.actionsToday.toString(), 
+      icon: Activity, 
+      color: 'text-red-600',
+      subtitle: `Última actualización: ${new Date(statsData.lastUpdated).toLocaleTimeString()}`
+    },
   ];
 
   const getRecentActivities = () => {
@@ -122,11 +286,132 @@ const AdminDashboard: React.FC = () => {
 
   const renderOverview = () => (
     <div className="space-y-6">
+      {/* Header con botón de actualización */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-xl font-semibold text-gray-900">Resumen del Sistema</h2>
+        <div className="flex space-x-2">
+          <button
+            onClick={loadDashboardData}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>{loading ? 'Actualizando...' : 'Actualizar'}</span>
+          </button>
+          
+          <button
+            onClick={async () => {
+              console.log('🔄 FORZANDO ACTUALIZACIÓN COMPLETA...');
+              setMetrics(null); // Limpiar métricas
+              setUsers([]); // Limpiar usuarios
+              await loadDashboardData(); // Recargar datos
+            }}
+            disabled={loading}
+            className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Forzar Recarga</span>
+          </button>
+          
+          <button
+            onClick={async () => {
+              console.log('🔍 DEBUG: Verificando usuarios directamente...');
+              try {
+                // Verificar autenticación actual
+                const currentUser = auth?.currentUser;
+                console.log('🔍 DEBUG - Usuario autenticado:', currentUser?.email);
+                console.log('🔍 DEBUG - UID del usuario:', currentUser?.uid);
+                
+                // Verificar conexión directa con Firestore
+                const { db } = await import('@/lib/firebase');
+                const { collection, getDocs } = await import('firebase/firestore');
+                
+                console.log('🔍 DEBUG - Verificando conexión directa con Firestore...');
+                const directSnapshot = await getDocs(collection(db, 'users'));
+                console.log('🔍 DEBUG - Documentos encontrados directamente:', directSnapshot.size);
+                
+                const directUsers: any[] = [];
+                directSnapshot.forEach((doc) => {
+                  const data = doc.data();
+                  directUsers.push({
+                    id: doc.id,
+                    email: data.email,
+                    role: data.role,
+                    status: data.status,
+                    isActive: data.isActive
+                  });
+                  console.log('🔍 DEBUG - Documento directo:', doc.id, data);
+                });
+                
+                // Ahora usar la función getAllUsers
+                const debugUsers = await getAllUsers(true);
+                console.log('🔍 DEBUG - Usuarios encontrados por getAllUsers:', debugUsers.length);
+                console.log('🔍 DEBUG - Detalles completos:', debugUsers);
+                
+                // Mostrar información detallada
+                const userSummary = debugUsers.map(u => 
+                  `${u.email} (${u.role}) - ${u.status}`
+                ).join('\n');
+                
+                const directSummary = directUsers.map(u => 
+                  `${u.email} (${u.role}) - ${u.status}`
+                ).join('\n');
+                
+                alert(`Comparación de resultados:\n\nDirecto desde Firestore: ${directUsers.length} usuarios\n\nPor getAllUsers: ${debugUsers.length} usuarios\n\nDirecto:\n${directSummary}\n\nPor función:\n${userSummary}\n\nRevisa la consola para más información.`);
+              } catch (error) {
+                console.error('🔍 DEBUG - Error:', error);
+                const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+                alert(`Error al obtener usuarios: ${errorMessage}\nRevisa la consola para más detalles.`);
+              }
+            }}
+            className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          >
+            <Eye className="w-4 h-4" />
+            <span>Debug</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mensaje de estado de conexión */}
+      {connectionStatus === 'error' && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 mr-3" />
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">Datos parciales disponibles</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                Algunos datos no pudieron cargarse debido a problemas de conectividad. 
+                Los indicadores principales están actualizados con la información disponible.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Debug: Mostrar estado actual de métricas */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <Activity className="w-5 h-5 text-blue-600 mr-3" />
+          <div>
+            <h3 className="text-sm font-medium text-blue-800">Estado de Datos (Debug)</h3>
+            <p className="text-sm text-blue-700 mt-1">
+              Usuarios en estado: {users.length} | 
+              Usuarios activos: {statsData.activeUsers} | 
+              Total calculado: {statsData.totalUsers} |
+              Última actualización: {new Date(statsData.lastUpdated).toLocaleTimeString()}
+            </p>
+            <p className="text-xs text-blue-600 mt-1">
+              Desglose: Super Admin: {statsData.usersByRole.super_admin}, Admin: {statsData.usersByRole.admin}, Comunidad: {statsData.usersByRole.comunidad}, Visitantes: {statsData.usersByRole.visitante}
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
           <div key={index} className="card">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between mb-3">
               <div>
                 <p className="text-sm font-medium text-gray-600">{stat.label}</p>
                 <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
@@ -135,6 +420,9 @@ const AdminDashboard: React.FC = () => {
                 <stat.icon className={`w-6 h-6 ${stat.color}`} />
               </div>
             </div>
+            {stat.subtitle && (
+              <p className="text-xs text-gray-500 mt-2">{stat.subtitle}</p>
+            )}
           </div>
         ))}
       </div>
@@ -332,6 +620,24 @@ const AdminDashboard: React.FC = () => {
                 <p className="text-gray-600">Administrador - Calle Jerusalén</p>
               </div>
               <div className="flex items-center space-x-4">
+                {/* Indicador de estado de conexión */}
+                <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
+                  connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                  connectionStatus === 'error' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  <div className={`w-2 h-2 rounded-full ${
+                    connectionStatus === 'connected' ? 'bg-green-500' :
+                    connectionStatus === 'error' ? 'bg-yellow-500' :
+                    'bg-red-500'
+                  }`}></div>
+                  <span>
+                    {connectionStatus === 'connected' ? 'Conectado' :
+                     connectionStatus === 'error' ? 'Datos parciales' :
+                     'Sin conexión'}
+                  </span>
+                </div>
+                
                 <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
                   Administrador
                 </span>

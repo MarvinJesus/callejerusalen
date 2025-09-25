@@ -75,17 +75,90 @@ async function readMetrics() {
 // GET - Obtener métricas del sistema
 export async function GET(request: NextRequest) {
   try {
-    const metrics = await readMetrics();
+    console.log('📊 Obteniendo métricas del sistema...');
+    
+    // Obtener datos reales de usuarios desde Firestore
+    let userMetrics = {
+      total: 0,
+      active: 0,
+      inactive: 0,
+      deleted: 0,
+      byRole: {
+        visitante: 0,
+        comunidad: 0,
+        admin: 0,
+        super_admin: 0
+      }
+    };
+
+    try {
+      // Importar Firebase dinámicamente
+      const { initializeApp } = await import('firebase/app');
+      const { getFirestore, collection, getDocs } = await import('firebase/firestore');
+      
+      // Configuración de Firebase
+      const firebaseConfig = {
+        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+      };
+
+      // Inicializar Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      console.log('🔍 Obteniendo usuarios desde Firestore...');
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      console.log(`📈 Documentos encontrados: ${usersSnapshot.size}`);
+
+      // Procesar usuarios
+      usersSnapshot.forEach((doc) => {
+        const userData = doc.data();
+        userMetrics.total++;
+        
+        // Contar por estado
+        const status = userData.status || (userData.isActive ? 'active' : 'inactive');
+        if (status === 'active') userMetrics.active++;
+        else if (status === 'inactive') userMetrics.inactive++;
+        else if (status === 'deleted') userMetrics.deleted++;
+        
+        // Contar por rol
+        const role = userData.role || 'visitante';
+        if (userMetrics.byRole[role] !== undefined) {
+          userMetrics.byRole[role]++;
+        }
+        
+        console.log(`👤 Usuario: ${userData.email}, Rol: ${role}, Estado: ${status}`);
+      });
+
+      console.log('✅ Métricas de usuarios calculadas:', userMetrics);
+      
+    } catch (firebaseError) {
+      console.error('❌ Error al obtener usuarios desde Firebase:', firebaseError);
+      // Usar métricas por defecto si hay error
+      userMetrics = {
+        total: 0,
+        active: 0,
+        inactive: 0,
+        deleted: 0,
+        byRole: { visitante: 0, comunidad: 0, admin: 0, super_admin: 0 }
+      };
+    }
     
     // Calcular acciones de hoy desde los logs
     const logFile = path.join(LOGS_DIR, 'system.log');
+    let actionsToday = 0;
+    
     try {
       await fs.access(logFile);
       const logContent = await fs.readFile(logFile, 'utf-8');
       const lines = logContent.trim().split('\n').filter(line => line.trim());
       
       const today = new Date().toDateString();
-      const actionsToday = lines.filter(line => {
+      actionsToday = lines.filter(line => {
         try {
           const log = JSON.parse(line);
           const logDate = new Date(log.timestamp).toDateString();
@@ -95,14 +168,31 @@ export async function GET(request: NextRequest) {
         }
       }).length;
       
-      metrics.activity.actionsToday = actionsToday;
+      console.log(`📝 Acciones de hoy: ${actionsToday}`);
     } catch {
-      metrics.activity.actionsToday = 0;
+      actionsToday = 0;
     }
+    
+    // Crear métricas actualizadas
+    const metrics = {
+      timestamp: new Date().toISOString(),
+      users: userMetrics,
+      activity: {
+        actionsToday: actionsToday,
+        lastUpdated: new Date().toISOString()
+      },
+      system: {
+        uptime: process.uptime(),
+        memoryUsage: process.memoryUsage(),
+        nodeVersion: process.version
+      }
+    };
+    
+    console.log('✅ Métricas finales:', JSON.stringify(metrics, null, 2));
     
     return NextResponse.json(metrics);
   } catch (error) {
-    console.error('Error getting metrics:', error);
+    console.error('❌ Error getting metrics:', error);
     return NextResponse.json(
       { error: 'Failed to get metrics' },
       { status: 500 }
