@@ -23,6 +23,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { logSystemAction } from './server-logging';
+import { Permission, DEFAULT_PERMISSIONS, validatePermissions } from './permissions';
 
 // Tipos de usuario
 export type UserRole = 'visitante' | 'comunidad' | 'admin' | 'super_admin';
@@ -37,7 +38,7 @@ export interface UserProfile {
   createdAt: Date;
   updatedAt: Date;
   isActive: boolean; // Mantenido por compatibilidad, pero status es la fuente de verdad
-  permissions?: string[];
+  permissions?: Permission[];
   lastLogin?: Date;
   registrationStatus?: 'pending' | 'approved' | 'rejected';
   approvedBy?: string;
@@ -89,7 +90,8 @@ export const registerUser = async (
       status: 'active',
       createdAt: new Date(),
       updatedAt: new Date(),
-      isActive: true
+      isActive: true,
+      permissions: DEFAULT_PERMISSIONS[role] || []
     };
 
     await setDoc(doc(db, 'users', user.uid), userProfile);
@@ -230,7 +232,7 @@ export const getAllUsers = async (includeDeleted: boolean = false): Promise<User
         createdAt: userData.createdAt || new Date(),
         updatedAt: userData.updatedAt || new Date(),
         isActive: userData.isActive !== undefined ? userData.isActive : true,
-        permissions: userData.permissions || [],
+        permissions: validatePermissions(userData.permissions || []),
         lastLogin: userData.lastLogin || null,
         registrationStatus: userData.registrationStatus || 'approved',
         approvedBy: userData.approvedBy || null,
@@ -656,6 +658,210 @@ export const updateExistingUserToSuperAdmin = async (email: string): Promise<voi
     console.log('✅ Usuario actualizado a super administrador:', email);
   } catch (error) {
     console.error('Error al actualizar usuario a super admin:', error);
+    throw error;
+  }
+};
+
+// === FUNCIONES DE GESTIÓN DE PERMISOS ===
+
+// Función para asignar permisos a un usuario
+export const assignPermissions = async (
+  uid: string,
+  permissions: Permission[],
+  assignedBy: string
+): Promise<void> => {
+  if (!db) {
+    throw new Error('Firebase no está inicializado');
+  }
+
+  try {
+    // Validar permisos
+    const validPermissions = validatePermissions(permissions);
+    
+    // Obtener información del usuario objetivo
+    const targetUserProfile = await getUserProfile(uid);
+    if (!targetUserProfile) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    // Obtener información del usuario que asigna los permisos
+    const assignerProfile = await getUserProfile(assignedBy);
+    if (!assignerProfile) {
+      throw new Error('Usuario asignador no encontrado');
+    }
+
+    // Verificar que el usuario que asigna tenga permisos para hacerlo
+    if (assignerProfile.role !== 'super_admin') {
+      throw new Error('Solo los super administradores pueden asignar permisos');
+    }
+
+    // Obtener permisos actuales y agregar los nuevos
+    const currentPermissions = targetUserProfile.permissions || [];
+    const combinedPermissions = [...currentPermissions, ...validPermissions];
+    const updatedPermissions = Array.from(new Set(combinedPermissions));
+
+    // Actualizar permisos del usuario
+    await updateDoc(doc(db, 'users', uid), {
+      permissions: updatedPermissions,
+      updatedAt: new Date()
+    });
+
+    // Log de la acción
+    await logSystemAction('permissions_assigned', assignedBy, targetUserProfile.email, {
+      targetUserId: uid,
+      targetUserEmail: targetUserProfile.email,
+      addedPermissions: validPermissions,
+      allPermissions: updatedPermissions
+    });
+
+    console.log(`✅ Permisos asignados a ${targetUserProfile.email}:`, validPermissions);
+    console.log(`📋 Permisos totales:`, updatedPermissions);
+  } catch (error) {
+    console.error('Error al asignar permisos:', error);
+    throw error;
+  }
+};
+
+// Función para revocar permisos de un usuario
+export const revokePermissions = async (
+  uid: string,
+  permissions: Permission[],
+  revokedBy: string
+): Promise<void> => {
+  if (!db) {
+    throw new Error('Firebase no está inicializado');
+  }
+
+  try {
+    // Obtener información del usuario objetivo
+    const targetUserProfile = await getUserProfile(uid);
+    if (!targetUserProfile) {
+      throw new Error('Usuario no encontrado');
+    }
+
+    // Obtener información del usuario que revoca los permisos
+    const revokerProfile = await getUserProfile(revokedBy);
+    if (!revokerProfile) {
+      throw new Error('Usuario revocador no encontrado');
+    }
+
+    // Verificar que el usuario que revoca tenga permisos para hacerlo
+    if (revokerProfile.role !== 'super_admin') {
+      throw new Error('Solo los super administradores pueden revocar permisos');
+    }
+
+    // Obtener permisos actuales y remover los especificados
+    const currentPermissions = targetUserProfile.permissions || [];
+    const updatedPermissions = currentPermissions.filter(
+      permission => !permissions.includes(permission)
+    );
+
+    // Actualizar permisos del usuario
+    await updateDoc(doc(db, 'users', uid), {
+      permissions: updatedPermissions,
+      updatedAt: new Date()
+    });
+
+    // Log de la acción
+    await logSystemAction('permissions_revoked', revokedBy, targetUserProfile.email, {
+      targetUserId: uid,
+      targetUserEmail: targetUserProfile.email,
+      revokedPermissions: permissions
+    });
+
+    console.log(`✅ Permisos revocados de ${targetUserProfile.email}:`, permissions);
+  } catch (error) {
+    console.error('Error al revocar permisos:', error);
+    throw error;
+  }
+};
+
+// Función para verificar si un usuario tiene un permiso específico
+export const checkUserPermission = async (
+  uid: string,
+  permission: Permission
+): Promise<boolean> => {
+  try {
+    const userProfile = await getUserProfile(uid);
+    if (!userProfile) {
+      return false;
+    }
+
+    // Super admin siempre tiene todos los permisos
+    if (userProfile.role === 'super_admin') {
+      return true;
+    }
+
+    // Verificar si el usuario tiene el permiso específico
+    return userProfile.permissions?.includes(permission) || false;
+  } catch (error) {
+    console.error('Error al verificar permiso:', error);
+    return false;
+  }
+};
+
+// Función para obtener todos los permisos de un usuario
+export const getUserPermissions = async (uid: string): Promise<Permission[]> => {
+  try {
+    const userProfile = await getUserProfile(uid);
+    if (!userProfile) {
+      return [];
+    }
+
+    // Super admin tiene todos los permisos
+    if (userProfile.role === 'super_admin') {
+      return Object.values(DEFAULT_PERMISSIONS.super_admin);
+    }
+
+    return userProfile.permissions || [];
+  } catch (error) {
+    console.error('Error al obtener permisos del usuario:', error);
+    return [];
+  }
+};
+
+// Función para actualizar permisos por defecto de un rol
+export const updateDefaultPermissions = async (
+  role: UserRole,
+  permissions: Permission[],
+  updatedBy: string
+): Promise<void> => {
+  if (!db) {
+    throw new Error('Firebase no está inicializado');
+  }
+
+  try {
+    // Solo super admin puede actualizar permisos por defecto
+    const currentUser = auth?.currentUser;
+    if (!currentUser) {
+      throw new Error('Usuario no autenticado');
+    }
+
+    const currentUserProfile = await getUserProfile(currentUser.uid);
+    if (!currentUserProfile || currentUserProfile.role !== 'super_admin') {
+      throw new Error('Solo los super administradores pueden actualizar permisos por defecto');
+    }
+
+    // Validar permisos
+    const validPermissions = validatePermissions(permissions);
+
+    // Actualizar permisos por defecto en la base de datos
+    await setDoc(doc(db, 'defaultPermissions', role), {
+      role,
+      permissions: validPermissions,
+      updatedAt: new Date(),
+      updatedBy: currentUser.uid
+    });
+
+    // Log de la acción
+    await logSystemAction('default_permissions_updated', updatedBy, currentUserProfile.email, {
+      role,
+      permissions: validPermissions
+    });
+
+    console.log(`✅ Permisos por defecto actualizados para rol ${role}:`, validPermissions);
+  } catch (error) {
+    console.error('Error al actualizar permisos por defecto:', error);
     throw error;
   }
 };

@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { loginUser, resetPassword } from '@/lib/auth';
+import { loginUser } from '@/lib/auth';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -13,7 +13,6 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [resetEmailSent, setResetEmailSent] = useState(false);
   
   const { user } = useAuth();
   const router = useRouter();
@@ -52,28 +51,6 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleResetPassword = async () => {
-    if (!email) {
-      toast.error('Por favor ingresa tu email primero');
-      return;
-    }
-
-    try {
-      await resetPassword(email);
-      setResetEmailSent(true);
-      toast.success('Email de recuperación enviado');
-    } catch (error: any) {
-      let errorMessage = 'Error al enviar email de recuperación';
-      
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No existe una cuenta con este email';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Email inválido';
-      }
-      
-      toast.error(errorMessage);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-theme flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -152,21 +129,14 @@ const LoginPage: React.FC = () => {
             </div>
 
             {/* Forgot Password */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-center">
               <div className="text-sm">
-                {resetEmailSent ? (
-                  <p className="text-green-600">
-                    Email de recuperación enviado. Revisa tu bandeja de entrada.
-                  </p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleResetPassword}
-                    className="font-medium text-primary-600 hover:text-primary-500"
-                  >
-                    ¿Olvidaste tu contraseña?
-                  </button>
-                )}
+                <Link
+                  href="/forgot-password"
+                  className="font-medium text-primary-600 hover:text-primary-500"
+                >
+                  ¿Olvidaste tu contraseña?
+                </Link>
               </div>
             </div>
 

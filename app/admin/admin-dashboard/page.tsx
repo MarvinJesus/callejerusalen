@@ -15,14 +15,20 @@ import {
   Bell,
   Clock,
   FileText,
-  Activity
+  Activity,
+  Key,
+  Settings
 } from 'lucide-react';
 import { 
   getAllUsers, 
   getPendingRegistrations,
   UserProfile,
-  RegistrationRequest
+  RegistrationRequest,
+  getUserPermissions
 } from '@/lib/auth';
+import { Permission } from '@/lib/permissions';
+import PermissionManager from '@/components/PermissionManager';
+import { PermissionList } from '@/components/PermissionBadge';
 import { auth } from '@/lib/firebase';
 import { getServerLogs, getSystemMetrics, ServerLog } from '@/lib/server-logging';
 
@@ -35,35 +41,34 @@ const AdminDashboard: React.FC = () => {
   const [systemLogs, setSystemLogs] = useState<ServerLog[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline' | 'error'>('connected');
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [userPermissions, setUserPermissions] = useState<Permission[]>([]);
+
+  // Función para verificar si el usuario es super admin
+  const isSuperAdmin = () => {
+    // Verificar múltiples fuentes para determinar si es super admin
+    if (userProfile?.role === 'super_admin') return true;
+    if (userProfile?.email === 'mar90jesus@gmail.com') return true; // Email del super admin principal
+    return false;
+  };
 
   const tabs = [
     { id: 'overview', label: 'Resumen', icon: BarChart3 },
     { id: 'users', label: 'Usuarios', icon: Users },
     { id: 'registrations', label: 'Solicitudes', icon: Clock },
+    ...(isSuperAdmin() ? [{ id: 'permissions', label: 'Permisos', icon: Key }] : []),
     { id: 'security', label: 'Seguridad', icon: Shield },
   ];
 
+
   // Cargar datos al montar el componente
   useEffect(() => {
-    if (userProfile?.role === 'admin') {
+    if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || isSuperAdmin()) {
       loadDashboardData();
     }
   }, [userProfile]);
 
-  // Debug: Verificar cuando cambian las métricas
-  useEffect(() => {
-    if (metrics) {
-      console.log('🔄 Métricas actualizadas en estado:', metrics.users.total);
-    }
-  }, [metrics]);
 
-  // Debug: Verificar cuando cambian los usuarios
-  useEffect(() => {
-    console.log('🔄 Usuarios actualizados en estado:', users.length);
-    if (users.length > 0) {
-      console.log('🔄 Detalles de usuarios en estado:', users.map(u => ({ email: u.email, role: u.role, status: u.status })));
-    }
-  }, [users]);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -177,6 +182,27 @@ const AdminDashboard: React.FC = () => {
     return 'Hace unos segundos';
   };
 
+  const loadUserPermissions = async (user: UserProfile) => {
+    try {
+      const permissions = await getUserPermissions(user.uid);
+      setUserPermissions(permissions);
+      setSelectedUser(user);
+      // Cambiar automáticamente a la pestaña de permisos
+      setActiveTab('permissions');
+    } catch (error) {
+      console.error('Error al cargar permisos del usuario:', error);
+    }
+  };
+
+  const handlePermissionsUpdated = () => {
+    // Recargar datos del dashboard
+    loadDashboardData();
+    // Recargar permisos del usuario seleccionado
+    if (selectedUser) {
+      loadUserPermissions(selectedUser);
+    }
+  };
+
   // Calcular estadísticas usando las métricas del servidor (más confiables)
   const calculateStats = () => {
     // Usar métricas del servidor si están disponibles
@@ -283,187 +309,86 @@ const AdminDashboard: React.FC = () => {
     });
   };
 
-  const renderOverview = () => (
-    <div className="space-y-6">
-      {/* Header con botón de actualización */}
-      <div className="flex justify-between items-center">
+  const renderOverview = () => {
+    return (
+      <div className="space-y-6">
         <h2 className="text-xl font-semibold text-gray-900">Resumen del Sistema</h2>
-        <div className="flex space-x-2">
-          <button
-            onClick={loadDashboardData}
-            disabled={loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>{loading ? 'Actualizando...' : 'Actualizar'}</span>
-          </button>
-          
-          <button
-            onClick={async () => {
-              console.log('🔄 FORZANDO ACTUALIZACIÓN COMPLETA...');
-              setMetrics(null); // Limpiar métricas
-              setUsers([]); // Limpiar usuarios
-              await loadDashboardData(); // Recargar datos
-            }}
-            disabled={loading}
-            className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Activity className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            <span>Forzar Recarga</span>
-          </button>
-          
-          <button
-            onClick={async () => {
-              console.log('🔍 DEBUG: Verificando usuarios directamente...');
-              try {
-                // Verificar autenticación actual
-                const currentUser = auth?.currentUser;
-                console.log('🔍 DEBUG - Usuario autenticado:', currentUser?.email);
-                console.log('🔍 DEBUG - UID del usuario:', currentUser?.uid);
-                
-                // Verificar conexión directa con Firestore
-                const { db } = await import('@/lib/firebase');
-                const { collection, getDocs } = await import('firebase/firestore');
-                
-                console.log('🔍 DEBUG - Verificando conexión directa con Firestore...');
-                const directSnapshot = await getDocs(collection(db, 'users'));
-                console.log('🔍 DEBUG - Documentos encontrados directamente:', directSnapshot.size);
-                
-                const directUsers: any[] = [];
-                directSnapshot.forEach((doc) => {
-                  const data = doc.data();
-                  directUsers.push({
-                    id: doc.id,
-                    email: data.email,
-                    role: data.role,
-                    status: data.status,
-                    isActive: data.isActive
-                  });
-                  console.log('🔍 DEBUG - Documento directo:', doc.id, data);
-                });
-                
-                // Ahora usar la función getAllUsers
-                const debugUsers = await getAllUsers(true);
-                console.log('🔍 DEBUG - Usuarios encontrados por getAllUsers:', debugUsers.length);
-                console.log('🔍 DEBUG - Detalles completos:', debugUsers);
-                
-                // Mostrar información detallada
-                const userSummary = debugUsers.map(u => 
-                  `${u.email} (${u.role}) - ${u.status}`
-                ).join('\n');
-                
-                const directSummary = directUsers.map(u => 
-                  `${u.email} (${u.role}) - ${u.status}`
-                ).join('\n');
-                
-                alert(`Comparación de resultados:\n\nDirecto desde Firestore: ${directUsers.length} usuarios\n\nPor getAllUsers: ${debugUsers.length} usuarios\n\nDirecto:\n${directSummary}\n\nPor función:\n${userSummary}\n\nRevisa la consola para más información.`);
-              } catch (error) {
-                console.error('🔍 DEBUG - Error:', error);
-                const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-                alert(`Error al obtener usuarios: ${errorMessage}\nRevisa la consola para más detalles.`);
-              }
-            }}
-            className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-          >
-            <Eye className="w-4 h-4" />
-            <span>Debug</span>
-          </button>
-        </div>
-      </div>
 
-      {/* Mensaje de estado de conexión */}
-      {connectionStatus === 'error' && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <div className="flex items-center">
-            <AlertTriangle className="w-5 h-5 text-yellow-600 mr-3" />
-            <div>
-              <h3 className="text-sm font-medium text-yellow-800">Datos parciales disponibles</h3>
-              <p className="text-sm text-yellow-700 mt-1">
-                Algunos datos no pudieron cargarse debido a problemas de conectividad. 
-                Los indicadores principales están actualizados con la información disponible.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Debug: Mostrar estado actual de métricas */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-center">
-          <Activity className="w-5 h-5 text-blue-600 mr-3" />
-          <div>
-            <h3 className="text-sm font-medium text-blue-800">Estado de Datos (Debug)</h3>
-            <p className="text-sm text-blue-700 mt-1">
-              Usuarios en estado: {users.length} | 
-              Usuarios activos: {statsData.activeUsers} | 
-              Total calculado: {statsData.totalUsers} |
-              Última actualización: {new Date(statsData.lastUpdated).toLocaleTimeString()}
-            </p>
-            <p className="text-xs text-blue-600 mt-1">
-              Desglose: Super Admin: {statsData.usersByRole.super_admin}, Admin: {statsData.usersByRole.admin}, Comunidad: {statsData.usersByRole.comunidad}, Visitantes: {statsData.usersByRole.visitante}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <div key={index} className="card">
-            <div className="flex items-center justify-between mb-3">
+        {/* Mensaje de estado de conexión */}
+        {connectionStatus === 'error' && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 mr-3" />
               <div>
-                <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-              </div>
-              <div className={`p-3 rounded-full bg-gray-100`}>
-                <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                <h3 className="text-sm font-medium text-yellow-800">Datos parciales disponibles</h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Algunos datos no pudieron cargarse debido a problemas de conectividad. 
+                  Los indicadores principales están actualizados con la información disponible.
+                </p>
               </div>
             </div>
-            {stat.subtitle && (
-              <p className="text-xs text-gray-500 mt-2">{stat.subtitle}</p>
-            )}
           </div>
-        ))}
-      </div>
+        )}
 
-      {/* Recent Activities */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Actividad Reciente</h3>
-        <div className="space-y-3">
-          {getRecentActivities().map((activity, index) => (
-            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-full ${
-                  activity.type === 'user' ? 'bg-blue-100' :
-                  activity.type === 'alert' ? 'bg-red-100' :
-                  activity.type === 'security' ? 'bg-green-100' :
-                  'bg-yellow-100'
-                }`}>
-                  {activity.type === 'user' && <Users className="w-4 h-4 text-blue-600" />}
-                  {activity.type === 'alert' && <AlertTriangle className="w-4 h-4 text-red-600" />}
-                  {activity.type === 'security' && <Shield className="w-4 h-4 text-green-600" />}
-                  {activity.type === 'request' && <UserCheck className="w-4 h-4 text-yellow-600" />}
-                </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {stats.map((stat, index) => (
+            <div key={index} className="card">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">{activity.action}</p>
-                  <p className="text-xs text-gray-500">{activity.user}</p>
+                  <p className="text-sm font-medium text-gray-600">{stat.label}</p>
+                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                </div>
+                <div className={`p-3 rounded-full bg-gray-100`}>
+                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
                 </div>
               </div>
-              <span className="text-xs text-gray-500">{activity.time}</span>
+              {stat.subtitle && (
+                <p className="text-xs text-gray-500 mt-2">{stat.subtitle}</p>
+              )}
             </div>
           ))}
-          {getRecentActivities().length === 0 && (
-            <p className="text-gray-500 text-center py-4">No hay actividad reciente</p>
-          )}
+        </div>
+
+        {/* Recent Activities */}
+        <div className="card">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Actividad Reciente</h3>
+          <div className="space-y-3">
+            {getRecentActivities().map((activity, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-full ${
+                    activity.type === 'user' ? 'bg-blue-100' :
+                    activity.type === 'alert' ? 'bg-red-100' :
+                    activity.type === 'security' ? 'bg-green-100' :
+                    'bg-yellow-100'
+                  }`}>
+                    {activity.type === 'user' && <Users className="w-4 h-4 text-blue-600" />}
+                    {activity.type === 'alert' && <AlertTriangle className="w-4 h-4 text-red-600" />}
+                    {activity.type === 'security' && <Shield className="w-4 h-4 text-green-600" />}
+                    {activity.type === 'request' && <UserCheck className="w-4 h-4 text-yellow-600" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{activity.action}</p>
+                    <p className="text-xs text-gray-500">{activity.user}</p>
+                  </div>
+                </div>
+                <span className="text-xs text-gray-500">{activity.time}</span>
+              </div>
+            ))}
+            {getRecentActivities().length === 0 && (
+              <p className="text-gray-500 text-center py-4">No hay actividad reciente</p>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderUsers = () => (
-    <div className="space-y-6">
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Gestión de Usuarios (Solo Lectura)</h3>
+   const renderUsers = () => (
+     <div className="space-y-6">
+       <div className="card">
+         <h3 className="text-lg font-semibold text-gray-900 mb-4">Gestión de Usuarios (Solo Lectura)</h3>
         
         {loading ? (
           <div className="text-center py-8">
@@ -478,7 +403,9 @@ const AdminDashboard: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permisos</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Acceso</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -508,9 +435,29 @@ const AdminDashboard: React.FC = () => {
                         {user.isActive ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="max-w-xs">
+                        <PermissionList 
+                          permissions={user.permissions || []} 
+                          size="sm" 
+                          maxVisible={2}
+                        />
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {user.lastLogin ? getTimeAgo(user.lastLogin) : 'Nunca'}
                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                       {user.role === 'admin' && isSuperAdmin() && (
+                         <button
+                           onClick={() => loadUserPermissions(user)}
+                           className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                         >
+                           <Key className="w-3 h-3" />
+                           <span>Gestionar</span>
+                         </button>
+                       )}
+                     </td>
                   </tr>
                 ))}
               </tbody>
@@ -521,10 +468,10 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 
-  const renderRegistrations = () => (
-    <div className="space-y-6">
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Solicitudes de Registro (Solo Lectura)</h3>
+   const renderRegistrations = () => (
+     <div className="space-y-6">
+       <div className="card">
+         <h3 className="text-lg font-semibold text-gray-900 mb-4">Solicitudes de Registro (Solo Lectura)</h3>
         
         {loading ? (
           <div className="text-center py-8">
@@ -563,10 +510,127 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 
-  const renderSecurity = () => (
+  const renderPermissions = () => (
     <div className="space-y-6">
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitoreo de Seguridad (Solo Lectura)</h3>
+      {selectedUser ? (
+        <div className="space-y-6">
+          {/* Header con información del usuario */}
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Gestión de Permisos
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Usuario: {selectedUser.displayName} ({selectedUser.email})
+                </p>
+                <p className="text-sm text-gray-500">
+                  Rol: {selectedUser.role} | Estado: {selectedUser.isActive ? 'Activo' : 'Inactivo'}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Volver a Lista
+              </button>
+            </div>
+          </div>
+
+          {/* Gestor de permisos */}
+          <div className="card">
+            <PermissionManager
+              targetUser={selectedUser}
+              onPermissionsUpdated={handlePermissionsUpdated}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Gestión de Permisos de Usuarios
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Selecciona un usuario administrador de la lista para gestionar sus permisos específicos.
+            </p>
+
+            {/* Lista de usuarios administradores */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-900">Usuarios Administradores</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {users
+                  .filter(user => user.role === 'admin' && user.isActive)
+                  .map((user) => (
+                    <div key={user.uid} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h5 className="font-medium text-gray-900">{user.displayName}</h5>
+                          <p className="text-sm text-gray-500">{user.email}</p>
+                          <div className="mt-2">
+                            <PermissionList 
+                              permissions={user.permissions || []} 
+                              size="sm" 
+                              maxVisible={3}
+                            />
+                          </div>
+                        </div>
+                         <button
+                           onClick={() => loadUserPermissions(user)}
+                           className="flex items-center space-x-1 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                         >
+                           <Key className="w-3 h-3" />
+                           <span>Gestionar</span>
+                         </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+              
+              {users.filter(user => user.role === 'admin' && user.isActive).length === 0 && (
+                <div className="text-center py-8">
+                  <Key className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">No hay usuarios administradores activos</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Información sobre permisos */}
+          <div className="card">
+            <h4 className="font-medium text-gray-900 mb-4">Información sobre Permisos</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h5 className="font-medium text-gray-900 mb-2">Tipos de Permisos</h5>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li>• <strong>Gestión de Usuarios:</strong> Crear, editar, eliminar usuarios</li>
+                  <li>• <strong>Gestión de Roles:</strong> Asignar roles y permisos</li>
+                  <li>• <strong>Gestión de Registros:</strong> Aprobar/rechazar solicitudes</li>
+                  <li>• <strong>Seguridad:</strong> Acceso a cámaras y alertas</li>
+                  <li>• <strong>Reportes:</strong> Ver y exportar reportes</li>
+                  <li>• <strong>Logs:</strong> Ver y gestionar logs del sistema</li>
+                </ul>
+              </div>
+              <div>
+                <h5 className="font-medium text-gray-900 mb-2">Niveles de Acceso</h5>
+                <ul className="text-sm text-gray-600 space-y-1">
+                  <li>• <strong>Super Admin:</strong> Todos los permisos</li>
+                  <li>• <strong>Admin:</strong> Permisos específicos asignados</li>
+                  <li>• <strong>Comunidad:</strong> Acceso básico a funcionalidades</li>
+                  <li>• <strong>Visitante:</strong> Solo lectura de información pública</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+   const renderSecurity = () => (
+     <div className="space-y-6">
+       <div className="card">
+         <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitoreo de Seguridad (Solo Lectura)</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="p-4 bg-gray-50 rounded-lg">
             <div className="flex items-center space-x-3 mb-3">
@@ -608,7 +672,7 @@ const AdminDashboard: React.FC = () => {
   );
 
   return (
-    <ProtectedRoute allowedRoles={['admin']}>
+    <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
@@ -618,29 +682,30 @@ const AdminDashboard: React.FC = () => {
                 <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
                 <p className="text-gray-600">Administrador - Calle Jerusalén</p>
               </div>
-              <div className="flex items-center space-x-4">
-                {/* Indicador de estado de conexión */}
-                <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
-                  connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
-                  connectionStatus === 'error' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
-                  <div className={`w-2 h-2 rounded-full ${
-                    connectionStatus === 'connected' ? 'bg-green-500' :
-                    connectionStatus === 'error' ? 'bg-yellow-500' :
-                    'bg-red-500'
-                  }`}></div>
-                  <span>
-                    {connectionStatus === 'connected' ? 'Conectado' :
-                     connectionStatus === 'error' ? 'Datos parciales' :
-                     'Sin conexión'}
-                  </span>
-                </div>
-                
-                <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
-                  Administrador
-                </span>
-              </div>
+               <div className="flex items-center space-x-4">
+                 
+                 {/* Indicador de estado de conexión */}
+                 <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
+                   connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                   connectionStatus === 'error' ? 'bg-yellow-100 text-yellow-800' :
+                   'bg-red-100 text-red-800'
+                 }`}>
+                   <div className={`w-2 h-2 rounded-full ${
+                     connectionStatus === 'connected' ? 'bg-green-500' :
+                     connectionStatus === 'error' ? 'bg-yellow-500' :
+                     'bg-red-500'
+                   }`}></div>
+                   <span>
+                     {connectionStatus === 'connected' ? 'Conectado' :
+                      connectionStatus === 'error' ? 'Datos parciales' :
+                      'Sin conexión'}
+                   </span>
+                 </div>
+                 
+                 <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
+                   {userProfile?.role === 'super_admin' ? 'Super Administrador' : 'Administrador'}
+                 </span>
+               </div>
             </div>
           </div>
         </div>
@@ -670,6 +735,7 @@ const AdminDashboard: React.FC = () => {
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'users' && renderUsers()}
           {activeTab === 'registrations' && renderRegistrations()}
+          {activeTab === 'permissions' && renderPermissions()}
           {activeTab === 'security' && renderSecurity()}
         </div>
       </div>

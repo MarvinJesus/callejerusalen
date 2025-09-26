@@ -18,7 +18,7 @@ import {
   Settings,
   Crown
 } from 'lucide-react';
-import ThemeSwitcher from './ThemeSwitcher';
+import SettingsDropdown from './SettingsDropdown';
 import toast from 'react-hot-toast';
 
 const Navbar: React.FC = () => {
@@ -110,7 +110,7 @@ const Navbar: React.FC = () => {
 
                 {(userProfile?.role === 'super_admin' || userProfile?.role === 'admin') && (
                   <Link 
-                    href="/admin" 
+                    href="/admin/admin-dashboard" 
                     className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
                   >
                     <Settings className="w-4 h-4" />
@@ -166,9 +166,11 @@ const Navbar: React.FC = () => {
                   <span className="text-sm">{getRoleLabel(userProfile?.role || 'visitante')}</span>
                 </div>
 
+                {/* Configuración */}
+                <SettingsDropdown />
+
                 {/* Usuario */}
                 <div className="flex items-center space-x-4">
-                  <ThemeSwitcher />
                   <span className="text-sm text-gray-600">
                     {userProfile?.displayName || user.email}
                   </span>
@@ -183,18 +185,15 @@ const Navbar: React.FC = () => {
               </>
             ) : (
               <div className="flex items-center space-x-4">
-                <ThemeSwitcher />
+                <SettingsDropdown />
                 <Link 
                   href="/login" 
-                  className="text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                  className="group relative inline-flex items-center justify-center px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 shadow-sm hover:shadow-md"
                 >
-                  Iniciar Sesión
-                </Link>
-                <Link 
-                  href="/register" 
-                  className="btn-theme-primary"
-                >
-                  Registrarse como Residente
+                  <span className="flex items-center space-x-2">
+                    <User className="w-4 h-4" />
+                    <span>Iniciar Sesión</span>
+                  </span>
                 </Link>
               </div>
             )}
@@ -291,6 +290,16 @@ const Navbar: React.FC = () => {
                     </>
                   )}
 
+                  {(userProfile?.role === 'super_admin' || userProfile?.role === 'admin') && (
+                    <Link 
+                      href="/admin/admin-dashboard" 
+                      className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Panel de Administración
+                    </Link>
+                  )}
+
                   <div className="border-t border-gray-200 pt-2">
                     <div className="px-3 py-2 text-sm text-gray-600">
                       {userProfile?.displayName || user.email}
@@ -311,22 +320,18 @@ const Navbar: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <>
+                <div className="px-3 py-2">
                   <Link 
                     href="/login" 
-                    className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                    className="inline-flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 shadow-sm hover:shadow-md"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    Iniciar Sesión
+                    <span className="flex items-center space-x-2">
+                      <User className="w-4 h-4" />
+                      <span>Iniciar Sesión</span>
+                    </span>
                   </Link>
-                  <Link 
-                    href="/register" 
-                    className="block px-3 py-2 text-primary-600 hover:text-primary-700 transition-colors duration-200"
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Registrarse como Residente
-                  </Link>
-                </>
+                </div>
               )}
             </div>
           </div>
