@@ -25,21 +25,11 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             {!userProfile ? (
-              <>
-                <Link href="/register" className="btn-theme-primary text-lg px-8 py-3">
-                  Registrarse como Residente
-                </Link>
-                <Link href="/login" className="btn-theme-secondary text-lg px-8 py-3">
-                  Iniciar Sesión
-                </Link>
-                <button 
-                  onClick={loginAsGuest}
-                  className="btn-theme-outline text-lg px-8 py-3 flex items-center justify-center"
-                >
-                  <UserPlus className="w-5 h-5 mr-2" />
-                  Explorar como Invitado
-                </button>
-              </>
+              <div className="text-center">
+                <p className="text-lg text-gray-600 mb-4">
+                  Inicia sesión para acceder a todas las funcionalidades de la comunidad
+                </p>
+              </div>
             ) : (
               <div className="text-center">
                 <p className="text-lg text-gray-600 mb-4">
@@ -54,6 +44,16 @@ export default function HomePage() {
                   {userProfile.role === 'comunidad' && (
                     <Link href="/residentes/camaras" className="btn-theme-primary text-lg px-8 py-3">
                       Ver Cámaras
+                    </Link>
+                  )}
+                  {userProfile.role === 'admin' && (
+                    <Link href="/admin/admin-dashboard" className="btn-theme-primary text-lg px-8 py-3">
+                      Panel de Administración
+                    </Link>
+                  )}
+                  {userProfile.role === 'super_admin' && (
+                    <Link href="/admin/admin-dashboard" className="btn-theme-primary text-lg px-8 py-3">
+                      Panel de Super Administración
                     </Link>
                   )}
                   <Link href="/mapa" className="btn-theme-secondary text-lg px-8 py-3">
@@ -165,11 +165,8 @@ export default function HomePage() {
             ¿Listo para ser parte de la comunidad?
           </h2>
           <p className="text-xl text-gray-600 mb-8">
-            Únete hoy y comienza a disfrutar de todos los beneficios de nuestra plataforma comunitaria.
+            Inicia sesión para acceder a todos los beneficios de nuestra plataforma comunitaria.
           </p>
-          <Link href="/register" className="btn-theme-primary text-lg px-8 py-3">
-            Registrarse como Residente
-          </Link>
         </div>
       </section>
 

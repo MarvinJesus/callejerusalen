@@ -4,11 +4,16 @@ import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { Permission } from '@/lib/permissions';
+import { canPerformAction } from '@/lib/permissions';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: 'visitante' | 'comunidad' | 'admin' | 'super_admin';
   allowedRoles?: string[];
+  requiredPermission?: Permission;
+  requiredPermissions?: Permission[];
+  requireAllPermissions?: boolean; // true = requiere todos, false = requiere cualquiera
   fallbackPath?: string;
 }
 
@@ -16,6 +21,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRole,
   allowedRoles,
+  requiredPermission,
+  requiredPermissions,
+  requireAllPermissions = false,
   fallbackPath = '/'
 }) => {
   const { userProfile, loading } = useAuth();
@@ -44,7 +52,30 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       router.push(fallbackPath);
       return;
     }
-  }, [userProfile, loading, requiredRole, allowedRoles, fallbackPath, router]);
+
+    // Verificar permiso específico
+    if (requiredPermission && !canPerformAction(userProfile.role, userProfile.permissions || [], requiredPermission)) {
+      toast.error(`No tienes permisos para acceder a esta sección. Se requiere: ${requiredPermission}`);
+      router.push(fallbackPath);
+      return;
+    }
+
+    // Verificar múltiples permisos
+    if (requiredPermissions && requiredPermissions.length > 0) {
+      const hasRequiredPermissions = requireAllPermissions ? 
+        requiredPermissions.every(permission => canPerformAction(userProfile.role, userProfile.permissions || [], permission)) :
+        requiredPermissions.some(permission => canPerformAction(userProfile.role, userProfile.permissions || [], permission));
+
+      if (!hasRequiredPermissions) {
+        const message = requireAllPermissions ? 
+          'No tienes todos los permisos requeridos para acceder a esta sección' :
+          'No tienes ninguno de los permisos requeridos para acceder a esta sección';
+        toast.error(message);
+        router.push(fallbackPath);
+        return;
+      }
+    }
+  }, [userProfile, loading, requiredRole, allowedRoles, requiredPermission, requiredPermissions, requireAllPermissions, fallbackPath, router]);
 
   // Mostrar loading mientras se verifica la autenticación
   if (loading) {
@@ -66,6 +97,22 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (allowedRoles && !allowedRoles.includes(userProfile.role)) {
     return null;
+  }
+
+  // Verificar permiso específico
+  if (requiredPermission && !canPerformAction(userProfile.role, userProfile.permissions || [], requiredPermission)) {
+    return null;
+  }
+
+  // Verificar múltiples permisos
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    const hasRequiredPermissions = requireAllPermissions ? 
+      requiredPermissions.every(permission => canPerformAction(userProfile.role, userProfile.permissions || [], permission)) :
+      requiredPermissions.some(permission => canPerformAction(userProfile.role, userProfile.permissions || [], permission));
+
+    if (!hasRequiredPermissions) {
+      return null;
+    }
   }
 
   return <>{children}</>;

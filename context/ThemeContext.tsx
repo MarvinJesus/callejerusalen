@@ -58,8 +58,44 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } else {
         document.body.setAttribute('data-theme', 'default');
       }
+
+      // Cargar colores personalizados si existen
+      const savedColors = localStorage.getItem('callejerusalen-custom-colors');
+      if (savedColors) {
+        try {
+          const customColors = JSON.parse(savedColors);
+          applyCustomColors(customColors);
+        } catch (error) {
+          console.error('Error al cargar colores personalizados:', error);
+        }
+      }
     }
   }, []);
+
+  // Función para aplicar colores personalizados
+  const applyCustomColors = (colors: any) => {
+    if (typeof window !== 'undefined') {
+      const root = document.documentElement;
+      
+      // Aplicar colores primarios
+      Object.entries(colors.primary).forEach(([shade, color]) => {
+        root.style.setProperty(`--primary-${shade}`, color as string);
+      });
+      
+      // Aplicar colores secundarios
+      Object.entries(colors.secondary).forEach(([shade, color]) => {
+        root.style.setProperty(`--secondary-${shade}`, color as string);
+      });
+      
+      // Actualizar gradientes
+      root.style.setProperty('--gradient-primary', 
+        `linear-gradient(135deg, ${colors.primary[600]}, ${colors.secondary[600]})`);
+      root.style.setProperty('--gradient-secondary', 
+        `linear-gradient(135deg, ${colors.secondary[500]}, ${colors.primary[500]})`);
+      root.style.setProperty('--gradient-bg', 
+        `linear-gradient(135deg, ${colors.primary[50]}, ${colors.secondary[50]})`);
+    }
+  };
 
   const setTheme = (newTheme: Theme) => {
     setThemeState(newTheme);

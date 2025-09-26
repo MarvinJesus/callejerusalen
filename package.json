@@ -9,6 +9,7 @@
     "lint": "next lint",
     "init-admin": "node scripts/init-super-admin.js",
     "update-admin": "node scripts/update-user-to-super-admin.js",
+    "init-permissions": "node scripts/init-permissions.js",
     "deploy:vercel": "vercel --prod",
     "deploy:setup": "node scripts/setup-vercel-env.js",
     "deploy:windows": "powershell -ExecutionPolicy Bypass -File scripts/deploy-to-vercel.ps1",
