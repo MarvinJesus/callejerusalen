@@ -509,3 +509,4 @@ async function seedEventsAndActivities() {
 
 seedEventsAndActivities();
 
+

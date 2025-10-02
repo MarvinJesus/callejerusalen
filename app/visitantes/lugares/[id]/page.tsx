@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, MapPin, Clock, Star, Phone, Globe, Camera, Navigation } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Star, Phone, Globe, Camera, Navigation, Eye } from 'lucide-react';
 import Link from 'next/link';
+import GoogleEarthStream from '@/components/GoogleEarthStream';
 
 interface Place {
   id: string;
@@ -35,6 +36,7 @@ export default function PlaceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [showGoogleEarth, setShowGoogleEarth] = useState(false);
 
   // Función para obtener todas las imágenes del lugar
   const getAllImages = () => {
@@ -133,6 +135,9 @@ export default function PlaceDetailPage() {
       window.open(url, '_blank');
     }
   };
+
+  // URL específica de Google Earth para Calle Jerusalén
+  const googleEarthUrl = "https://earth.google.com/web/search/Calle+Jerusal%c3%a9n,+Heredia,+San+Rafael/@10.02193128,-84.07814492,1432.60522461a,0d,60y,340.69294323h,84.43871213t,0r/data=CpQBGmYSYAolMHg4ZmEwZTU2NzFiYmZhOGMxOjB4MTU2MjhmMTcyY2VmNGQ3ORk9IkuLnwskQCEEQTZ_AgVVwColQ2FsbGUgSmVydXNhbMOpbiwgSGVyZWRpYSwgU2FuIFJhZmFlbBgBIAEiJgokCbbCPZECECRAEXldvarbACRAGX7uLZJrC1XAIfxHlYazDVXAQgIIASIaChYzYVNoRlEwT25hNVVxbjBIeHFkVmdREAI6AwoBMEICCABKDQj___________8BEAA?hl=es&authuser=0";
 
   if (loading) {
     return (
@@ -380,24 +385,81 @@ export default function PlaceDetailPage() {
 
             {/* Mapa */}
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Ubicación</h2>
-              <div className="relative">
-                <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600 text-sm">Mapa interactivo</p>
-                    <p className="text-gray-500 text-xs">Lat: {place.coordinates.lat}</p>
-                    <p className="text-gray-500 text-xs">Lng: {place.coordinates.lng}</p>
-                  </div>
-                </div>
-                <div className="absolute top-2 right-2">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Ubicación</h2>
+                <div className="flex items-center space-x-2">
                   <button
-                    onClick={openInGoogleMaps}
-                    className="bg-white/90 hover:bg-white text-gray-700 px-3 py-1 rounded-md text-sm font-medium shadow-sm transition-colors"
+                    onClick={() => setShowGoogleEarth(false)}
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                      !showGoogleEarth 
+                        ? 'bg-primary-600 text-white' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
                   >
-                    Ver en Maps
+                    <MapPin className="w-4 h-4 mr-1 inline" />
+                    Mapa
+                  </button>
+                  <button
+                    onClick={() => setShowGoogleEarth(true)}
+                    className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                      showGoogleEarth 
+                        ? 'bg-primary-600 text-white' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    <Globe className="w-4 h-4 mr-1 inline" />
+                    Vista 3D
                   </button>
                 </div>
+              </div>
+              
+              <div className="relative">
+                {showGoogleEarth ? (
+                  <GoogleEarthStream
+                    url={googleEarthUrl}
+                    title={`Vista 3D de ${place.name}`}
+                    height="400px"
+                    className="rounded-lg"
+                    coordinates={place.coordinates}
+                  />
+                ) : (
+                  <>
+                    <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <div className="text-center">
+                        <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                        <p className="text-gray-600 text-sm">Mapa interactivo</p>
+                        <p className="text-gray-500 text-xs">Lat: {place.coordinates.lat}</p>
+                        <p className="text-gray-500 text-xs">Lng: {place.coordinates.lng}</p>
+                      </div>
+                    </div>
+                    <div className="absolute top-2 right-2">
+                      <button
+                        onClick={openInGoogleMaps}
+                        className="bg-white/90 hover:bg-white text-gray-700 px-3 py-1 rounded-md text-sm font-medium shadow-sm transition-colors"
+                      >
+                        Ver en Maps
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              {/* Botones de acción adicionales */}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  onClick={openInGoogleMaps}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  Abrir en Google Maps
+                </button>
+                <button
+                  onClick={openInGoogleEarth}
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  <Navigation className="w-4 h-4 mr-2" />
+                  Abrir en Google Earth
+                </button>
               </div>
             </div>
 
