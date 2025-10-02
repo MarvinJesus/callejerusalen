@@ -226,8 +226,8 @@ export async function getHistoryPageData(): Promise<HistoryPageData | null> {
       services: data.services || [],
       exploreLinks: data.exploreLinks || [],
       isActive: data.isActive !== false,
-      createdAt: data.createdAt?.toDate(),
-      updatedAt: data.updatedAt?.toDate(),
+      createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt instanceof Date ? data.createdAt : new Date()),
+      updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt instanceof Date ? data.updatedAt : new Date()),
       createdBy: data.createdBy,
       updatedBy: data.updatedBy,
     };
@@ -267,8 +267,8 @@ export async function getHistoryPageDataById(id: string): Promise<HistoryPageDat
       services: data.services || [],
       exploreLinks: data.exploreLinks || [],
       isActive: data.isActive !== false,
-      createdAt: data.createdAt?.toDate(),
-      updatedAt: data.updatedAt?.toDate(),
+      createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt instanceof Date ? data.createdAt : new Date()),
+      updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt instanceof Date ? data.updatedAt : new Date()),
       createdBy: data.createdBy,
       updatedBy: data.updatedBy,
     };
@@ -375,8 +375,8 @@ export async function getVisitorsGuideData(): Promise<VisitorsGuideData> {
       tips: data.tips || [],
       emergencyContacts: data.emergencyContacts || [],
       isActive: data.isActive !== false,
-      createdAt: data.createdAt?.toDate(),
-      updatedAt: data.updatedAt?.toDate(),
+      createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt instanceof Date ? data.createdAt : new Date()),
+      updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate() : (data.updatedAt instanceof Date ? data.updatedAt : new Date()),
     };
     
     console.log(`✅ Datos de guía de visitantes obtenidos desde Firebase: ${guideData.title}`);

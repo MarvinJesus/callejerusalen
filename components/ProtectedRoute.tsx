@@ -46,18 +46,24 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     // Verificar rol específico
     if (requiredRole && userProfile.role !== requiredRole) {
-      console.log(`ProtectedRoute: Acceso denegado. Se requiere rol: ${requiredRole}, usuario tiene: ${userProfile.role}`);
-      toast.error(`Acceso denegado. Se requiere rol: ${requiredRole}`);
-      router.push(fallbackPath);
-      return;
+      // Super admin puede acceder a cualquier rol
+      if (userProfile.role !== 'super_admin') {
+        console.log(`ProtectedRoute: Acceso denegado. Se requiere rol: ${requiredRole}, usuario tiene: ${userProfile.role}`);
+        toast.error(`Acceso denegado. Se requiere rol: ${requiredRole}`);
+        router.push(fallbackPath);
+        return;
+      }
     }
 
     // Verificar roles permitidos
     if (allowedRoles && !allowedRoles.includes(userProfile.role)) {
-      console.log(`ProtectedRoute: Acceso denegado. Roles permitidos: ${allowedRoles.join(', ')}, usuario tiene: ${userProfile.role}`);
-      toast.error('No tienes permisos para acceder a esta sección');
-      router.push(fallbackPath);
-      return;
+      // Super admin puede acceder a cualquier rol
+      if (userProfile.role !== 'super_admin') {
+        console.log(`ProtectedRoute: Acceso denegado. Roles permitidos: ${allowedRoles.join(', ')}, usuario tiene: ${userProfile.role}`);
+        toast.error('No tienes permisos para acceder a esta sección');
+        router.push(fallbackPath);
+        return;
+      }
     }
 
     // Verificar permiso específico
@@ -99,11 +105,17 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (requiredRole && userProfile.role !== requiredRole) {
-    return null;
+    // Super admin puede acceder a cualquier rol
+    if (userProfile.role !== 'super_admin') {
+      return null;
+    }
   }
 
   if (allowedRoles && !allowedRoles.includes(userProfile.role)) {
-    return null;
+    // Super admin puede acceder a cualquier rol
+    if (userProfile.role !== 'super_admin') {
+      return null;
+    }
   }
 
   // Verificar permiso específico
