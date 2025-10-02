@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -20,117 +20,111 @@ import {
   Wifi,
   ParkingCircle
 } from 'lucide-react';
+import { VisitorsGuideData } from '@/lib/history-service';
 
 const VisitorsGuidePage: React.FC = () => {
   const { user, userProfile } = useAuth();
+  const [guideData, setGuideData] = useState<VisitorsGuideData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const guideSections = [
-    {
-      title: 'Bienvenida',
-      icon: <Heart className="w-6 h-6" />,
-      content: [
-        '¡Bienvenido a Calle Jerusalén!',
-        'Somos una comunidad unida que valora la seguridad, la convivencia y el bienestar de todos.',
-        'Esta guía te ayudará a conocer mejor nuestra comunidad y aprovechar al máximo tu visita.'
-      ]
-    },
-    {
-      title: 'Información General',
-      icon: <Info className="w-6 h-6" />,
-      content: [
-        'Ubicación: Calle Jerusalén #123, Colonia Centro',
-        'Horarios de atención: Lunes a Viernes 8:00 AM - 6:00 PM',
-        'Área total: 15 hectáreas de desarrollo comunitario',
-        'Población: 150+ familias residentes'
-      ]
-    },
-    {
-      title: 'Servicios Disponibles',
-      icon: <Users className="w-6 h-6" />,
-      content: [
-        'Administración comunitaria con atención personalizada',
-        'Servicios de seguridad 24/7',
-        'Mantenimiento y limpieza de áreas comunes',
-        'WiFi gratuito en áreas públicas',
-        'Estacionamiento para visitantes'
-      ]
-    },
-    {
-      title: 'Reglas y Normas',
-      icon: <Shield className="w-6 h-6" />,
-      content: [
-        'Respeta el horario de silencio: 10:00 PM - 7:00 AM',
-        'Mantén las áreas comunes limpias',
-        'Estaciona solo en espacios designados',
-        'Los menores deben estar acompañados por un adulto',
-        'Está prohibido el consumo de alcohol en espacios públicos'
-      ]
-    },
-    {
-      title: 'Emergencias',
-      icon: <AlertTriangle className="w-6 h-6" />,
-      content: [
-        'Seguridad: +1 (555) 911-0000',
-        'Emergencias médicas: 911',
-        'Administración: +1 (555) 911-0002',
-        'Mantenimiento: +1 (555) 911-0001',
-        'Todos los números están disponibles 24/7'
-      ]
+  useEffect(() => {
+    loadGuideData();
+  }, []);
+
+  const loadGuideData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/guide');
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar datos de la guía');
+      }
+
+      const data = await response.json();
+      setGuideData(data.guideData);
+    } catch (error) {
+      console.error('Error al cargar datos de la guía:', error);
+      setError('Error al cargar la guía de visitantes');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
-  const amenities = [
-    {
-      name: 'WiFi Gratuito',
-      description: 'Conexión a internet en todas las áreas comunes',
-      icon: <Wifi className="w-6 h-6" />,
-      available: true
-    },
-    {
-      name: 'Estacionamiento',
-      description: 'Espacios designados para visitantes',
-      icon: <ParkingCircle className="w-6 h-6" />,
-      available: true
-    },
-    {
-      name: 'Áreas de Descanso',
-      description: 'Bancas y espacios sombreados',
-      icon: <Users className="w-6 h-6" />,
-      available: true
-    },
-    {
-      name: 'Baños Públicos',
-      description: 'Instalaciones sanitarias en áreas comunes',
-      icon: <MapPin className="w-6 h-6" />,
-      available: true
-    }
-  ];
+  const getIconComponent = (iconName: string) => {
+    const icons: { [key: string]: React.ReactNode } = {
+      Heart: <Heart className="w-6 h-6" />,
+      Info: <Info className="w-6 h-6" />,
+      Users: <Users className="w-6 h-6" />,
+      Shield: <Shield className="w-6 h-6" />,
+      AlertTriangle: <AlertTriangle className="w-6 h-6" />,
+      Clock: <Clock className="w-6 h-6" />,
+      Navigation: <Navigation className="w-6 h-6" />,
+      Calendar: <Calendar className="w-6 h-6" />,
+      Wifi: <Wifi className="w-6 h-6" />,
+      ParkingCircle: <ParkingCircle className="w-6 h-6" />,
+      MapPin: <MapPin className="w-6 h-6" />,
+      Phone: <Phone className="w-6 h-6" />,
+      CheckCircle: <CheckCircle className="w-6 h-6" />,
+    };
+    return icons[iconName] || <Info className="w-6 h-6" />;
+  };
 
-  const tips = [
-    {
-      title: 'Planifica tu visita',
-      description: 'Revisa los horarios de los lugares que quieres visitar',
-      icon: <Clock className="w-5 h-5" />
-    },
-    {
-      title: 'Usa el mapa interactivo',
-      description: 'Navega fácilmente por la comunidad con nuestra herramienta de mapas',
-      icon: <Navigation className="w-5 h-5" />
-    },
-    {
-      title: 'Consulta los eventos',
-      description: 'Mantente al día con las actividades comunitarias',
-      icon: <Calendar className="w-5 h-5" />
-    },
-    {
-      title: 'Respeta las normas',
-      description: 'Ayúdanos a mantener un ambiente agradable para todos',
-      icon: <Shield className="w-5 h-5" />
-    }
-  ];
+  const getIconComponentSmall = (iconName: string) => {
+    const icons: { [key: string]: React.ReactNode } = {
+      Heart: <Heart className="w-5 h-5" />,
+      Info: <Info className="w-5 h-5" />,
+      Users: <Users className="w-5 h-5" />,
+      Shield: <Shield className="w-5 h-5" />,
+      AlertTriangle: <AlertTriangle className="w-5 h-5" />,
+      Clock: <Clock className="w-5 h-5" />,
+      Navigation: <Navigation className="w-5 h-5" />,
+      Calendar: <Calendar className="w-5 h-5" />,
+      Wifi: <Wifi className="w-5 h-5" />,
+      ParkingCircle: <ParkingCircle className="w-5 h-5" />,
+      MapPin: <MapPin className="w-5 h-5" />,
+      Phone: <Phone className="w-5 h-5" />,
+      CheckCircle: <CheckCircle className="w-5 h-5" />,
+    };
+    return icons[iconName] || <Info className="w-5 h-5" />;
+  };
 
-  // Permitir acceso a todos los usuarios (incluyendo visitantes no registrados)
-  // No hay restricciones de acceso para la guía de visitantes
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-theme">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Cargando guía de visitantes...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !guideData) {
+    return (
+      <div className="min-h-screen bg-theme">
+        <Navbar />
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <div className="text-center">
+            <div className="text-red-500 mb-4">
+              <AlertTriangle className="w-16 h-16 mx-auto" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error al cargar la guía</h2>
+            <p className="text-gray-600 mb-4">{error || 'No se pudieron cargar los datos'}</p>
+            <button
+              onClick={loadGuideData}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+            >
+              Intentar de nuevo
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-theme">
@@ -140,88 +134,98 @@ const VisitorsGuidePage: React.FC = () => {
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Guía para Visitantes
+            {guideData.title}
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Todo lo que necesitas saber para disfrutar al máximo tu visita a nuestra comunidad.
+            {guideData.subtitle}
           </p>
         </div>
 
         {/* Secciones de la guía */}
-        <div className="grid lg:grid-cols-2 gap-8 mb-12">
-          {guideSections.map((section, index) => (
-            <div key={index} className="card-theme">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600">
-                  {section.icon}
+        {guideData.sections && guideData.sections.length > 0 && (
+          <div className="grid lg:grid-cols-2 gap-8 mb-12">
+            {guideData.sections.filter(section => section.isActive).map((section) => (
+              <div key={section.id} className="card-theme">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600">
+                    {getIconComponent(section.icon)}
+                  </div>
+                  <h2 className="text-2xl font-semibold text-gray-900">
+                    {section.title}
+                  </h2>
                 </div>
-                <h2 className="text-2xl font-semibold text-gray-900">
-                  {section.title}
-                </h2>
+                <ul className="space-y-2">
+                  {section.content.map((item, itemIndex) => (
+                    <li key={itemIndex} className="flex items-start space-x-2 text-gray-600">
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
-              <ul className="space-y-2">
-                {section.content.map((item, itemIndex) => (
-                  <li key={itemIndex} className="flex items-start space-x-2 text-gray-600">
-                    <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Comodidades */}
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-8">
-            Comodidades Disponibles
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {amenities.map((amenity, index) => (
-              <div key={index} className="card-theme text-center">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
-                  {amenity.icon}
+        {guideData.amenities && guideData.amenities.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-8">
+              Comodidades Disponibles
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {guideData.amenities.filter(amenity => amenity.isActive).map((amenity) => (
+                <div key={amenity.id} className="card-theme text-center">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-green-600">
+                    {getIconComponent(amenity.icon)}
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {amenity.name}
+                  </h3>
+                  <p className="text-gray-600 text-sm mb-3">
+                    {amenity.description}
+                  </p>
+                  <div className={`flex items-center justify-center space-x-1 ${
+                    amenity.available ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    <CheckCircle className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {amenity.available ? 'Disponible' : 'No disponible'}
+                    </span>
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {amenity.name}
-                </h3>
-                <p className="text-gray-600 text-sm mb-3">
-                  {amenity.description}
-                </p>
-                <div className="flex items-center justify-center space-x-1 text-green-600">
-                  <CheckCircle className="w-4 h-4" />
-                  <span className="text-sm font-medium">Disponible</span>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Consejos útiles */}
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-8">
-            Consejos Útiles
-          </h2>
-          <div className="grid md:grid-cols-2 gap-6">
-            {tips.map((tip, index) => (
-              <div key={index} className="card-theme">
-                <div className="flex items-start space-x-4">
-                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 flex-shrink-0">
-                    {tip.icon}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                      {tip.title}
-                    </h3>
-                    <p className="text-gray-600">
-                      {tip.description}
-                    </p>
+        {guideData.tips && guideData.tips.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-3xl font-bold text-center text-gray-900 mb-8">
+              Consejos Útiles
+            </h2>
+            <div className="grid md:grid-cols-2 gap-6">
+              {guideData.tips.filter(tip => tip.isActive).map((tip) => (
+                <div key={tip.id} className="card-theme">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 flex-shrink-0">
+                      {getIconComponentSmall(tip.icon)}
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {tip.title}
+                      </h3>
+                      <p className="text-gray-600">
+                        {tip.description}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Enlaces rápidos */}
         <div className="card-theme">
@@ -261,29 +265,31 @@ const VisitorsGuidePage: React.FC = () => {
         </div>
 
         {/* Información de contacto de emergencia */}
-        <div className="mt-12 card-theme bg-red-50 border-red-200">
-          <div className="flex items-center space-x-3 mb-4">
-            <AlertTriangle className="w-8 h-8 text-red-600" />
-            <h3 className="text-2xl font-semibold text-red-900">
-              Contacto de Emergencia
-            </h3>
-          </div>
-          <p className="text-red-800 mb-4">
-            En caso de emergencia, contacta inmediatamente a:
-          </p>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg p-4">
-              <h4 className="font-semibold text-gray-900 mb-2">Seguridad</h4>
-              <p className="text-2xl font-bold text-red-600">+1 (555) 911-0000</p>
-              <p className="text-sm text-gray-600">Disponible 24/7</p>
+        {guideData.emergencyContacts && guideData.emergencyContacts.length > 0 && (
+          <div className="mt-12 card-theme bg-red-50 border-red-200">
+            <div className="flex items-center space-x-3 mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+              <h3 className="text-2xl font-semibold text-red-900">
+                Contacto de Emergencia
+              </h3>
             </div>
-            <div className="bg-white rounded-lg p-4">
-              <h4 className="font-semibold text-gray-900 mb-2">Administración</h4>
-              <p className="text-2xl font-bold text-red-600">+1 (555) 911-0002</p>
-              <p className="text-sm text-gray-600">Lunes a Viernes 8:00 AM - 6:00 PM</p>
+            <p className="text-red-800 mb-4">
+              En caso de emergencia, contacta inmediatamente a:
+            </p>
+            <div className="grid md:grid-cols-2 gap-4">
+              {guideData.emergencyContacts.filter(contact => contact.isActive).map((contact) => (
+                <div key={contact.id} className="bg-white rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-900 mb-2">{contact.name}</h4>
+                  <p className="text-2xl font-bold text-red-600">{contact.phone}</p>
+                  <p className="text-sm text-gray-600">{contact.availableHours}</p>
+                  {contact.description && (
+                    <p className="text-sm text-gray-500 mt-1">{contact.description}</p>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

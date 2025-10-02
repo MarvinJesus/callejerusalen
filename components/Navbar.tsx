@@ -16,7 +16,8 @@ import {
   Phone,
   AlertTriangle,
   Settings,
-  Crown
+  Crown,
+  BookOpen
 } from 'lucide-react';
 import SettingsDropdown from './SettingsDropdown';
 import toast from 'react-hot-toast';
@@ -82,7 +83,7 @@ const Navbar: React.FC = () => {
           <div className="hidden md:flex items-center space-x-8">
             <Link 
               href="/" 
-              className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+              className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1 font-medium"
             >
               <Home className="w-4 h-4" />
               <span>Inicio</span>
@@ -109,13 +110,36 @@ const Navbar: React.FC = () => {
                 )}
 
                 {(userProfile?.role === 'super_admin' || userProfile?.role === 'admin') && (
-                  <Link 
-                    href="/admin/admin-dashboard" 
-                    className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
-                  >
-                    <Settings className="w-4 h-4" />
-                    <span>Admin</span>
-                  </Link>
+                  <>
+                    <Link 
+                      href="/admin/admin-dashboard" 
+                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+                    >
+                      <Settings className="w-4 h-4" />
+                      <span>Admin</span>
+                    </Link>
+                    <Link 
+                      href="/admin/places" 
+                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+                    >
+                      <MapPin className="w-4 h-4" />
+                      <span>Lugares</span>
+                    </Link>
+                    <Link 
+                      href="/admin/history" 
+                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+                    >
+                      <BookOpen className="w-4 h-4" />
+                      <span>Historia</span>
+                    </Link>
+                    <Link 
+                      href="/visitantes" 
+                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+                    >
+                      <Eye className="w-4 h-4" />
+                      <span>Vista Visitante</span>
+                    </Link>
+                  </>
                 )}
 
                 {userProfile?.role === 'visitante' && (
@@ -184,18 +208,53 @@ const Navbar: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="flex items-center space-x-4">
-                <SettingsDropdown />
+              <>
+                {/* Enlaces para visitantes no autenticados */}
                 <Link 
-                  href="/login" 
-                  className="group relative inline-flex items-center justify-center px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                  href="/visitantes" 
+                  className="text-gray-700 hover:text-primary-600 transition-colors duration-200"
                 >
-                  <span className="flex items-center space-x-2">
-                    <User className="w-4 h-4" />
-                    <span>Iniciar Sesión</span>
-                  </span>
+                  Para Visitantes
                 </Link>
-              </div>
+                <Link 
+                  href="/visitantes/lugares" 
+                  className="text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                >
+                  Lugares
+                </Link>
+                <Link 
+                  href="/visitantes/servicios" 
+                  className="text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                >
+                  Servicios
+                </Link>
+                <Link 
+                  href="/visitantes/eventos" 
+                  className="text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                >
+                  Eventos
+                </Link>
+                <Link 
+                  href="/visitantes/contacto" 
+                  className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span>Contacto</span>
+                </Link>
+                
+                <div className="flex items-center space-x-4">
+                  <SettingsDropdown />
+                  <Link 
+                    href="/login" 
+                    className="group relative inline-flex items-center justify-center px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    <span className="flex items-center space-x-2">
+                      <User className="w-4 h-4" />
+                      <span>Iniciar Sesión</span>
+                    </span>
+                  </Link>
+                </div>
+              </>
             )}
           </div>
 
@@ -291,13 +350,36 @@ const Navbar: React.FC = () => {
                   )}
 
                   {(userProfile?.role === 'super_admin' || userProfile?.role === 'admin') && (
-                    <Link 
-                      href="/admin/admin-dashboard" 
-                      className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Panel de Administración
-                    </Link>
+                    <>
+                      <Link 
+                        href="/admin/admin-dashboard" 
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        Panel de Administración
+                      </Link>
+                      <Link 
+                        href="/admin/places" 
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        Gestión de Lugares
+                      </Link>
+                      <Link 
+                        href="/admin/history" 
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        Gestión de Historia
+                      </Link>
+                      <Link 
+                        href="/visitantes" 
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        Vista Visitante
+                      </Link>
+                    </>
                   )}
 
                   <div className="border-t border-gray-200 pt-2">
@@ -320,18 +402,57 @@ const Navbar: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="px-3 py-2">
+                <>
+                  {/* Enlaces para visitantes no autenticados en móvil */}
                   <Link 
-                    href="/login" 
-                    className="inline-flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                    href="/visitantes" 
+                    className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <span className="flex items-center space-x-2">
-                      <User className="w-4 h-4" />
-                      <span>Iniciar Sesión</span>
-                    </span>
+                    Para Visitantes
                   </Link>
-                </div>
+                  <Link 
+                    href="/visitantes/lugares" 
+                    className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Lugares
+                  </Link>
+                  <Link 
+                    href="/visitantes/servicios" 
+                    className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Servicios
+                  </Link>
+                  <Link 
+                    href="/visitantes/eventos" 
+                    className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Eventos
+                  </Link>
+                  <Link 
+                    href="/visitantes/contacto" 
+                    className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Contacto
+                  </Link>
+                  
+                  <div className="border-t border-gray-200 pt-2 px-3 py-2">
+                    <Link 
+                      href="/login" 
+                      className="inline-flex items-center justify-center w-full px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 shadow-sm hover:shadow-md"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <span className="flex items-center space-x-2">
+                        <User className="w-4 h-4" />
+                        <span>Iniciar Sesión</span>
+                      </span>
+                    </Link>
+                  </div>
+                </>
               )}
             </div>
           </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import UserMenu from '@/components/UserMenu';
 import { useAuth } from '@/context/AuthContext';
 import { 
   Users, 
@@ -683,6 +684,8 @@ const AdminDashboard: React.FC = () => {
                 <p className="text-gray-600">Administrador - Calle Jerusalén</p>
               </div>
                <div className="flex items-center space-x-4">
+                 {/* User Menu */}
+                 <UserMenu />
                  
                  {/* Indicador de estado de conexión */}
                  <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${

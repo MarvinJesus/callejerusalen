@@ -12,6 +12,7 @@ export const metadata: Metadata = {
   title: 'Calle Jerusalén - Comunidad Digital',
   description: 'Plataforma comunitaria para residentes y visitantes de Calle Jerusalén',
   keywords: 'comunidad, seguridad, servicios, lugares, Calle Jerusalén',
+  viewport: 'width=device-width, initial-scale=1',
 };
 
 export default function RootLayout({

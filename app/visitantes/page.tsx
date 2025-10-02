@@ -16,7 +16,14 @@ import {
   Shield,
   Calendar,
   Navigation,
-  Info
+  Info,
+  Camera,
+  TreePine,
+  Store,
+  Mountain,
+  BookOpen,
+  Eye,
+  Compass
 } from 'lucide-react';
 
 const VisitorsHomePage: React.FC = () => {
@@ -25,62 +32,76 @@ const VisitorsHomePage: React.FC = () => {
   const quickActions = [
     {
       title: 'Explorar Lugares',
-      description: 'Descubre parques, instalaciones deportivas y espacios culturales',
+      description: 'Descubre parques, miradores, pulperías y espacios únicos de Calle Jerusalén',
       icon: <MapPin className="w-8 h-8" />,
       href: '/visitantes/lugares',
       color: 'bg-blue-500'
     },
     {
+      title: 'Historia y Cultura',
+      description: 'Conoce la rica historia y tradiciones de nuestra comunidad',
+      icon: <BookOpen className="w-8 h-8" />,
+      href: '/visitantes/historia',
+      color: 'bg-amber-500'
+    },
+    {
       title: 'Servicios Locales',
-      description: 'Encuentra restaurantes, tiendas, transporte y servicios esenciales',
-      icon: <Users className="w-8 h-8" />,
+      description: 'Encuentra pulperías, restaurantes, transporte y servicios esenciales',
+      icon: <Store className="w-8 h-8" />,
       href: '/visitantes/servicios',
       color: 'bg-green-500'
     },
     {
-      title: 'Eventos Comunitarios',
-      description: 'Descubre y participa en eventos organizados por la comunidad',
+      title: 'Eventos y Actividades',
+      description: 'Participa en eventos comunitarios y actividades culturales',
       icon: <Calendar className="w-8 h-8" />,
       href: '/visitantes/eventos',
       color: 'bg-orange-500'
+    },
+    {
+      title: 'Guía del Visitante',
+      description: 'Todo lo que necesitas saber para tu visita a Calle Jerusalén',
+      icon: <Compass className="w-8 h-8" />,
+      href: '/visitantes/guia',
+      color: 'bg-purple-500'
     },
     {
       title: 'Contacto',
       description: 'Ponte en contacto con la administración comunitaria',
       icon: <Phone className="w-8 h-8" />,
       href: '/visitantes/contacto',
-      color: 'bg-purple-500'
+      color: 'bg-red-500'
     }
   ];
 
   const communityStats = [
-    { label: 'Lugares de Recreación', value: '25+', icon: <MapPin className="w-5 h-5" /> },
-    { label: 'Servicios Locales', value: '50+', icon: <Users className="w-5 h-5" /> },
-    { label: 'Miembros Activos', value: '150+', icon: <Heart className="w-5 h-5" /> },
-    { label: 'Cámaras de Seguridad', value: '12', icon: <Shield className="w-5 h-5" /> }
+    { label: 'Lugares de Interés', value: '15+', icon: <MapPin className="w-5 h-5" /> },
+    { label: 'Pulperías y Tiendas', value: '8+', icon: <Store className="w-5 h-5" /> },
+    { label: 'Miradores Naturales', value: '5+', icon: <Mountain className="w-5 h-5" /> },
+    { label: 'Zonas Verdes', value: '12+', icon: <TreePine className="w-5 h-5" /> }
   ];
 
   const upcomingEvents = [
     {
-      title: 'Feria Comunitaria',
+      title: 'Feria Artesanal de Calle Jerusalén',
       date: '15 de Marzo',
       time: '10:00 AM',
-      location: 'Parque Central',
+      location: 'Plaza Central',
       type: 'evento'
     },
     {
-      title: 'Mantenimiento Programado',
+      title: 'Tour Histórico Guiado',
       date: '20 de Marzo',
-      time: '8:00 AM',
-      location: 'Área Común',
-      type: 'mantenimiento'
+      time: '2:00 PM',
+      location: 'Punto de Encuentro: Mirador Principal',
+      type: 'turismo'
     },
     {
-      title: 'Reunión de Vecinos',
+      title: 'Noche de Cuentos Tradicionales',
       date: '25 de Marzo',
       time: '7:00 PM',
-      location: 'Salón Comunitario',
-      type: 'reunion'
+      location: 'Casa Cultural',
+      type: 'cultural'
     }
   ];
 
@@ -93,23 +114,14 @@ const VisitorsHomePage: React.FC = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-              Bienvenido a{' '}
+              Descubre{' '}
               <span className="text-primary-600">Calle Jerusalén</span>
             </h1>
             <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-              Tu guía completa para descubrir y disfrutar de todo lo que nuestra comunidad tiene para ofrecer.
+              Una comunidad llena de historia, tradición y belleza natural. Explora nuestros miradores, 
+              conoce nuestras pulperías tradicionales y sumérgete en la cultura local.
             </p>
             
-            {!user && (
-              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-                <Link href="/register" className="btn-theme-primary text-lg px-8 py-3">
-                  Registrarse como Residente
-                </Link>
-                <Link href="/login" className="btn-theme-secondary text-lg px-8 py-3">
-                  Iniciar Sesión
-                </Link>
-              </div>
-            )}
           </div>
 
           {/* Estadísticas de la comunidad */}
@@ -134,7 +146,7 @@ const VisitorsHomePage: React.FC = () => {
             ¿Qué te gustaría hacer?
           </h2>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {quickActions.map((action, index) => (
               <Link
                 key={index}
@@ -191,11 +203,11 @@ const VisitorsHomePage: React.FC = () => {
                     <div className="mt-3">
                       <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
                         event.type === 'evento' ? 'bg-blue-100 text-blue-800' :
-                        event.type === 'mantenimiento' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
+                        event.type === 'turismo' ? 'bg-green-100 text-green-800' :
+                        'bg-purple-100 text-purple-800'
                       }`}>
                         {event.type === 'evento' ? 'Evento' :
-                         event.type === 'mantenimiento' ? 'Mantenimiento' : 'Reunión'}
+                         event.type === 'turismo' ? 'Tour' : 'Cultural'}
                       </span>
                     </div>
                   </div>
@@ -289,14 +301,14 @@ const VisitorsHomePage: React.FC = () => {
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-primary-600">
         <div className="max-w-4xl mx-auto text-center text-white">
           <h2 className="text-3xl font-bold mb-6">
-            ¿Te gustaría ser parte de nuestra comunidad?
+            ¡Explora Calle Jerusalén!
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Regístrate como residente para acceder a todas las funcionalidades de seguridad y gestión comunitaria.
+            Descubre todos los lugares únicos, servicios locales y eventos que nuestra comunidad tiene para ofrecer.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
-              Registrarse como Residente
+            <Link href="/visitantes/lugares" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
+              Explorar Lugares
             </Link>
             <Link href="/visitantes/contacto" className="border-2 border-white text-white hover:bg-white hover:text-primary-600 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
               Más Información
