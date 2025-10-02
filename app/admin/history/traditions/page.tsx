@@ -728,3 +728,4 @@ const AdminTraditionsPage: React.FC = () => {
 
 export default AdminTraditionsPage;
 
+

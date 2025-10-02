@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import InteractiveMap from '@/components/InteractiveMap';
+import GoogleEarthStream from '@/components/GoogleEarthStream';
 import { useAuth } from '@/context/AuthContext';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { MapPin, Clock, Star, Search, Filter, Eye, Navigation } from 'lucide-react';
+import { MapPin, Clock, Star, Search, Filter, Eye, Navigation, Globe } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -34,6 +35,7 @@ const PlacesPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showMap, setShowMap] = useState(false);
+  const [showGoogleEarth, setShowGoogleEarth] = useState(false);
 
   const categories = [
     { value: 'all', label: 'Todos' },
@@ -183,6 +185,9 @@ const PlacesPage: React.FC = () => {
     setFilteredPlaces(filtered);
   }, [places, searchTerm, selectedCategory]);
 
+  // URL específica de Google Earth para Calle Jerusalén
+  const googleEarthUrl = "https://earth.google.com/web/search/Calle+Jerusal%c3%a9n,+Heredia,+San+Rafael/@10.02193128,-84.07814492,1432.60522461a,0d,60y,340.69294323h,84.43871213t,0r/data=CpQBGmYSYAolMHg4ZmEwZTU2NzFiYmZhOGMxOjB4MTU2MjhmMTcyY2VmNGQ3ORk9IkuLnwskQCEEQTZ_AgVVwColQ2FsbGUgSmVydXNhbMOpbiwgSGVyZWRpYSwgU2FuIFJhZmFlbBgBIAEiJgokCbbCPZECECRAEXldvarbACRAGX7uLZJrC1XAIfxHlYazDVXAQgIIASIaChYzYVNoRlEwT25hNVVxbjBIeHFkVmdREAI6AwoBMEICCABKDQj___________8BEAA?hl=es&authuser=0";
+
   // Permitir acceso a todos los usuarios (incluyendo visitantes no registrados)
   // No hay restricciones de acceso para la página de lugares
 
@@ -237,14 +242,34 @@ const PlacesPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Botón para mostrar/ocultar mapa */}
-            <button
-              onClick={() => setShowMap(!showMap)}
-              className="btn-theme-secondary flex items-center space-x-2"
-            >
-              {showMap ? <Eye className="w-4 h-4" /> : <Navigation className="w-4 h-4" />}
-              <span>{showMap ? 'Ocultar Mapa' : 'Ver Mapa'}</span>
-            </button>
+            {/* Botones para mostrar/ocultar mapas */}
+            <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  setShowMap(!showMap);
+                  setShowGoogleEarth(false);
+                }}
+                className={`btn-theme-secondary flex items-center space-x-2 ${
+                  showMap && !showGoogleEarth ? 'bg-primary-600 text-white' : ''
+                }`}
+              >
+                {showMap && !showGoogleEarth ? <Eye className="w-4 h-4" /> : <Navigation className="w-4 h-4" />}
+                <span>{showMap && !showGoogleEarth ? 'Ocultar Mapa' : 'Ver Mapa'}</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setShowGoogleEarth(!showGoogleEarth);
+                  setShowMap(false);
+                }}
+                className={`btn-theme-secondary flex items-center space-x-2 ${
+                  showGoogleEarth ? 'bg-primary-600 text-white' : ''
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                <span>{showGoogleEarth ? 'Ocultar Vista 3D' : 'Vista 3D'}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -255,6 +280,18 @@ const PlacesPage: React.FC = () => {
               places={filteredPlaces}
               selectedPlace={selectedPlace}
               onPlaceSelect={setSelectedPlace}
+            />
+          </div>
+        )}
+
+        {/* Vista 3D de Google Earth */}
+        {showGoogleEarth && (
+          <div className="card-theme mb-8">
+            <GoogleEarthStream
+              url={googleEarthUrl}
+              title="Vista 3D de Calle Jerusalén"
+              height="500px"
+              coordinates={{ lat: 10.02193128, lng: -84.07814492 }}
             />
           </div>
         )}
