@@ -1,5 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Configuración de headers para UTF-8
+  async headers() {
+    return [
+      {
+        source: '/((?!.*\\.).*)',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'text/html; charset=utf-8',
+          },
+        ],
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import UserMenu from '@/components/UserMenu';
 import { useAuth } from '@/context/AuthContext';
 import { 
   Users, 
@@ -23,6 +24,7 @@ import {
   FileText,
   Activity
 } from 'lucide-react';
+import Link from 'next/link';
 import { 
   getAllUsers, 
   createUserAsAdmin, 
@@ -828,9 +830,17 @@ const AdminDashboard: React.FC = () => {
               <p className="text-gray-600">Super Administrador - Calle Jerusalén</p>
             </div>
             <div className="flex items-center space-x-4">
+              <Link
+                href="/admin/permissions"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Gestión de Permisos
+              </Link>
               <span className="px-3 py-1 bg-red-100 text-red-800 text-sm font-medium rounded-full">
                 Super Admin
               </span>
+              <UserMenu />
             </div>
           </div>
         </div>

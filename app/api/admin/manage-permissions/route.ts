@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { adminAuth, db } from '@/lib/firebase-admin';
 import { Permission, validatePermissions } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const decodedToken = await adminAuth.verifyIdToken(token);
     
     // Verificar que el usuario sea super admin
-    const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
     if (!userDoc.exists) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
     }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     const validPermissions = validatePermissions(permissions);
 
     // Obtener información del usuario objetivo
-    const targetUserDoc = await adminDb.collection('users').doc(targetUserId).get();
+    const targetUserDoc = await db.collection('users').doc(targetUserId).get();
     if (!targetUserDoc.exists) {
       return NextResponse.json({ error: 'Usuario objetivo no encontrado' }, { status: 404 });
     }
@@ -64,13 +64,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Actualizar permisos en la base de datos
-    await adminDb.collection('users').doc(targetUserId).update({
+    await db.collection('users').doc(targetUserId).update({
       permissions: updatedPermissions,
       updatedAt: new Date()
     });
 
     // Log de la acción
-    await adminDb.collection('systemLogs').add({
+    await db.collection('systemLogs').add({
       action: `permissions_${action}`,
       userId: decodedToken.uid,
       userEmail: userData.email,
@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     const decodedToken = await adminAuth.verifyIdToken(token);
     
     // Verificar que el usuario sea super admin
-    const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
+    const userDoc = await db.collection('users').doc(decodedToken.uid).get();
     if (!userDoc.exists) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
     }
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Obtener permisos del usuario objetivo
-    const targetUserDoc = await adminDb.collection('users').doc(targetUserId).get();
+    const targetUserDoc = await db.collection('users').doc(targetUserId).get();
     if (!targetUserDoc.exists) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
     }

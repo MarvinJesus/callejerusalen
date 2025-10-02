@@ -1,347 +1,753 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Navbar from '@/components/Navbar';
+import { Calendar, ArrowLeft, Search, Filter, Clock, MapPin, Users, Star, Share2, Navigation, CheckCircle } from 'lucide-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { Calendar, Clock, MapPin, Users, Filter, Search } from 'lucide-react';
 
-interface Event {
-  id: string;
+interface CommunityEvent {
+  id?: string;
   title: string;
   description: string;
   date: string;
   time: string;
   location: string;
   category: string;
-  maxAttendees: number;
-  currentAttendees: number;
-  image: string;
-  isRecurring: boolean;
+  type: string;
   organizer: string;
+  contact: string;
+  image: string;
+  maxParticipants?: number;
+  requirements: string[];
+  highlights: string[];
+  isRecurring: boolean;
+  recurringPattern?: string;
+  order: number;
+}
+
+interface HistoryPageData {
+  id?: string;
+  title: string;
+  subtitle: string;
+  periods: any[];
+  traditions: any[];
+  places: any[];
+  events: CommunityEvent[];
+  gallery: any[];
+  exploreLinks: any[];
+  isActive: boolean;
 }
 
 const EventsPage: React.FC = () => {
-  const { user, userProfile } = useAuth();
-  const [events, setEvents] = useState<Event[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const router = useRouter();
+  const { user } = useAuth();
+  const [historyData, setHistoryData] = useState<HistoryPageData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedType, setSelectedType] = useState('');
+  const [showUpcoming, setShowUpcoming] = useState(true);
+  const [userRegistrations, setUserRegistrations] = useState<any[]>([]);
+  const [eventStats, setEventStats] = useState<{[key: string]: any}>({});
 
   const categories = [
-    { value: 'all', label: 'Todos' },
-    { value: 'social', label: 'Social' },
-    { value: 'deportivo', label: 'Deportivo' },
-    { value: 'cultural', label: 'Cultural' },
-    { value: 'educativo', label: 'Educativo' },
-    { value: 'recreativo', label: 'Recreativo' }
+    'Cultural',
+    'Deportivo',
+    'Religioso',
+    'Educativo',
+    'Social',
+    'Benéfico',
+    'Recreativo',
+    'Tradicional',
+    'Comunitario',
+    'Otros'
   ];
 
-  // Datos de ejemplo para eventos
-  const sampleEvents: Event[] = [
-    {
-      id: '1',
-      title: 'Feria Comunitaria Primaveral',
-      description: 'Gran feria con stands de comida, artesanías locales y actividades para toda la familia.',
-      date: '2024-03-15',
-      time: '10:00 AM - 6:00 PM',
-      location: 'Parque Central',
-      category: 'social',
-      maxAttendees: 500,
-      currentAttendees: 245,
-      image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=400',
-      isRecurring: false,
-      organizer: 'Comité de Eventos'
-    },
-    {
-      id: '2',
-      title: 'Torneo de Fútbol Comunitario',
-      description: 'Torneo de fútbol 7 para todas las edades. Inscripciones abiertas.',
-      date: '2024-03-20',
-      time: '8:00 AM - 5:00 PM',
-      location: 'Cancha de Fútbol',
-      category: 'deportivo',
-      maxAttendees: 80,
-      currentAttendees: 32,
-      image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400',
-      isRecurring: false,
-      organizer: 'Club Deportivo Local'
-    },
-    {
-      id: '3',
-      title: 'Noche de Cine al Aire Libre',
-      description: 'Proyección de película familiar en el parque. Trae tu manta y disfruta.',
-      date: '2024-03-25',
-      time: '7:30 PM - 10:00 PM',
-      location: 'Parque Central',
-      category: 'recreativo',
-      maxAttendees: 200,
-      currentAttendees: 89,
-      image: 'https://images.unsplash.com/photo-1489599856878-46f6b2b5c6e9?w=400',
-      isRecurring: true,
-      organizer: 'Cine Club Comunitario'
-    },
-    {
-      id: '4',
-      title: 'Taller de Jardinería',
-      description: 'Aprende técnicas básicas de jardinería y cuidado de plantas.',
-      date: '2024-03-28',
-      time: '2:00 PM - 4:00 PM',
-      location: 'Jardín Botánico',
-      category: 'educativo',
-      maxAttendees: 25,
-      currentAttendees: 18,
-      image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400',
-      isRecurring: false,
-      organizer: 'Grupo Ecológico'
-    },
-    {
-      id: '5',
-      title: 'Concierto de Música Local',
-      description: 'Presentación de bandas locales con diferentes géneros musicales.',
-      date: '2024-04-05',
-      time: '6:00 PM - 9:00 PM',
-      location: 'Plaza Cultural',
-      category: 'cultural',
-      maxAttendees: 150,
-      currentAttendees: 67,
-      image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400',
-      isRecurring: false,
-      organizer: 'Asociación Musical'
-    }
+  const eventTypes = [
+    'Evento Único',
+    'Evento Recurrente',
+    'Taller',
+    'Conferencia',
+    'Festival',
+    'Competencia',
+    'Celebración',
+    'Reunión',
+    'Actividad',
+    'Otros'
   ];
 
   useEffect(() => {
-    // Simular carga de datos
-    setTimeout(() => {
-      setEvents(sampleEvents);
-      setFilteredEvents(sampleEvents);
-      setLoading(false);
-    }, 1000);
+    loadHistoryData();
   }, []);
 
   useEffect(() => {
-    let filtered = events;
-
-    // Filtrar por categoría
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter(event => event.category === selectedCategory);
+    if (historyData?.events) {
+      loadUserRegistrations();
+      loadEventStats();
     }
+  }, [historyData]);
 
-    // Filtrar por término de búsqueda
-    if (searchTerm) {
-      filtered = filtered.filter(event =>
-        event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        event.organizer.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  const loadHistoryData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch('/api/history');
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar datos de historia');
+      }
+
+      const data = await response.json();
+      setHistoryData(data.historyData);
+    } catch (error) {
+      console.error('Error al cargar datos de historia:', error);
+      setError('Error al cargar datos de historia');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setFilteredEvents(filtered);
-  }, [events, searchTerm, selectedCategory]);
+  const loadUserRegistrations = async () => {
+    if (!user) {
+      setUserRegistrations([]);
+      return;
+    }
+    
+    try {
+      // Usar el ID real del usuario autenticado
+      const userId = user.uid;
+      
+      // Obtener inscripciones reales del usuario
+      const response = await fetch(`/api/events/user/${userId}/registrations`);
+      if (response.ok) {
+        const data = await response.json();
+        setUserRegistrations(data.registrations || []);
+      } else {
+        console.error('Error al cargar inscripciones del usuario:', response.statusText);
+        setUserRegistrations([]);
+      }
+    } catch (error) {
+      console.error('Error al cargar inscripciones del usuario:', error);
+      setUserRegistrations([]);
+    }
+  };
 
-  // Permitir acceso a todos los usuarios (incluyendo visitantes no registrados)
-  // No hay restricciones de acceso para la página de eventos
+  const loadEventStats = async () => {
+    try {
+      const stats: {[key: string]: any} = {};
+      
+      // Cargar estadísticas reales para cada evento
+      for (let i = 0; i < (historyData?.events.length || 0); i++) {
+        try {
+          const response = await fetch(`/api/events/${i}/stats`);
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`📊 Estadísticas del evento ${i}:`, data);
+            // La API devuelve las estadísticas directamente, no anidadas bajo 'stats'
+            stats[i] = data;
+          } else {
+            // Si no hay estadísticas, usar valores por defecto
+            stats[i] = {
+              confirmedRegistrations: 0,
+              totalRegistrations: 0
+            };
+          }
+        } catch (error) {
+          // En caso de error, usar valores por defecto
+          stats[i] = {
+            confirmedRegistrations: 0,
+            totalRegistrations: 0
+          };
+        }
+      }
+      
+      setEventStats(stats);
+    } catch (error) {
+      console.error('Error al cargar estadísticas de eventos:', error);
+    }
+  };
+
+  const isUserRegistered = (eventIndex: string) => {
+    return userRegistrations.some(reg => reg.eventId === eventIndex && reg.status === 'confirmed');
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'Cultural':
+        return '🎭';
+      case 'Deportivo':
+        return '⚽';
+      case 'Religioso':
+        return '⛪';
+      case 'Educativo':
+        return '📚';
+      case 'Social':
+        return '👥';
+      case 'Benéfico':
+        return '❤️';
+      case 'Recreativo':
+        return '🎮';
+      case 'Tradicional':
+        return '🏛️';
+      case 'Comunitario':
+        return '🏘️';
+      default:
+        return '📅';
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'Evento Único':
+        return 'bg-blue-100 text-blue-800';
+      case 'Evento Recurrente':
+        return 'bg-green-100 text-green-800';
+      case 'Taller':
+        return 'bg-purple-100 text-purple-800';
+      case 'Conferencia':
+        return 'bg-orange-100 text-orange-800';
+      case 'Festival':
+        return 'bg-pink-100 text-pink-800';
+      case 'Competencia':
+        return 'bg-red-100 text-red-800';
+      case 'Celebración':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'Reunión':
+        return 'bg-gray-100 text-gray-800';
+      case 'Actividad':
+        return 'bg-indigo-100 text-indigo-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    try {
     const date = new Date(dateString);
     return date.toLocaleDateString('es-ES', {
-      weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
+    } catch {
+      return dateString;
+    }
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors: { [key: string]: string } = {
-      social: 'bg-blue-100 text-blue-800',
-      deportivo: 'bg-green-100 text-green-800',
-      cultural: 'bg-purple-100 text-purple-800',
-      educativo: 'bg-yellow-100 text-yellow-800',
-      recreativo: 'bg-pink-100 text-pink-800'
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800';
+  const isUpcoming = (dateString: string) => {
+    if (!dateString) return true; // Si no hay fecha, considerarlo como próximo
+    try {
+      const eventDate = new Date(dateString);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return eventDate >= today;
+    } catch {
+      return true;
+    }
   };
 
-  const getCategoryLabel = (category: string) => {
-    return categories.find(cat => cat.value === category)?.label || category;
+  const filteredEvents = historyData?.events.filter(event => {
+    const matchesSearch = (event.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (event.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (event.location || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (event.organizer || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || event.category === selectedCategory;
+    const matchesType = !selectedType || event.type === selectedType;
+    const matchesUpcoming = !showUpcoming || isUpcoming(event.date);
+    
+    return matchesSearch && matchesCategory && matchesType && matchesUpcoming;
+  }) || [];
+
+  // Separar eventos inscritos de no inscritos
+  const registeredEvents = filteredEvents.filter((_, index) => isUserRegistered(index.toString()));
+  const unregisteredEvents = filteredEvents.filter((_, index) => !isUserRegistered(index.toString()));
+
+  const shareEvent = async (event: CommunityEvent) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: event.title,
+          text: event.description,
+          url: window.location.href,
+        });
+      } catch (error) {
+        console.log('Error al compartir:', error);
+      }
+    } else {
+      // Fallback: copiar URL al portapapeles
+      navigator.clipboard.writeText(window.location.href);
+      alert('URL copiada al portapapeles');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Cargando eventos y actividades...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center">
+            <div className="text-red-600 mb-4">
+              <Calendar className="w-12 h-12 mx-auto" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error al cargar los eventos</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+            >
+              Intentar de nuevo
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-theme">
-      <Navbar />
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center py-6 space-y-4 lg:space-y-0">
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+              <Link
+                href="/visitantes"
+                className="inline-flex items-center text-gray-600 hover:text-primary-600 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 mr-2" />
+                Volver al Inicio
+              </Link>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Eventos y Actividades</h1>
+                <p className="text-gray-600 mt-1">Participa en los eventos de la comunidad de Calle Jerusalén</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Eventos Comunitarios
-          </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Descubre y participa en los eventos que organiza nuestra comunidad. 
-            ¡Hay algo para todos!
-          </p>
-        </div>
-
-        {/* Filtros y búsqueda */}
-        <div className="card-theme mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
+        {/* Filtros y Búsqueda */}
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
             {/* Búsqueda */}
             <div className="flex-1">
-              <div className="input-container">
-                <Search className="input-icon" />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
                   placeholder="Buscar eventos..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="input-theme pl-10"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
             </div>
 
-            {/* Filtro por categoría */}
-            <div className="md:w-64">
-              <div className="input-container">
-                <Filter className="input-icon" />
+            {/* Filtros */}
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                 <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="input-theme pl-10 appearance-none"
-                >
-                  {categories.map(category => (
-                    <option key={category.value} value={category.value}>
-                      {category.label}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="">Todas las categorías</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {getCategoryIcon(category)} {category}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value="">Todos los tipos</option>
+                {eventTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
                     </option>
                   ))}
                 </select>
-              </div>
+
+              <label className="flex items-center px-3 py-2 border border-gray-300 rounded-md bg-white">
+                <input
+                  type="checkbox"
+                  checked={showUpcoming}
+                  onChange={(e) => setShowUpcoming(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">Solo próximos</span>
+              </label>
             </div>
           </div>
         </div>
 
-        {/* Lista de eventos */}
-        {loading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="card-theme animate-pulse">
-                <div className="h-48 bg-gray-200 rounded-lg mb-4"></div>
-                <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded mb-4"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+        {/* Estadísticas */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Calendar className="w-8 h-8 text-blue-500" />
               </div>
-            ))}
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Total de Eventos</p>
+                <p className="text-2xl font-semibold text-gray-900">{historyData?.events.length || 0}</p>
+              </div>
+            </div>
           </div>
-        ) : filteredEvents.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredEvents.map(event => (
-              <div key={event.id} className="card-theme overflow-hidden hover:shadow-xl transition-all duration-300 group">
-                <div className="relative h-48 overflow-hidden">
-                  <img
-                    src={event.image}
-                    alt={event.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute top-4 left-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(event.category)}`}>
-                      {getCategoryLabel(event.category)}
-                    </span>
+
+          <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Clock className="w-8 h-8 text-green-500" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Próximos</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {historyData?.events.filter(e => isUpcoming(e.date)).length || 0}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Star className="w-8 h-8 text-yellow-500" />
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Recurrentes</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {historyData?.events.filter(e => e.isRecurring).length || 0}
+                </p>
+              </div>
                   </div>
-                  <div className="absolute top-4 right-4">
-                    {event.isRecurring && (
-                      <span className="bg-primary-600 text-white px-2 py-1 rounded-full text-xs font-medium">
-                        Recurrente
-                      </span>
-                    )}
                   </div>
-                  <div className="absolute bottom-4 left-4 right-4">
-                    <div className="bg-white bg-opacity-90 rounded-lg p-3">
-                      <div className="flex items-center space-x-2 text-sm text-gray-600">
-                        <Users className="w-4 h-4" />
-                        <span>{event.currentAttendees} / {event.maxAttendees} asistentes</span>
+
+          <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <CheckCircle className="w-8 h-8 text-green-500" />
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                        <div 
-                          className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${(event.currentAttendees / event.maxAttendees) * 100}%` }}
-                        ></div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-500">Mis Inscripciones</p>
+                <p className="text-2xl font-semibold text-gray-900">
+                  {registeredEvents.length}
+                </p>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3 group-hover:text-primary-600 transition-colors duration-300">
-                    {event.title}
-                  </h3>
-                  <p className="text-gray-600 mb-4 line-clamp-2">
-                    {event.description}
-                  </p>
-                  
-                  <div className="space-y-3 text-sm text-gray-500 mb-6">
-                    <div className="flex items-center space-x-2">
-                      <Calendar className="w-4 h-4 text-primary-500" />
-                      <span className="capitalize">{formatDate(event.date)}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4 text-primary-500" />
-                      <span>{event.time}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="w-4 h-4 text-primary-500" />
-                      <span>{event.location}</span>
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      Organizado por: {event.organizer}
-                    </div>
-                  </div>
-                  
-                  <button className="w-full btn-theme-primary">
-                    Ver Detalles
-                  </button>
+        {/* Sección Mis Inscripciones */}
+        {registeredEvents.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center mb-6">
+              <div className="flex items-center">
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Mis Inscripciones</h2>
+                  <p className="text-sm text-gray-600">Eventos a los que estás inscrito</p>
                 </div>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              No se encontraron eventos
-            </h3>
-            <p className="text-gray-600">
-              Intenta ajustar tus filtros de búsqueda
-            </p>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {registeredEvents.map((event, index) => {
+                const originalIndex = historyData?.events.findIndex(e => e === event) || 0;
+                const maxParticipants = event.maxParticipants || 100;
+                const currentParticipants = eventStats[originalIndex]?.confirmedRegistrations || 0;
+                const percentage = maxParticipants > 0 ? (currentParticipants / maxParticipants) * 100 : 0;
+                const spotsLeft = maxParticipants - currentParticipants;
+                
+                return (
+                  <div key={index} className="bg-green-50 border border-green-200 rounded-lg p-4 hover:bg-green-100 transition-colors">
+                    {/* Header compacto */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-medium text-green-800 bg-green-200 px-2 py-1 rounded">
+                            {getCategoryIcon(event.category)} {event.category}
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 mb-1">
+                    {event.title}
+                  </h3>
+                      </div>
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 ml-2" />
+                    </div>
+
+                    {/* Información básica compacta */}
+                    <div className="space-y-1 mb-3 text-xs text-gray-600">
+                      {event.date && (
+                        <div className="flex items-center">
+                          <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
+                          <span className="truncate">{formatDate(event.date)}</span>
+                        </div>
+                      )}
+                      {event.time && (
+                        <div className="flex items-center">
+                          <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                          <span className="truncate">{event.time}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Progress bar compacto */}
+                    {event.maxParticipants && (
+                      <div className="mb-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-gray-600">Cupo</span>
+                          <span className="text-xs text-gray-500">
+                            {spotsLeft} de {maxParticipants}
+                          </span>
+                    </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div 
+                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                              percentage >= 90 ? 'bg-red-500' : 
+                              percentage >= 70 ? 'bg-yellow-500' : 
+                              'bg-green-500'
+                            }`}
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                    </div>
+                  </div>
+                    )}
+
+                    {/* Botón de acción */}
+                    <button
+                      onClick={() => router.push(`/visitantes/eventos/${originalIndex}`)}
+                      className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 transition-colors"
+                    >
+                      Ver detalles
+                  </button>
+                </div>
+                );
+              })}
+              </div>
           </div>
         )}
 
-        {/* Información adicional */}
-        <div className="mt-16 grid md:grid-cols-2 gap-8">
-          <div className="card-theme">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">
-              ¿Quieres organizar un evento?
+        {/* Lista de Eventos */}
+        {filteredEvents.length === 0 ? (
+          <div className="text-center py-12">
+            <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {searchTerm || selectedCategory || selectedType 
+                ? 'No se encontraron eventos' 
+                : 'No hay eventos disponibles'
+              }
             </h3>
-            <p className="text-gray-600 mb-6">
-              Si tienes una idea para un evento comunitario, contáctanos y te ayudaremos a organizarlo.
+            <p className="text-gray-600 mb-4">
+              {searchTerm || selectedCategory || selectedType 
+                ? 'Intenta ajustar los filtros de búsqueda' 
+                : 'Los eventos se están preparando'
+              }
             </p>
-            <button className="btn-theme-primary">
-              Contactar Administración
+            {(searchTerm || selectedCategory || selectedType) && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedCategory('');
+                  setSelectedType('');
+                }}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+              >
+                Limpiar filtros
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredEvents.map((event, index) => {
+              // Usar datos reales de estadísticas
+              const maxParticipants = event.maxParticipants || 100;
+              const currentParticipants = eventStats[index]?.confirmedRegistrations || 0;
+              const percentage = maxParticipants > 0 ? (currentParticipants / maxParticipants) * 100 : 0;
+              const spotsLeft = maxParticipants - currentParticipants;
+              const isRegistered = isUserRegistered(index.toString());
+              
+              return (
+                <div key={index} className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                  {/* Imagen */}
+                  {event.image && (
+                    <div className="h-48 bg-gray-200 relative overflow-hidden">
+                      <img
+                        src={event.image}
+                        alt={event.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                      <div className="absolute top-3 right-3 flex flex-col gap-2">
+                        {event.isRecurring && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Recurrente
+                          </span>
+                        )}
+                        {isRegistered && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            ✅ Inscrito
+                          </span>
+                        )}
+                      </div>
+          </div>
+        )}
+
+                  {/* Contenido */}
+                  <div className="p-6">
+                    {/* Header */}
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-4">
+                      <div className="flex-1">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                            {getCategoryIcon(event.category)} {event.category}
+                          </span>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getTypeColor(event.type)}`}>
+                            {event.type}
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">{event.title}</h3>
+                      </div>
+                      <button
+                        onClick={() => shareEvent(event)}
+                        className="text-gray-400 hover:text-gray-600 transition-colors p-1 flex-shrink-0"
+                        title="Compartir evento"
+                      >
+                        <Share2 className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="card-theme">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">
-              Recibe notificaciones
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Mantente al día con los próximos eventos. Regístrate para recibir notificaciones.
-            </p>
-            <button className="btn-theme-secondary">
-              Suscribirse a Eventos
+                    {/* Información básica */}
+                    <div className="space-y-2 mb-4 text-sm text-gray-600">
+                      {event.date && (
+                        <div className="flex items-center">
+                          <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">{formatDate(event.date)}</span>
+                        </div>
+                      )}
+                      {event.time && (
+                        <div className="flex items-center">
+                          <Clock className="w-4 h-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">{event.time}</span>
+                        </div>
+                      )}
+                      {event.location && (
+                        <div className="flex items-center">
+                          <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
+                          <span className="truncate">{event.location}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Progress Bar de Cupo */}
+                    {event.maxParticipants && (
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-medium text-gray-700">Cupo disponible</span>
+                          <span className="text-sm text-gray-500">
+                            {spotsLeft} de {maxParticipants} lugares
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              percentage >= 90 ? 'bg-red-500' : 
+                              percentage >= 70 ? 'bg-yellow-500' : 
+                              'bg-green-500'
+                            }`}
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-xs text-gray-500">
+                            {percentage.toFixed(0)}% ocupado
+                          </span>
+                          <span className={`text-xs font-medium ${
+                            spotsLeft <= 5 ? 'text-red-600' : 
+                            spotsLeft <= 15 ? 'text-yellow-600' : 
+                            'text-green-600'
+                          }`}>
+                            {spotsLeft <= 5 ? '¡Últimos lugares!' : 
+                             spotsLeft <= 15 ? 'Pocos lugares' : 
+                             'Disponible'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Descripción */}
+                    <p className="text-gray-600 mb-4 line-clamp-2 text-sm">
+                      {event.description}
+                    </p>
+
+                    {/* Destacados */}
+                    {event.highlights && event.highlights.length > 0 && (
+                      <div className="mb-4">
+                        <div className="space-y-1">
+                          {(event.highlights || []).slice(0, 2).map((highlight, highlightIndex) => (
+                            <div key={highlightIndex} className="flex items-start">
+                              <div className="flex-shrink-0 w-1.5 h-1.5 bg-primary-500 rounded-full mt-2 mr-2"></div>
+                              <span className="text-xs text-gray-600 line-clamp-1">{highlight}</span>
+                            </div>
+                          ))}
+                          {event.highlights.length > 2 && (
+                            <p className="text-xs text-gray-500 ml-3.5">
+                              +{event.highlights.length - 2} más...
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                      <div className="flex items-center text-xs text-gray-500">
+                        {event.organizer && (
+                          <span className="flex items-center">
+                            <Users className="w-3 h-3 mr-1" />
+                            {event.organizer}
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => router.push(`/visitantes/eventos/${index}`)}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-primary-600 bg-primary-100 hover:bg-primary-200 transition-colors"
+                      >
+                        Ver detalles
             </button>
           </div>
         </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
