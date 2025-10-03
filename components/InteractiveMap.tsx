@@ -32,6 +32,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
+  const [isStreetView, setIsStreetView] = useState(true);
 
   // Cargar Google Maps API
   useEffect(() => {
@@ -52,16 +53,17 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     loadGoogleMaps();
   }, []);
 
-  // Inicializar mapa
+  // Inicializar mapa con Street View
   useEffect(() => {
     if (!isGoogleMapsLoaded) return;
 
     const mapElement = document.getElementById('interactive-map');
     if (!mapElement) return;
 
+    // Crear el mapa
     const mapInstance = new google.maps.Map(mapElement, {
-      center: { lat: 19.4326, lng: -99.1332 }, // Centro de Calle Jerusalén
-      zoom: 15,
+      center: { lat: 10.02424263, lng: -84.07890636 }, // Centro específico de C. Jerusalén
+      zoom: 18,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
       styles: [
         {
@@ -70,6 +72,39 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           stylers: [{ visibility: 'off' }]
         }
       ]
+    });
+
+    // Crear Street View
+    const streetViewService = new google.maps.StreetViewService();
+    const panorama = new google.maps.StreetViewPanorama(mapElement, {
+      position: { lat: 10.02424263, lng: -84.07890636 },
+      pov: {
+        heading: 134.85494773, // Dirección específica de la vista
+        pitch: 0 // Inclinación horizontal (0 = nivel de la calle)
+      },
+      zoom: 1,
+      visible: true,
+      addressControl: true,
+      linksControl: true,
+      panControl: true,
+      enableCloseButton: true,
+      showRoadLabels: true
+    });
+
+    // Verificar si hay Street View disponible en esta ubicación
+    streetViewService.getPanorama({
+      location: { lat: 10.02424263, lng: -84.07890636 },
+      radius: 50
+    }, (data, status) => {
+      if (status === 'OK') {
+        // Si hay Street View disponible, mostrarlo por defecto
+        mapInstance.setStreetView(panorama);
+        setIsStreetView(true);
+      } else {
+        // Si no hay Street View, mostrar mapa normal
+        console.log('Street View no disponible en esta ubicación');
+        setIsStreetView(false);
+      }
     });
 
     setMap(mapInstance);
@@ -180,6 +215,28 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <button
             onClick={() => {
               if (map) {
+                const streetView = map.getStreetView();
+                if (streetView) {
+                  streetView.setVisible(true);
+                  setIsStreetView(true);
+                }
+              }
+            }}
+            className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm transition-colors ${
+              isStreetView ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'
+            }`}
+          >
+            <Eye className="w-4 h-4" />
+            <span>Street View</span>
+          </button>
+          <button
+            onClick={() => {
+              if (map) {
+                const streetView = map.getStreetView();
+                if (streetView) {
+                  streetView.setVisible(false);
+                  setIsStreetView(false);
+                }
                 map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
               }
             }}
@@ -191,6 +248,11 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <button
             onClick={() => {
               if (map) {
+                const streetView = map.getStreetView();
+                if (streetView) {
+                  streetView.setVisible(false);
+                  setIsStreetView(false);
+                }
                 map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
               }
             }}

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, MapPin, Clock, Star, Phone, Globe, Camera, Navigation, Eye } from 'lucide-react';
 import Link from 'next/link';
-import GoogleEarthStream from '@/components/GoogleEarthStream';
+import OpenStreetMap3D from '@/components/OpenStreetMap3D';
 
 interface Place {
   id: string;
@@ -415,12 +415,11 @@ export default function PlaceDetailPage() {
               
               <div className="relative">
                 {showGoogleEarth ? (
-                  <GoogleEarthStream
-                    url={googleEarthUrl}
+                  <OpenStreetMap3D
+                    coordinates={place.coordinates}
                     title={`Vista 3D de ${place.name}`}
                     height="400px"
                     className="rounded-lg"
-                    coordinates={place.coordinates}
                   />
                 ) : (
                   <>

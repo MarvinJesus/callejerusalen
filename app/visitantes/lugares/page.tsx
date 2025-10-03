@@ -3,11 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import InteractiveMap from '@/components/InteractiveMap';
-import GoogleEarthStream from '@/components/GoogleEarthStream';
 import { useAuth } from '@/context/AuthContext';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { MapPin, Clock, Star, Search, Filter, Eye, Navigation, Globe } from 'lucide-react';
+import { MapPin, Clock, Star, Search, Filter, Eye, Navigation } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -35,7 +34,6 @@ const PlacesPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showMap, setShowMap] = useState(false);
-  const [showGoogleEarth, setShowGoogleEarth] = useState(false);
 
   const categories = [
     { value: 'all', label: 'Todos' },
@@ -47,7 +45,7 @@ const PlacesPage: React.FC = () => {
     { value: 'historia', label: 'Históricos' },
   ];
 
-  // Datos de ejemplo para lugares
+  // Datos de ejemplo para lugares en Calle Jerusalén, Heredia
   const samplePlaces: Place[] = [
     {
       id: '1',
@@ -58,7 +56,7 @@ const PlacesPage: React.FC = () => {
       hours: '5:00 AM - 8:00 PM',
       rating: 4.9,
       image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
-      coordinates: { lat: 19.4326, lng: -99.1332 }
+      coordinates: { lat: 10.02424263, lng: -84.07890636 }
     },
     {
       id: '2',
@@ -69,7 +67,7 @@ const PlacesPage: React.FC = () => {
       hours: '6:00 AM - 9:00 PM',
       rating: 4.7,
       image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400',
-      coordinates: { lat: 19.4336, lng: -99.1342 }
+      coordinates: { lat: 10.0235, lng: -84.0785 }
     },
     {
       id: '3',
@@ -80,7 +78,7 @@ const PlacesPage: React.FC = () => {
       hours: '6:00 AM - 10:00 PM',
       rating: 4.5,
       image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400',
-      coordinates: { lat: 19.4316, lng: -99.1322 }
+      coordinates: { lat: 10.0248, lng: -84.0792 }
     },
     {
       id: '4',
@@ -91,7 +89,7 @@ const PlacesPage: React.FC = () => {
       hours: '9:00 AM - 5:00 PM',
       rating: 4.8,
       image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400',
-      coordinates: { lat: 19.4306, lng: -99.1312 }
+      coordinates: { lat: 10.0238, lng: -84.0795 }
     },
     {
       id: '5',
@@ -102,7 +100,7 @@ const PlacesPage: React.FC = () => {
       hours: '24 horas',
       rating: 4.6,
       image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
-      coordinates: { lat: 19.4296, lng: -99.1302 }
+      coordinates: { lat: 10.0251, lng: -84.0783 }
     },
     {
       id: '6',
@@ -113,7 +111,7 @@ const PlacesPage: React.FC = () => {
       hours: '7:00 AM - 8:00 PM',
       rating: 4.4,
       image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400',
-      coordinates: { lat: 19.4286, lng: -99.1292 }
+      coordinates: { lat: 10.0240, lng: -84.0780 }
     },
     {
       id: '7',
@@ -124,7 +122,7 @@ const PlacesPage: React.FC = () => {
       hours: '7:00 AM - 7:00 PM',
       rating: 4.6,
       image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400',
-      coordinates: { lat: 19.4276, lng: -99.1282 }
+      coordinates: { lat: 10.0255, lng: -84.0790 }
     },
     {
       id: '8',
@@ -135,7 +133,7 @@ const PlacesPage: React.FC = () => {
       hours: '8:00 AM - 8:00 PM',
       rating: 4.7,
       image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400',
-      coordinates: { lat: 19.4266, lng: -99.1272 }
+      coordinates: { lat: 10.0232, lng: -84.0788 }
     }
   ];
 
@@ -184,9 +182,6 @@ const PlacesPage: React.FC = () => {
 
     setFilteredPlaces(filtered);
   }, [places, searchTerm, selectedCategory]);
-
-  // URL específica de Google Earth para Calle Jerusalén
-  const googleEarthUrl = "https://earth.google.com/web/search/Calle+Jerusal%c3%a9n,+Heredia,+San+Rafael/@10.02193128,-84.07814492,1432.60522461a,0d,60y,340.69294323h,84.43871213t,0r/data=CpQBGmYSYAolMHg4ZmEwZTU2NzFiYmZhOGMxOjB4MTU2MjhmMTcyY2VmNGQ3ORk9IkuLnwskQCEEQTZ_AgVVwColQ2FsbGUgSmVydXNhbMOpbiwgSGVyZWRpYSwgU2FuIFJhZmFlbBgBIAEiJgokCbbCPZECECRAEXldvarbACRAGX7uLZJrC1XAIfxHlYazDVXAQgIIASIaChYzYVNoRlEwT25hNVVxbjBIeHFkVmdREAI6AwoBMEICCABKDQj___________8BEAA?hl=es&authuser=0";
 
   // Permitir acceso a todos los usuarios (incluyendo visitantes no registrados)
   // No hay restricciones de acceso para la página de lugares
@@ -242,34 +237,14 @@ const PlacesPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Botones para mostrar/ocultar mapas */}
-            <div className="flex space-x-2">
-              <button
-                onClick={() => {
-                  setShowMap(!showMap);
-                  setShowGoogleEarth(false);
-                }}
-                className={`btn-theme-secondary flex items-center space-x-2 ${
-                  showMap && !showGoogleEarth ? 'bg-primary-600 text-white' : ''
-                }`}
-              >
-                {showMap && !showGoogleEarth ? <Eye className="w-4 h-4" /> : <Navigation className="w-4 h-4" />}
-                <span>{showMap && !showGoogleEarth ? 'Ocultar Mapa' : 'Ver Mapa'}</span>
-              </button>
-              
-              <button
-                onClick={() => {
-                  setShowGoogleEarth(!showGoogleEarth);
-                  setShowMap(false);
-                }}
-                className={`btn-theme-secondary flex items-center space-x-2 ${
-                  showGoogleEarth ? 'bg-primary-600 text-white' : ''
-                }`}
-              >
-                <Globe className="w-4 h-4" />
-                <span>{showGoogleEarth ? 'Ocultar Vista 3D' : 'Vista 3D'}</span>
-              </button>
-            </div>
+            {/* Botón para mostrar/ocultar mapa */}
+            <button
+              onClick={() => setShowMap(!showMap)}
+              className="btn-theme-secondary flex items-center space-x-2"
+            >
+              {showMap ? <Eye className="w-4 h-4" /> : <Navigation className="w-4 h-4" />}
+              <span>{showMap ? 'Ocultar Mapa' : 'Ver Mapa'}</span>
+            </button>
           </div>
         </div>
 
@@ -284,17 +259,6 @@ const PlacesPage: React.FC = () => {
           </div>
         )}
 
-        {/* Vista 3D de Google Earth */}
-        {showGoogleEarth && (
-          <div className="card-theme mb-8">
-            <GoogleEarthStream
-              url={googleEarthUrl}
-              title="Vista 3D de Calle Jerusalén"
-              height="500px"
-              coordinates={{ lat: 10.02193128, lng: -84.07814492 }}
-            />
-          </div>
-        )}
 
         {/* Lista de lugares */}
         {loading ? (
