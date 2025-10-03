@@ -190,21 +190,21 @@ const PlacesPage: React.FC = () => {
     <div className="min-h-screen bg-theme">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <div className="text-center mb-8 sm:mb-10 lg:mb-12">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
             Lugares de Interés en Calle Jerusalén
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
             Explora los lugares únicos de nuestra comunidad. Desde miradores con vistas espectaculares 
             hasta pulperías tradicionales y sitios históricos llenos de cultura.
           </p>
         </div>
 
         {/* Filtros y búsqueda */}
-        <div className="card-theme mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
+        <div className="card-theme mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             {/* Búsqueda */}
             <div className="flex-1">
               <div className="input-container">
@@ -220,7 +220,7 @@ const PlacesPage: React.FC = () => {
             </div>
 
             {/* Filtro por categoría */}
-            <div className="md:w-64">
+            <div className="sm:w-48 md:w-56 lg:w-64">
               <div className="input-container">
                 <Filter className="input-icon" />
                 <select
@@ -240,7 +240,7 @@ const PlacesPage: React.FC = () => {
             {/* Botón para mostrar/ocultar mapa */}
             <button
               onClick={() => setShowMap(!showMap)}
-              className="btn-theme-secondary flex items-center space-x-2"
+              className="btn-theme-secondary flex items-center space-x-2 whitespace-nowrap"
             >
               {showMap ? <Eye className="w-4 h-4" /> : <Navigation className="w-4 h-4" />}
               <span>{showMap ? 'Ocultar Mapa' : 'Ver Mapa'}</span>
@@ -275,63 +275,63 @@ const PlacesPage: React.FC = () => {
             ))}
           </div>
         ) : filteredPlaces.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="places-grid">
             {filteredPlaces.map(place => (
-              <div key={place.id} className="card-theme overflow-hidden hover:shadow-xl transition-all duration-300 group">
-                <div className="relative h-48 overflow-hidden">
+              <div key={place.id} className="card-theme overflow-hidden hover:shadow-xl transition-all duration-300 group h-full flex flex-col">
+                <div className="relative h-40 sm:h-44 md:h-48 lg:h-52 overflow-hidden">
                   <Image
                     src={place.image}
                     alt={place.name}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute top-4 right-4 bg-white bg-opacity-90 px-3 py-1 rounded-full flex items-center space-x-1">
-                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                    <span className="text-sm font-medium">{place.rating}</span>
+                  <div className="absolute top-2 sm:top-3 right-2 sm:right-3 bg-white bg-opacity-90 px-2 sm:px-3 py-1 rounded-full flex items-center space-x-1">
+                    <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 fill-current" />
+                    <span className="text-xs sm:text-sm font-medium">{place.rating}</span>
                   </div>
-                  <div className="absolute bottom-4 left-4">
+                  <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3">
                     <span className="bg-primary-600 text-white px-2 py-1 rounded-full text-xs font-medium">
                       {categories.find(cat => cat.value === place.category)?.label}
                     </span>
                   </div>
                 </div>
                 
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3 group-hover:text-primary-600 transition-colors duration-300">
+                <div className="p-4 sm:p-5 lg:p-6 flex-1 flex flex-col">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3 group-hover:text-primary-600 transition-colors duration-300 line-clamp-2">
                     {place.name}
                   </h3>
-                  <p className="text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4 line-clamp-2 flex-1">
                     {place.description}
                   </p>
                   
-                  <div className="space-y-3 text-sm text-gray-500 mb-6">
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="w-4 h-4 text-primary-500" />
-                      <span>{place.address}</span>
+                  <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
+                    <div className="flex items-start space-x-2">
+                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-primary-500 mt-0.5 flex-shrink-0" />
+                      <span className="line-clamp-2">{place.address}</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4 text-primary-500" />
-                      <span>{place.hours}</span>
+                      <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-primary-500 flex-shrink-0" />
+                      <span className="line-clamp-1">{place.hours}</span>
                     </div>
                   </div>
                   
-                  <div className="flex space-x-2">
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mt-auto">
                     <Link
                       href={`/visitantes/lugares/${place.id}`}
-                      className="flex-1 btn-theme-primary flex items-center justify-center"
+                      className="flex-1 btn-theme-primary flex items-center justify-center text-xs sm:text-sm whitespace-nowrap py-2 sm:py-2.5 min-w-0"
                     >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Ver Detalles
+                      <Eye className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1.5 flex-shrink-0" />
+                      <span className="truncate">Ver</span>
                     </Link>
                     <button 
                       onClick={() => {
                         setSelectedPlace(place);
                         setShowMap(true);
                       }}
-                      className="flex-1 btn-theme-secondary"
+                      className="flex-1 btn-theme-secondary flex items-center justify-center text-xs sm:text-sm whitespace-nowrap py-2 sm:py-2.5 min-w-0"
                     >
-                      <Navigation className="w-4 h-4 mr-2" />
-                      Mapa
+                      <Navigation className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1.5 flex-shrink-0" />
+                      <span className="truncate">Mapa</span>
                     </button>
                   </div>
                 </div>
@@ -355,5 +355,33 @@ const PlacesPage: React.FC = () => {
 };
 
 export default PlacesPage;
+
+// CSS personalizado para evitar superposición de tarjetas
+const styles = `
+  .places-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+    gap: 1.5rem !important;
+    width: 100% !important;
+  }
+  
+  .places-grid .card-theme {
+    position: relative !important;
+    z-index: 1 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+  
+  .places-grid .card-theme:hover {
+    z-index: 2 !important;
+  }
+`;
+
+// Agregar estilos al head
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
+}
 
 
