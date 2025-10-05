@@ -32,6 +32,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [markers, setMarkers] = useState<google.maps.Marker[]>([]);
+  const [isStreetView, setIsStreetView] = useState(true);
 
   // Cargar Google Maps API
   useEffect(() => {
@@ -52,16 +53,17 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     loadGoogleMaps();
   }, []);
 
-  // Inicializar mapa
+  // Inicializar mapa con Street View
   useEffect(() => {
     if (!isGoogleMapsLoaded) return;
 
     const mapElement = document.getElementById('interactive-map');
     if (!mapElement) return;
 
+    // Crear el mapa
     const mapInstance = new google.maps.Map(mapElement, {
-      center: { lat: 19.4326, lng: -99.1332 }, // Centro de Calle Jerusalén
-      zoom: 15,
+      center: { lat: 10.02424263, lng: -84.07890636 }, // Centro específico de C. Jerusalén
+      zoom: 18,
       mapTypeId: google.maps.MapTypeId.ROADMAP,
       styles: [
         {
@@ -70,6 +72,39 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           stylers: [{ visibility: 'off' }]
         }
       ]
+    });
+
+    // Crear Street View
+    const streetViewService = new google.maps.StreetViewService();
+    const panorama = new google.maps.StreetViewPanorama(mapElement, {
+      position: { lat: 10.02424263, lng: -84.07890636 },
+      pov: {
+        heading: 134.85494773, // Dirección específica de la vista
+        pitch: 0 // Inclinación horizontal (0 = nivel de la calle)
+      },
+      zoom: 1,
+      visible: true,
+      addressControl: true,
+      linksControl: true,
+      panControl: true,
+      enableCloseButton: true,
+      showRoadLabels: true
+    });
+
+    // Verificar si hay Street View disponible en esta ubicación
+    streetViewService.getPanorama({
+      location: { lat: 10.02424263, lng: -84.07890636 },
+      radius: 50
+    }, (data, status) => {
+      if (status === 'OK') {
+        // Si hay Street View disponible, mostrarlo por defecto
+        mapInstance.setStreetView(panorama);
+        setIsStreetView(true);
+      } else {
+        // Si no hay Street View, mostrar mapa normal
+        console.log('Street View no disponible en esta ubicación');
+        setIsStreetView(false);
+      }
     });
 
     setMap(mapInstance);
@@ -141,6 +176,56 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, [map, places, isGoogleMapsLoaded, onPlaceSelect]);
 
+  // Manejar lugar seleccionado
+  useEffect(() => {
+    if (!map || !selectedPlace || !isGoogleMapsLoaded) return;
+
+    const { lat, lng } = selectedPlace.coordinates;
+    
+    // Centrar el mapa en el lugar seleccionado
+    map.setCenter({ lat, lng });
+    map.setZoom(18);
+
+    // Crear Street View para el lugar seleccionado
+    const streetViewService = new google.maps.StreetViewService();
+    streetViewService.getPanorama({
+      location: { lat, lng },
+      radius: 50
+    }, (data, status) => {
+      if (status === 'OK' && data) {
+        // Crear nuevo panorama para el lugar seleccionado
+        const panorama = new google.maps.StreetViewPanorama(document.getElementById('interactive-map')!, {
+          position: { lat, lng },
+          pov: {
+            heading: 0, // Dirección por defecto
+            pitch: 0 // Nivel de la calle
+          },
+          zoom: 1,
+          visible: true,
+          addressControl: true,
+          linksControl: true,
+          panControl: true,
+          enableCloseButton: true,
+          showRoadLabels: true
+        });
+
+        // Establecer Street View en el mapa
+        map.setStreetView(panorama);
+        setIsStreetView(true);
+      } else {
+        // Si no hay Street View disponible, ocultar Street View y mostrar mapa normal
+        const streetView = map.getStreetView();
+        if (streetView) {
+          streetView.setVisible(false);
+          setIsStreetView(false);
+        }
+        // Centrar en el lugar sin Street View
+        map.setCenter({ lat, lng });
+        map.setZoom(18);
+      }
+    });
+  }, [selectedPlace, map, isGoogleMapsLoaded]);
+
   const getMarkerIcon = (category: string) => {
     const colors: { [key: string]: string } = {
       miradores: '#3B82F6', // Azul
@@ -180,10 +265,34 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <button
             onClick={() => {
               if (map) {
+                const streetView = map.getStreetView();
+                if (streetView) {
+                  streetView.setVisible(true);
+                  setIsStreetView(true);
+                }
+              }
+            }}
+            className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm ${
+              isStreetView 
+                ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700' 
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400'
+            }`}
+          >
+            <Eye className="w-4 h-4" />
+            <span>Street View</span>
+          </button>
+          <button
+            onClick={() => {
+              if (map) {
+                const streetView = map.getStreetView();
+                if (streetView) {
+                  streetView.setVisible(false);
+                  setIsStreetView(false);
+                }
                 map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
               }
             }}
-            className="flex items-center space-x-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
+            className="flex items-center space-x-1 px-3 py-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm"
           >
             <Eye className="w-4 h-4" />
             <span>Satélite</span>
@@ -191,10 +300,15 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <button
             onClick={() => {
               if (map) {
+                const streetView = map.getStreetView();
+                if (streetView) {
+                  streetView.setVisible(false);
+                  setIsStreetView(false);
+                }
                 map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
               }
             }}
-            className="flex items-center space-x-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
+            className="flex items-center space-x-1 px-3 py-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm"
           >
             <Navigation className="w-4 h-4" />
             <span>Mapa</span>
@@ -202,7 +316,53 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </div>
       </div>
       
-      <div id="interactive-map" className="w-full h-96 rounded-lg border border-gray-200"></div>
+      <div className="relative">
+        <div id="interactive-map" className="w-full h-96 rounded-lg border border-gray-200"></div>
+        <style jsx>{`
+          #interactive-map .gm-style-cc {
+            display: none !important;
+          }
+          #interactive-map .gm-style .gm-style-iw-c {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+            border-radius: 8px !important;
+          }
+          #interactive-map .gm-style .gm-style-iw-tc {
+            display: none !important;
+          }
+          #interactive-map .gm-style .gm-style-iw-d {
+            overflow: hidden !important;
+            border-radius: 8px !important;
+          }
+          /* Mejorar visibilidad de controles nativos de Google Maps */
+          #interactive-map .gm-control-active {
+            background-color: #fff !important;
+            border: 1px solid #ccc !important;
+            color: #333 !important;
+            font-weight: 500 !important;
+          }
+          #interactive-map .gm-control {
+            background-color: #fff !important;
+            border: 1px solid #ddd !important;
+            color: #333 !important;
+            font-weight: 500 !important;
+          }
+          #interactive-map .gm-control:hover {
+            background-color: #f5f5f5 !important;
+            border-color: #999 !important;
+          }
+          /* Mejorar controles de tipo de mapa */
+          #interactive-map .gm-style .gm-control-wrapper {
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            border-radius: 4px !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+          }
+          #interactive-map .gm-style .gm-control-wrapper .gm-control {
+            color: #333 !important;
+            font-weight: 500 !important;
+            text-shadow: none !important;
+          }
+        `}</style>
+      </div>
       
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
         <div className="flex items-center space-x-1">

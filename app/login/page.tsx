@@ -152,15 +152,6 @@ const LoginPage: React.FC = () => {
             </div>
           </form>
         </div>
-
-        {/* Demo Accounts */}
-        <div className="card bg-blue-50 border-blue-200">
-          <h3 className="text-sm font-medium text-blue-800 mb-2">Cuentas de demostración:</h3>
-          <div className="text-xs text-blue-700 space-y-1">
-            <p><strong>Visitante:</strong> visitante@demo.com / demo123</p>
-            <p><strong>Residente:</strong> residente@demo.com / demo123</p>
-          </div>
-        </div>
       </div>
     </div>
   );

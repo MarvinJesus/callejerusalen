@@ -1,32 +1,45 @@
-# Google Earth Stream Integration
+# Vista 3D Interactiva - Solución al Error 403
 
 ## Descripción
 
-Se ha integrado una vista 3D de Google Earth en la sección de lugares de Calle Jerusalén. Esta integración permite a los usuarios explorar la zona en una vista tridimensional interactiva directamente desde la aplicación web.
+Se ha implementado una solución robusta para la vista 3D en la sección de lugares de Calle Jerusalén que evita completamente el error 403. La solución utiliza Google Maps embebido con vista satelital, híbrida y de terreno, proporcionando una experiencia interactiva sin restricciones de acceso.
 
 ## Características Implementadas
 
-### 1. Componente GoogleEarthStream
+### 1. Componente InteractiveMap3D (Nuevo - Sin Error 403)
 
-- **Ubicación**: `components/GoogleEarthStream.tsx`
+- **Ubicación**: `components/InteractiveMap3D.tsx`
 - **Funcionalidades**:
-  - Vista 3D embebida de Google Earth
+  - Vista satelital, híbrida y de terreno de Google Maps
+  - Sin restricciones de acceso (no más error 403)
   - Modo pantalla completa
+  - Selector de tipo de mapa
   - Botón de recarga
   - Estados de carga y error
   - Interfaz responsive
   - Controles de navegación
+  - Botones para abrir en Google Earth/Maps
 
-### 2. Integración en Páginas de Lugares
+### 2. Componente GoogleEarthStream (Fallback)
+
+- **Ubicación**: `components/GoogleEarthStream.tsx`
+- **Funcionalidades**:
+  - Intenta Google Earth pero fallback a Google Maps
+  - Detección automática de error 403
+  - Vista alternativa con Google Maps
+  - Opciones de navegación externa
+
+### 3. Integración en Páginas de Lugares
 
 #### Página Principal de Lugares (`app/visitantes/lugares/page.tsx`)
 - Toggle entre mapa interactivo y vista 3D
-- Vista 3D de toda la zona de Calle Jerusalén
+- **NUEVO**: Vista 3D con InteractiveMap3D (sin error 403)
 - Altura configurable (500px por defecto)
+- Selector de tipo de mapa (satelital, híbrido, terreno)
 
 #### Página de Detalle de Lugar (`app/visitantes/lugares/[id]/page.tsx`)
 - Toggle entre mapa estático y vista 3D
-- Vista 3D específica para cada lugar
+- **NUEVO**: Vista 3D específica para cada lugar sin error 403
 - Botones de acción adicionales para abrir en Google Maps/Earth
 
 ## URL de Google Earth

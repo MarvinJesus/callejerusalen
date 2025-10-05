@@ -25,7 +25,8 @@ const GoogleEarthStream: React.FC<GoogleEarthStreamProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [showFallback, setShowFallback] = useState(false);
+  const [showFallback, setShowFallback] = useState(true); // Mostrar fallback por defecto
+  const [useGoogleMaps, setUseGoogleMaps] = useState(true); // Usar Google Maps por defecto
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Función para alternar pantalla completa
@@ -70,17 +71,13 @@ const GoogleEarthStream: React.FC<GoogleEarthStreamProps> = ({
     setHasError(true);
   };
 
-  // Detectar error 403 automáticamente después de un tiempo
+  // Inicializar con Google Maps por defecto
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (isLoading) {
-        setIsLoading(false);
-        setHasError(true);
-      }
-    }, 5000); // 5 segundos de timeout
-
-    return () => clearTimeout(timer);
-  }, [isLoading]);
+    if (coordinates) {
+      setIsLoading(false);
+      setHasError(false);
+    }
+  }, [coordinates]);
 
   // Función para abrir Google Earth en nueva pestaña
   const openInGoogleEarth = () => {
@@ -101,7 +98,16 @@ const GoogleEarthStream: React.FC<GoogleEarthStreamProps> = ({
   // Función para mostrar vista alternativa
   const showAlternativeView = () => {
     setShowFallback(true);
+    setUseGoogleMaps(true);
     setIsLoading(false);
+    setHasError(false);
+  };
+
+  // Función para intentar Google Earth
+  const tryGoogleEarth = () => {
+    setUseGoogleMaps(false);
+    setShowFallback(false);
+    setIsLoading(true);
     setHasError(false);
   };
 
@@ -189,8 +195,8 @@ const GoogleEarthStream: React.FC<GoogleEarthStreamProps> = ({
         </div>
       )}
 
-      {/* Vista alternativa con Google Maps 3D */}
-      {showFallback && coordinates && (
+      {/* Vista principal con Google Maps 3D */}
+      {(showFallback || useGoogleMaps) && coordinates && (
         <GoogleMaps3D
           coordinates={coordinates}
           title={title}
@@ -226,22 +232,18 @@ const GoogleEarthStream: React.FC<GoogleEarthStreamProps> = ({
                 Ver en Google Maps 3D
               </button>
               <button
-                onClick={() => {
-                  setShowFallback(false);
-                  setHasError(false);
-                  setIsLoading(true);
-                }}
+                onClick={tryGoogleEarth}
                 className="w-full text-sm text-gray-600 hover:text-gray-800 underline"
               >
-                Intentar cargar vista embebida
+                Intentar Google Earth (puede fallar)
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Iframe de Google Earth - Solo mostrar si no hay error */}
-      {!hasError && !showFallback && (
+      {/* Iframe de Google Earth - Solo mostrar cuando se intenta Google Earth */}
+      {!useGoogleMaps && !hasError && !showFallback && (
         <iframe
           src={url}
           title={title}
@@ -255,11 +257,11 @@ const GoogleEarthStream: React.FC<GoogleEarthStreamProps> = ({
       )}
 
       {/* Overlay de instrucciones */}
-      {!isLoading && !hasError && (
+      {!isLoading && !hasError && useGoogleMaps && (
         <div className="absolute bottom-4 left-4 right-4 z-10">
           <div className="bg-black/70 text-white p-3 rounded-lg text-sm">
             <p className="text-center">
-              💡 Usa el mouse para rotar, hacer zoom y explorar la vista 3D
+              💡 Usa el mouse para hacer zoom y explorar la vista satelital
             </p>
           </div>
         </div>

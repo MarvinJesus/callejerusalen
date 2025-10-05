@@ -3,11 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import InteractiveMap from '@/components/InteractiveMap';
-import GoogleEarthStream from '@/components/GoogleEarthStream';
 import { useAuth } from '@/context/AuthContext';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { MapPin, Clock, Star, Search, Filter, Eye, Navigation, Globe } from 'lucide-react';
+import { MapPin, Clock, Star, Search, Filter, Eye, Navigation } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -35,7 +34,6 @@ const PlacesPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showMap, setShowMap] = useState(false);
-  const [showGoogleEarth, setShowGoogleEarth] = useState(false);
 
   const categories = [
     { value: 'all', label: 'Todos' },
@@ -47,7 +45,7 @@ const PlacesPage: React.FC = () => {
     { value: 'historia', label: 'Históricos' },
   ];
 
-  // Datos de ejemplo para lugares
+  // Datos de ejemplo para lugares en Calle Jerusalén, Heredia
   const samplePlaces: Place[] = [
     {
       id: '1',
@@ -58,7 +56,7 @@ const PlacesPage: React.FC = () => {
       hours: '5:00 AM - 8:00 PM',
       rating: 4.9,
       image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
-      coordinates: { lat: 19.4326, lng: -99.1332 }
+      coordinates: { lat: 10.02424263, lng: -84.07890636 }
     },
     {
       id: '2',
@@ -69,7 +67,7 @@ const PlacesPage: React.FC = () => {
       hours: '6:00 AM - 9:00 PM',
       rating: 4.7,
       image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400',
-      coordinates: { lat: 19.4336, lng: -99.1342 }
+      coordinates: { lat: 10.0235, lng: -84.0785 }
     },
     {
       id: '3',
@@ -80,7 +78,7 @@ const PlacesPage: React.FC = () => {
       hours: '6:00 AM - 10:00 PM',
       rating: 4.5,
       image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400',
-      coordinates: { lat: 19.4316, lng: -99.1322 }
+      coordinates: { lat: 10.0248, lng: -84.0792 }
     },
     {
       id: '4',
@@ -91,7 +89,7 @@ const PlacesPage: React.FC = () => {
       hours: '9:00 AM - 5:00 PM',
       rating: 4.8,
       image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400',
-      coordinates: { lat: 19.4306, lng: -99.1312 }
+      coordinates: { lat: 10.0238, lng: -84.0795 }
     },
     {
       id: '5',
@@ -102,7 +100,7 @@ const PlacesPage: React.FC = () => {
       hours: '24 horas',
       rating: 4.6,
       image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
-      coordinates: { lat: 19.4296, lng: -99.1302 }
+      coordinates: { lat: 10.0251, lng: -84.0783 }
     },
     {
       id: '6',
@@ -113,7 +111,7 @@ const PlacesPage: React.FC = () => {
       hours: '7:00 AM - 8:00 PM',
       rating: 4.4,
       image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400',
-      coordinates: { lat: 19.4286, lng: -99.1292 }
+      coordinates: { lat: 10.0240, lng: -84.0780 }
     },
     {
       id: '7',
@@ -124,7 +122,7 @@ const PlacesPage: React.FC = () => {
       hours: '7:00 AM - 7:00 PM',
       rating: 4.6,
       image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400',
-      coordinates: { lat: 19.4276, lng: -99.1282 }
+      coordinates: { lat: 10.0255, lng: -84.0790 }
     },
     {
       id: '8',
@@ -135,7 +133,7 @@ const PlacesPage: React.FC = () => {
       hours: '8:00 AM - 8:00 PM',
       rating: 4.7,
       image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400',
-      coordinates: { lat: 19.4266, lng: -99.1272 }
+      coordinates: { lat: 10.0232, lng: -84.0788 }
     }
   ];
 
@@ -185,9 +183,6 @@ const PlacesPage: React.FC = () => {
     setFilteredPlaces(filtered);
   }, [places, searchTerm, selectedCategory]);
 
-  // URL específica de Google Earth para Calle Jerusalén
-  const googleEarthUrl = "https://earth.google.com/web/search/Calle+Jerusal%c3%a9n,+Heredia,+San+Rafael/@10.02193128,-84.07814492,1432.60522461a,0d,60y,340.69294323h,84.43871213t,0r/data=CpQBGmYSYAolMHg4ZmEwZTU2NzFiYmZhOGMxOjB4MTU2MjhmMTcyY2VmNGQ3ORk9IkuLnwskQCEEQTZ_AgVVwColQ2FsbGUgSmVydXNhbMOpbiwgSGVyZWRpYSwgU2FuIFJhZmFlbBgBIAEiJgokCbbCPZECECRAEXldvarbACRAGX7uLZJrC1XAIfxHlYazDVXAQgIIASIaChYzYVNoRlEwT25hNVVxbjBIeHFkVmdREAI6AwoBMEICCABKDQj___________8BEAA?hl=es&authuser=0";
-
   // Permitir acceso a todos los usuarios (incluyendo visitantes no registrados)
   // No hay restricciones de acceso para la página de lugares
 
@@ -195,21 +190,21 @@ const PlacesPage: React.FC = () => {
     <div className="min-h-screen bg-theme">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 xl:px-8 py-4 sm:py-6 lg:py-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <div className="text-center mb-8 sm:mb-10 lg:mb-12">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
             Lugares de Interés en Calle Jerusalén
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg lg:text-xl text-gray-600 max-w-3xl mx-auto px-4">
             Explora los lugares únicos de nuestra comunidad. Desde miradores con vistas espectaculares 
             hasta pulperías tradicionales y sitios históricos llenos de cultura.
           </p>
         </div>
 
         {/* Filtros y búsqueda */}
-        <div className="card-theme mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
+        <div className="card-theme mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             {/* Búsqueda */}
             <div className="flex-1">
               <div className="input-container">
@@ -225,7 +220,7 @@ const PlacesPage: React.FC = () => {
             </div>
 
             {/* Filtro por categoría */}
-            <div className="md:w-64">
+            <div className="sm:w-48 md:w-56 lg:w-64">
               <div className="input-container">
                 <Filter className="input-icon" />
                 <select
@@ -242,34 +237,14 @@ const PlacesPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Botones para mostrar/ocultar mapas */}
-            <div className="flex space-x-2">
-              <button
-                onClick={() => {
-                  setShowMap(!showMap);
-                  setShowGoogleEarth(false);
-                }}
-                className={`btn-theme-secondary flex items-center space-x-2 ${
-                  showMap && !showGoogleEarth ? 'bg-primary-600 text-white' : ''
-                }`}
-              >
-                {showMap && !showGoogleEarth ? <Eye className="w-4 h-4" /> : <Navigation className="w-4 h-4" />}
-                <span>{showMap && !showGoogleEarth ? 'Ocultar Mapa' : 'Ver Mapa'}</span>
-              </button>
-              
-              <button
-                onClick={() => {
-                  setShowGoogleEarth(!showGoogleEarth);
-                  setShowMap(false);
-                }}
-                className={`btn-theme-secondary flex items-center space-x-2 ${
-                  showGoogleEarth ? 'bg-primary-600 text-white' : ''
-                }`}
-              >
-                <Globe className="w-4 h-4" />
-                <span>{showGoogleEarth ? 'Ocultar Vista 3D' : 'Vista 3D'}</span>
-              </button>
-            </div>
+            {/* Botón para mostrar/ocultar mapa */}
+            <button
+              onClick={() => setShowMap(!showMap)}
+              className="btn-theme-secondary flex items-center space-x-2 whitespace-nowrap"
+            >
+              {showMap ? <Eye className="w-4 h-4" /> : <Navigation className="w-4 h-4" />}
+              <span>{showMap ? 'Ocultar Mapa' : 'Ver Mapa'}</span>
+            </button>
           </div>
         </div>
 
@@ -284,17 +259,6 @@ const PlacesPage: React.FC = () => {
           </div>
         )}
 
-        {/* Vista 3D de Google Earth */}
-        {showGoogleEarth && (
-          <div className="card-theme mb-8">
-            <GoogleEarthStream
-              url={googleEarthUrl}
-              title="Vista 3D de Calle Jerusalén"
-              height="500px"
-              coordinates={{ lat: 10.02193128, lng: -84.07814492 }}
-            />
-          </div>
-        )}
 
         {/* Lista de lugares */}
         {loading ? (
@@ -311,63 +275,63 @@ const PlacesPage: React.FC = () => {
             ))}
           </div>
         ) : filteredPlaces.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="places-grid">
             {filteredPlaces.map(place => (
-              <div key={place.id} className="card-theme overflow-hidden hover:shadow-xl transition-all duration-300 group">
-                <div className="relative h-48 overflow-hidden">
+              <div key={place.id} className="card-theme overflow-hidden hover:shadow-xl transition-all duration-300 group h-full flex flex-col">
+                <div className="relative h-40 sm:h-44 md:h-48 lg:h-52 overflow-hidden">
                   <Image
                     src={place.image}
                     alt={place.name}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-300"
                   />
-                  <div className="absolute top-4 right-4 bg-white bg-opacity-90 px-3 py-1 rounded-full flex items-center space-x-1">
-                    <Star className="w-4 h-4 text-yellow-500 fill-current" />
-                    <span className="text-sm font-medium">{place.rating}</span>
+                  <div className="absolute top-2 sm:top-3 right-2 sm:right-3 bg-white bg-opacity-90 px-2 sm:px-3 py-1 rounded-full flex items-center space-x-1">
+                    <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 fill-current" />
+                    <span className="text-xs sm:text-sm font-medium text-gray-800">{place.rating}</span>
                   </div>
-                  <div className="absolute bottom-4 left-4">
+                  <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3">
                     <span className="bg-primary-600 text-white px-2 py-1 rounded-full text-xs font-medium">
                       {categories.find(cat => cat.value === place.category)?.label}
                     </span>
                   </div>
                 </div>
                 
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3 group-hover:text-primary-600 transition-colors duration-300">
+                <div className="p-4 sm:p-5 lg:p-6 flex-1 flex flex-col">
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3 group-hover:text-primary-600 transition-colors duration-300 line-clamp-2">
                     {place.name}
                   </h3>
-                  <p className="text-gray-600 mb-4 line-clamp-2">
+                  <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4 line-clamp-2 flex-1">
                     {place.description}
                   </p>
                   
-                  <div className="space-y-3 text-sm text-gray-500 mb-6">
-                    <div className="flex items-center space-x-2">
-                      <MapPin className="w-4 h-4 text-primary-500" />
-                      <span>{place.address}</span>
+                  <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm text-gray-500 mb-4 sm:mb-6">
+                    <div className="flex items-start space-x-2">
+                      <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-primary-500 mt-0.5 flex-shrink-0" />
+                      <span className="line-clamp-2">{place.address}</span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Clock className="w-4 h-4 text-primary-500" />
-                      <span>{place.hours}</span>
+                      <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-primary-500 flex-shrink-0" />
+                      <span className="line-clamp-1">{place.hours}</span>
                     </div>
                   </div>
                   
-                  <div className="flex space-x-2">
+                  <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mt-auto">
                     <Link
                       href={`/visitantes/lugares/${place.id}`}
-                      className="flex-1 btn-theme-primary flex items-center justify-center"
+                      className="flex-1 btn-theme-primary flex items-center justify-center text-xs sm:text-sm whitespace-nowrap py-2 sm:py-2.5 min-w-0"
                     >
-                      <Eye className="w-4 h-4 mr-2" />
-                      Ver Detalles
+                      <Eye className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1.5 flex-shrink-0" />
+                      <span className="truncate">Ver</span>
                     </Link>
                     <button 
                       onClick={() => {
                         setSelectedPlace(place);
                         setShowMap(true);
                       }}
-                      className="flex-1 btn-theme-secondary"
+                      className="flex-1 btn-theme-secondary flex items-center justify-center text-xs sm:text-sm whitespace-nowrap py-2 sm:py-2.5 min-w-0"
                     >
-                      <Navigation className="w-4 h-4 mr-2" />
-                      Mapa
+                      <Navigation className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1.5 flex-shrink-0" />
+                      <span className="truncate">Mapa</span>
                     </button>
                   </div>
                 </div>
@@ -391,5 +355,33 @@ const PlacesPage: React.FC = () => {
 };
 
 export default PlacesPage;
+
+// CSS personalizado para evitar superposición de tarjetas
+const styles = `
+  .places-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+    gap: 1.5rem !important;
+    width: 100% !important;
+  }
+  
+  .places-grid .card-theme {
+    position: relative !important;
+    z-index: 1 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+  
+  .places-grid .card-theme:hover {
+    z-index: 2 !important;
+  }
+`;
+
+// Agregar estilos al head
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
+}
 
 

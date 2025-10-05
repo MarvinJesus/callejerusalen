@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   Settings,
   Crown,
-  BookOpen
+  BookOpen,
+  Briefcase
 } from 'lucide-react';
 import SettingsDropdown from './SettingsDropdown';
 import toast from 'react-hot-toast';
@@ -131,6 +132,13 @@ const Navbar: React.FC = () => {
                     >
                       <BookOpen className="w-4 h-4" />
                       <span>Historia</span>
+                    </Link>
+                    <Link 
+                      href="/admin/services" 
+                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+                    >
+                      <Briefcase className="w-4 h-4" />
+                      <span>Servicios</span>
                     </Link>
                     <Link 
                       href="/visitantes" 
@@ -371,6 +379,13 @@ const Navbar: React.FC = () => {
                         onClick={() => setIsMenuOpen(false)}
                       >
                         Gestión de Historia
+                      </Link>
+                      <Link 
+                        href="/admin/services" 
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        Gestión de Servicios
                       </Link>
                       <Link 
                         href="/visitantes" 

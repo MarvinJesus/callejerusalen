@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, MapPin, Clock, Star, Phone, Globe, Camera, Navigation, Eye } from 'lucide-react';
 import Link from 'next/link';
-import GoogleEarthStream from '@/components/GoogleEarthStream';
+import OpenStreetMap3D from '@/components/OpenStreetMap3D';
 
 interface Place {
   id: string;
@@ -190,7 +190,7 @@ export default function PlaceDetailPage() {
                 </span>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="hidden sm:flex items-center space-x-2">
               <button
                 onClick={openInGoogleMaps}
                 className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
@@ -415,12 +415,11 @@ export default function PlaceDetailPage() {
               
               <div className="relative">
                 {showGoogleEarth ? (
-                  <GoogleEarthStream
-                    url={googleEarthUrl}
+                  <OpenStreetMap3D
+                    coordinates={place.coordinates}
                     title={`Vista 3D de ${place.name}`}
                     height="400px"
                     className="rounded-lg"
-                    coordinates={place.coordinates}
                   />
                 ) : (
                   <>
@@ -445,7 +444,7 @@ export default function PlaceDetailPage() {
               </div>
               
               {/* Botones de acción adicionales */}
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4 hidden sm:flex flex-wrap gap-2">
                 <button
                   onClick={openInGoogleMaps}
                   className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
