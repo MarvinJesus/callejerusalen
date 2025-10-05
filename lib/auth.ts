@@ -126,8 +126,16 @@ export const logoutUser = async (): Promise<void> => {
 
   try {
     await signOut(auth);
+    console.log('✅ Usuario cerró sesión exitosamente');
+    
+    // Limpiar cualquier estado local si es necesario
+    if (typeof window !== 'undefined') {
+      // Limpiar localStorage si hay datos de sesión guardados
+      localStorage.removeItem('userSession');
+      localStorage.removeItem('userProfile');
+    }
   } catch (error) {
-    console.error('Error al cerrar sesión:', error);
+    console.error('❌ Error al cerrar sesión:', error);
     throw error;
   }
 };

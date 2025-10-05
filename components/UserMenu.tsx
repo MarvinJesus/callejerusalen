@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { logoutUser } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 import { 
   User, 
   LogOut, 
@@ -19,14 +20,18 @@ import toast from 'react-hot-toast';
 const UserMenu: React.FC = () => {
   const { user, userProfile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const router = useRouter();
 
   const handleLogout = async () => {
     try {
       await logoutUser();
       toast.success('Sesión cerrada correctamente');
       setIsOpen(false);
+      // Redirigir al home después del logout exitoso
+      router.push('/');
     } catch (error) {
       toast.error('Error al cerrar sesión');
+      console.error('Error al cerrar sesión:', error);
     }
   };
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import UserMenu from '@/components/UserMenu';
 import { useAuth } from '@/context/AuthContext';
@@ -18,16 +19,41 @@ import {
   FileText,
   Activity,
   Key,
-  Settings
+  Settings,
+  Menu,
+  X,
+  EyeOff,
+  UserX,
+  CheckCircle,
+  XCircle,
+  Plus,
+  Edit,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import { 
   getAllUsers, 
   getPendingRegistrations,
   UserProfile,
   RegistrationRequest,
-  getUserPermissions
+  getUserPermissions,
+  createUserAsAdmin, 
+  deleteUserAsAdmin, 
+  updateUserAsAdmin,
+  approveRegistration,
+  rejectRegistration,
+  isMainSuperAdmin,
+  canDeleteUser,
+  canModifyUserRole,
+  changeUserStatus,
+  reactivateUser,
+  recoverUser,
+  getUsersByStatus,
+  UserRole,
+  UserStatus,
+  checkEmailExists
 } from '@/lib/auth';
-import { Permission } from '@/lib/permissions';
+import { Permission, hasPermission, hasAnyPermission } from '@/lib/permissions';
 import PermissionManager from '@/components/PermissionManager';
 import { PermissionList } from '@/components/PermissionBadge';
 import { auth } from '@/lib/firebase';
@@ -44,6 +70,21 @@ const AdminDashboard: React.FC = () => {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline' | 'error'>('connected');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [userPermissions, setUserPermissions] = useState<Permission[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [showEditUser, setShowEditUser] = useState<UserProfile | null>(null);
+  const [showRejectModal, setShowRejectModal] = useState<{ requestId: string; reason: string } | null>(null);
+  const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'active' | 'inactive' | 'deleted'>('all');
+  const [showConfirmModal, setShowConfirmModal] = useState<{
+    type: 'deactivate' | 'activate' | 'delete' | 'recover';
+    user: UserProfile;
+    action: string;
+    description: string;
+    icon: React.ReactNode;
+    confirmText: string;
+    confirmClass: string;
+  } | null>(null);
 
   // Función para verificar si el usuario es super admin
   const isSuperAdmin = () => {
@@ -53,13 +94,35 @@ const AdminDashboard: React.FC = () => {
     return false;
   };
 
-  const tabs = [
-    { id: 'overview', label: 'Resumen', icon: BarChart3 },
-    { id: 'users', label: 'Usuarios', icon: Users },
-    { id: 'registrations', label: 'Solicitudes', icon: Clock },
-    ...(isSuperAdmin() ? [{ id: 'permissions', label: 'Permisos', icon: Key }] : []),
-    { id: 'security', label: 'Seguridad', icon: Shield },
+  const navItems = [
+    { id: 'overview', label: 'Resumen', icon: BarChart3, required: ['analytics.view', 'reports.view', 'logs.view', 'users.view', 'security.view'] as Permission[], any: true },
+    { id: 'users', label: 'Usuarios', icon: Users, required: ['users.view'] as Permission[] },
+    { id: 'registrations', label: 'Solicitudes', icon: Clock, required: ['registrations.view'] as Permission[] },
+    { id: 'logs', label: 'Logs', icon: FileText, required: ['logs.view'] as Permission[] },
+    ...(isSuperAdmin() 
+      ? [{ id: 'permissions', label: 'Permisos', icon: Key, required: [] as Permission[] }]
+      : [{ id: 'permissions', label: 'Permisos', icon: Key, required: ['permissions.view'] as Permission[] }]
+    ),
+    { id: 'security', label: 'Seguridad', icon: Shield, required: ['security.view'] as Permission[] },
+    { id: 'settings', label: 'Configuración', icon: Settings, required: ['settings.view'] as any[] },
   ];
+
+  const canSeeItem = (item: { required?: Permission[]; any?: boolean; id: string }) => {
+    if (isSuperAdmin()) return true;
+    const userPerms = (userProfile?.permissions || []) as Permission[];
+    if (!item.required || item.required.length === 0) return true;
+    return item.any ? hasAnyPermission(userPerms, item.required) : hasPermission(userPerms, item.required[0] as Permission);
+  };
+
+  const visibleNavItems = navItems.filter(canSeeItem);
+
+  // Garantizar que la pestaña activa sea accesible; si no, cambiar a la primera visible
+  useEffect(() => {
+    const currentItem = navItems.find(i => i.id === activeTab);
+    if (currentItem && !canSeeItem(currentItem)) {
+      setActiveTab(visibleNavItems[0]?.id || 'overview');
+    }
+  }, [userProfile, activeTab]);
 
 
   // Cargar datos al montar el componente
@@ -67,7 +130,45 @@ const AdminDashboard: React.FC = () => {
     if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || isSuperAdmin()) {
       loadDashboardData();
     }
-  }, [userProfile]);
+  }, [userProfile, userStatusFilter]);
+
+  // Abrir sidebar por defecto en pantallas medianas+ y cerrarlo en mobile
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isDesktop = window.innerWidth >= 768; // md breakpoint
+      setSidebarOpen(isDesktop);
+      setSidebarCollapsed(!isDesktop);
+    }
+  }, []);
+
+  // Función para alternar el sidebar con animación
+  const toggleSidebar = () => {
+    // Agregar efecto de bounce al botón
+    const button = document.querySelector('[aria-label*="menú"]') as HTMLElement;
+    if (button) {
+      button.style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        button.style.transform = '';
+      }, 150);
+    }
+
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      // En desktop, alternar entre colapsado y expandido
+      setSidebarCollapsed(!sidebarCollapsed);
+    } else {
+      // En mobile, alternar entre abierto y cerrado
+      setSidebarOpen(!sidebarOpen);
+    }
+  };
+
+  // Función para cerrar sidebar en mobile al navegar
+  const handleNavClick = (tabId: string) => {
+    setActiveTab(tabId);
+    // Cerrar sidebar en mobile después de navegar
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  };
 
 
 
@@ -88,10 +189,17 @@ const AdminDashboard: React.FC = () => {
         console.warn('⚠️ Error al obtener métricas del servidor:', metricsResponse.status);
       }
       
-      // Obtener datos de usuarios para la tabla (incluyendo todos los estados)
+      // Obtener datos de usuarios para la tabla según el filtro de estado
       console.log('🔍 Obteniendo usuarios para la tabla...');
-      const usersData = await getAllUsers(true); // Incluir usuarios eliminados para conteo completo
-      console.log('📊 Usuarios obtenidos para tabla:', usersData.length);
+      let usersData: UserProfile[];
+      
+      if (userStatusFilter === 'all') {
+        usersData = await getAllUsers(true); // Incluir usuarios eliminados para vista completa
+      } else {
+        usersData = await getUsersByStatus(userStatusFilter as UserStatus);
+      }
+      
+      console.log('📊 Usuarios obtenidos para tabla:', usersData.length, `(filtro: ${userStatusFilter})`);
       
       // Obtener datos de forma individual para mejor manejo de errores
       let registrationsData: RegistrationRequest[] = [];
@@ -204,6 +312,191 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleApproveRegistration = async (requestId: string, role: UserRole = 'comunidad') => {
+    if (!userProfile?.uid) return;
+    
+    try {
+      await approveRegistration(requestId, userProfile.uid, role);
+      await loadDashboardData();
+    } catch (error) {
+      console.error('Error al aprobar registro:', error);
+    }
+  };
+
+  const handleRejectRegistration = async (requestId: string, reason: string) => {
+    if (!userProfile?.uid) return;
+    
+    try {
+      await rejectRegistration(requestId, userProfile.uid, reason);
+      await loadDashboardData();
+    } catch (error) {
+      console.error('Error al rechazar registro:', error);
+    }
+  };
+
+  const handleDeleteUser = (user: UserProfile) => {
+    showConfirmationModal(user, 'delete');
+  };
+
+  const showConfirmationModal = (user: UserProfile, action: 'deactivate' | 'activate' | 'delete' | 'recover') => {
+    const confirmations = {
+      deactivate: {
+        action: 'Desactivar Usuario',
+        description: `¿Estás seguro de que quieres desactivar a ${user.displayName || user.email}?\n\nEl usuario no podrá acceder al sistema hasta que sea reactivado.`,
+        icon: <UserX className="w-8 h-8 text-yellow-600" />,
+        confirmText: 'Desactivar Usuario',
+        confirmClass: 'bg-yellow-600 hover:bg-yellow-700'
+      },
+      activate: {
+        action: 'Activar Usuario',
+        description: `¿Estás seguro de que quieres activar a ${user.displayName || user.email}?\n\nEl usuario podrá acceder nuevamente al sistema.`,
+        icon: <UserCheck className="w-8 h-8 text-green-600" />,
+        confirmText: 'Activar Usuario',
+        confirmClass: 'bg-green-600 hover:bg-green-700'
+      },
+      delete: {
+        action: 'Eliminar Usuario',
+        description: `¿Estás seguro de que quieres eliminar permanentemente a ${user.displayName || user.email}?\n\nEsta acción es irreversible y el usuario no podrá acceder al sistema.`,
+        icon: <Trash2 className="w-8 h-8 text-red-600" />,
+        confirmText: 'Eliminar Permanentemente',
+        confirmClass: 'bg-red-600 hover:bg-red-700'
+      },
+      recover: {
+        action: 'Recuperar Usuario',
+        description: `¿Estás seguro de que quieres recuperar a ${user.displayName || user.email}?\n\nEl usuario será reactivado y podrá acceder nuevamente al sistema.`,
+        icon: <RotateCcw className="w-8 h-8 text-blue-600" />,
+        confirmText: 'Recuperar Usuario',
+        confirmClass: 'bg-blue-600 hover:bg-blue-700'
+      }
+    };
+
+    setShowConfirmModal({
+      type: action,
+      user,
+      ...confirmations[action]
+    });
+  };
+
+  const handleConfirmAction = async () => {
+    if (!showConfirmModal || !userProfile?.uid) return;
+
+    const { type, user } = showConfirmModal;
+    const reason = prompt('¿Cuál es la razón para esta acción? (opcional)');
+    if (reason === null) return; // Usuario canceló
+
+    // Verificar si se puede modificar el usuario
+    if (!canDeleteUser(user.email)) {
+      alert('No se puede modificar al super administrador principal');
+      setShowConfirmModal(null);
+      return;
+    }
+
+    try {
+      let newStatus: UserStatus;
+      let successMessage: string;
+
+      switch (type) {
+        case 'deactivate':
+          newStatus = 'inactive';
+          successMessage = '✅ Usuario desactivado exitosamente';
+          await changeUserStatus(user.uid, newStatus, userProfile.uid, reason || undefined);
+          break;
+        case 'activate':
+          newStatus = 'active';
+          successMessage = '✅ Usuario activado exitosamente';
+          await changeUserStatus(user.uid, newStatus, userProfile.uid, reason || undefined);
+          break;
+        case 'delete':
+          newStatus = 'deleted';
+          successMessage = '🗑️ Usuario eliminado exitosamente';
+          await changeUserStatus(user.uid, newStatus, userProfile.uid, reason || undefined);
+          break;
+        case 'recover':
+          await recoverUser(user.uid, userProfile.uid, reason || undefined);
+          successMessage = '✅ Usuario recuperado exitosamente';
+          break;
+      }
+
+      await loadDashboardData();
+      setShowConfirmModal(null);
+      alert(successMessage);
+    } catch (error) {
+      console.error('Error al ejecutar acción:', error);
+      alert(error instanceof Error ? error.message : 'Error al ejecutar la acción');
+      setShowConfirmModal(null);
+    }
+  };
+
+  const handleChangeUserStatus = async (uid: string, newStatus: UserStatus, userEmail: string, reason?: string) => {
+    if (!userProfile?.uid) return;
+    
+    // Verificar si se puede modificar el usuario
+    if (!canDeleteUser(userEmail)) {
+      alert('No se puede modificar al super administrador principal');
+      return;
+    }
+    
+    try {
+      await changeUserStatus(uid, newStatus, userProfile.uid, reason);
+      await loadDashboardData();
+      
+      const statusMessages = {
+        'active': '✅ Usuario activado exitosamente',
+        'inactive': '⚠️ Usuario desactivado exitosamente',
+        'deleted': '🗑️ Usuario eliminado exitosamente'
+      };
+      
+      alert(statusMessages[newStatus]);
+    } catch (error) {
+      console.error('Error al cambiar estado del usuario:', error);
+      alert(error instanceof Error ? error.message : 'Error al cambiar estado del usuario');
+    }
+  };
+
+  const handleReactivateUser = (user: UserProfile) => {
+    showConfirmationModal(user, 'activate');
+  };
+
+  const handleRecoverUser = (user: UserProfile) => {
+    showConfirmationModal(user, 'recover');
+  };
+
+  const handleUpdateUser = async (uid: string, updates: Partial<UserProfile>, userEmail: string) => {
+    if (!userProfile?.uid) return;
+    
+    // Verificar si se puede modificar el rol del usuario
+    if (updates.role && !canModifyUserRole(userEmail)) {
+      alert('No se puede cambiar el rol del super administrador principal');
+      return;
+    }
+    
+    try {
+      await updateUserAsAdmin(uid, updates, userProfile.uid);
+      await loadDashboardData();
+      setShowEditUser(null);
+    } catch (error) {
+      console.error('Error al actualizar usuario:', error);
+      alert(error instanceof Error ? error.message : 'Error al actualizar usuario');
+    }
+  };
+
+  const handleCreateUser = async (userData: { email: string; password: string; displayName: string; role: UserRole }) => {
+    if (!userProfile?.uid) return;
+    
+    try {
+      await createUserAsAdmin(userData.email, userData.password, userData.displayName, userData.role, userProfile.uid);
+      await loadDashboardData();
+      setShowCreateUser(false);
+      alert('✅ Usuario creado exitosamente');
+    } catch (error) {
+      console.error('Error al crear usuario:', error);
+      
+      // Mostrar mensaje de error específico
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al crear usuario';
+      alert(`❌ ${errorMessage}`);
+    }
+  };
+
   // Calcular estadísticas usando las métricas del servidor (más confiables)
   const calculateStats = () => {
     // Usar métricas del servidor si están disponibles
@@ -252,6 +545,16 @@ const AdminDashboard: React.FC = () => {
   };
 
   const statsData = calculateStats();
+ 
+  // UI helpers for sidebar avatar
+  const getInitials = (name?: string | null) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    const first = parts[0]?.charAt(0) || '';
+    const last = parts.length > 1 ? parts[parts.length - 1].charAt(0) : '';
+    return (first + last).toUpperCase();
+  };
+  const pendingCount = pendingRegistrations.length;
   
   const stats = [
     { 
@@ -313,11 +616,11 @@ const AdminDashboard: React.FC = () => {
   const renderOverview = () => {
     return (
       <div className="space-y-6">
-        <h2 className="text-xl font-semibold text-gray-900">Resumen del Sistema</h2>
+        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Resumen del Sistema</h2>
 
         {/* Mensaje de estado de conexión */}
         {connectionStatus === 'error' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 shadow-sm">
             <div className="flex items-center">
               <AlertTriangle className="w-5 h-5 text-yellow-600 mr-3" />
               <div>
@@ -334,13 +637,13 @@ const AdminDashboard: React.FC = () => {
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, index) => (
-            <div key={index} className="card">
+            <div key={index} className="card border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow bg-white">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-3xl font-extrabold text-gray-900 leading-tight">{stat.value}</p>
                 </div>
-                <div className={`p-3 rounded-full bg-gray-100`}>
+                <div className={`p-3 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 ring-1 ring-gray-200`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
                 </div>
               </div>
@@ -352,11 +655,11 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Recent Activities */}
-        <div className="card">
+        <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Actividad Reciente</h3>
           <div className="space-y-3">
             {getRecentActivities().map((activity, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                 <div className="flex items-center space-x-3">
                   <div className={`p-2 rounded-full ${
                     activity.type === 'user' ? 'bg-blue-100' :
@@ -386,94 +689,267 @@ const AdminDashboard: React.FC = () => {
     );
   };
 
-   const renderUsers = () => (
-     <div className="space-y-6">
-       <div className="card">
-         <h3 className="text-lg font-semibold text-gray-900 mb-4">Gestión de Usuarios (Solo Lectura)</h3>
-        
-        {loading ? (
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="text-gray-500 mt-2">Cargando usuarios...</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Permisos</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Acceso</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
-                  <tr key={user.uid}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">{user.displayName}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.role === 'super_admin' ? 'bg-red-100 text-red-800' :
-                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                        user.role === 'comunidad' ? 'bg-green-100 text-green-800' :
-                        user.role === 'visitante' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {user.isActive ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="max-w-xs">
-                        <PermissionList 
-                          permissions={user.permissions || []} 
-                          size="sm" 
-                          maxVisible={2}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.lastLogin ? getTimeAgo(user.lastLogin) : 'Nunca'}
-                    </td>
-                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                       {user.role === 'admin' && isSuperAdmin() && (
-                         <button
-                           onClick={() => loadUserPermissions(user)}
-                           className="flex items-center space-x-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                         >
-                           <Key className="w-3 h-3" />
-                           <span>Gestionar</span>
-                         </button>
+   const renderUsers = () => {
+     const categorizeUsers = (users: UserProfile[]) => {
+       const categories = {
+         superAdmins: users.filter(user => user.role === 'super_admin'),
+         admins: users.filter(user => user.role === 'admin'),
+         community: users.filter(user => user.role === 'comunidad' || user.role === 'visitante')
+       };
+       return categories;
+     };
+
+     const getStatusBadge = (status: UserStatus) => {
+       const statusConfig = {
+         'active': { color: 'bg-green-100 text-green-800', text: 'Activo' },
+         'inactive': { color: 'bg-yellow-100 text-yellow-800', text: 'Inactivo' },
+         'deleted': { color: 'bg-red-100 text-red-800', text: 'Eliminado' }
+       };
+       const config = statusConfig[status];
+       return (
+         <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+           {config.text}
+         </span>
+       );
+     };
+
+     const getDeletedUserInfo = (user: UserProfile) => {
+       if (user.status !== 'deleted') return null;
+       
+       return (
+         <div className="text-xs text-gray-500 mt-1">
+           {user.statusChangedAt && (
+             <div>Eliminado: {new Date(user.statusChangedAt).toLocaleDateString()}</div>
+           )}
+           {user.statusChangedBy && (
+             <div>Por: {user.statusChangedBy}</div>
+           )}
+           {user.statusReason && (
+             <div>Razón: {user.statusReason}</div>
+           )}
+         </div>
+       );
+     };
+
+     const renderUserTable = (categoryUsers: UserProfile[], title: string, icon: React.ReactNode, bgColor: string) => (
+       <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+         <div className="flex items-center space-x-2 mb-4">
+           <div className={`p-2 rounded-lg ${bgColor}`}>
+             {icon}
+           </div>
+           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+           <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-sm">
+             {categoryUsers.length}
+           </span>
+         </div>
+         
+         {categoryUsers.length === 0 ? (
+           <div className="text-center py-8">
+             <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+             <p className="text-gray-500">No hay usuarios en esta categoría</p>
+           </div>
+         ) : (
+           <div className="overflow-x-auto">
+             <table className="min-w-full divide-y divide-gray-200">
+               <thead className="bg-gray-50">
+                 <tr>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Acceso</th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                 </tr>
+               </thead>
+               <tbody className="bg-white divide-y divide-gray-200">
+                 {categoryUsers.map((user) => (
+                   <tr key={user.uid} className={isMainSuperAdmin(user.email) ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <div className="flex items-center">
+                         <div className="flex-shrink-0 h-10 w-10">
+                           <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                             <span className="text-sm font-medium text-primary-600">
+                               {user.displayName?.charAt(0) || user.email.charAt(0)}
+                             </span>
+                           </div>
+                         </div>
+                         <div className="ml-4">
+                           <div className="text-sm font-medium text-gray-900">{user.displayName || 'Sin nombre'}</div>
+                           <div className="text-sm text-gray-500">{user.email}</div>
+                           {isMainSuperAdmin(user.email) && (
+                             <div className="text-xs text-yellow-600 font-medium">⭐ Super Admin Principal</div>
+                           )}
+                           {getDeletedUserInfo(user)}
+                         </div>
+                       </div>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                         user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
+                         user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                         user.role === 'comunidad' ? 'bg-green-100 text-green-800' :
+                         'bg-gray-100 text-gray-800'
+                       }`}>
+                         {user.role === 'super_admin' ? 'Super Admin' :
+                          user.role === 'admin' ? 'Admin' :
+                          user.role === 'comunidad' ? 'Comunidad' :
+                          'Visitante'}
+                       </span>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       {getStatusBadge(user.status)}
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                       {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Nunca'}
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                       <button
+                         onClick={() => setShowEditUser(user)}
+                         className="text-primary-600 hover:text-primary-900"
+                         title="Editar usuario"
+                       >
+                         <Edit className="w-4 h-4" />
+                       </button>
+                       {canDeleteUser(user.email) && (
+                         <>
+                           {user.status === 'active' && (
+                             <button
+                               onClick={() => showConfirmationModal(user, 'deactivate')}
+                               className="text-yellow-600 hover:text-yellow-900 transition-colors"
+                               title="Desactivar usuario"
+                             >
+                               <UserX className="w-4 h-4" />
+                             </button>
+                           )}
+                           {user.status === 'inactive' && (
+                             <button
+                               onClick={() => handleReactivateUser(user)}
+                               className="text-green-600 hover:text-green-900 transition-colors"
+                               title="Reactivar usuario"
+                             >
+                               <UserCheck className="w-4 h-4" />
+                             </button>
+                           )}
+                           {user.status === 'deleted' && (
+                             <button
+                               onClick={() => handleRecoverUser(user)}
+                               className="text-blue-600 hover:text-blue-900 transition-colors"
+                               title="Recuperar usuario"
+                             >
+                               <RotateCcw className="w-4 h-4" />
+                             </button>
+                           )}
+                           {user.status !== 'deleted' && (
+                             <button
+                               onClick={() => handleDeleteUser(user)}
+                               className="text-red-600 hover:text-red-900 transition-colors"
+                               title="Eliminar usuario"
+                             >
+                               <Trash2 className="w-4 h-4" />
+                             </button>
+                           )}
+                         </>
                        )}
                      </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           </div>
+         )}
+       </div>
+     );
+
+     const categorizedUsers = categorizeUsers(users);
+     
+     return (
+       <div className="space-y-6">
+         <div className="flex justify-between items-center mb-4">
+           <h2 className="text-xl font-semibold text-gray-900">Gestión de Usuarios</h2>
+           {isSuperAdmin() && (
+             <button
+               onClick={() => setShowCreateUser(true)}
+               className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+             >
+               <Plus className="w-4 h-4" />
+               <span>Crear Usuario</span>
+             </button>
+           )}
+         </div>
+
+         {/* Filtro de Estado */}
+         <div className="flex items-center justify-between mb-6">
+           <div className="flex items-center space-x-4">
+             <label className="text-sm font-medium text-gray-700">Filtrar por estado:</label>
+             <select
+               value={userStatusFilter}
+               onChange={(e) => setUserStatusFilter(e.target.value as any)}
+               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+             >
+               <option value="all">Todos los usuarios</option>
+               <option value="active">Solo activos</option>
+               <option value="inactive">Solo inactivos</option>
+               <option value="deleted">Solo eliminados</option>
+             </select>
+             <span className="text-sm text-gray-500">
+               {users.length} usuario{users.length !== 1 ? 's' : ''} encontrado{users.length !== 1 ? 's' : ''}
+             </span>
+           </div>
+           
+           {userStatusFilter === 'deleted' && (
+             <div className="flex items-center space-x-2 text-sm text-red-600">
+               <Trash2 className="w-4 h-4" />
+               <span>Usuarios eliminados pueden ser recuperados</span>
+             </div>
+           )}
+         </div>
+         
+         {loading ? (
+           <div className="text-center py-8">
+             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+             <p className="text-gray-500 mt-2">Cargando usuarios...</p>
+           </div>
+         ) : users.length === 0 ? (
+           <div className="text-center py-8">
+             <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+             <p className="text-gray-500 mb-2">No se encontraron usuarios</p>
+             <p className="text-sm text-gray-400">Verifica la consola para más detalles</p>
+           </div>
+         ) : (
+           <div className="space-y-6">
+             {/* Super Administradores */}
+             {renderUserTable(
+               categorizedUsers.superAdmins,
+               'Super Administradores',
+               <Shield className="w-5 h-5 text-purple-600" />,
+               'bg-purple-100'
+             )}
+             
+             {/* Administradores */}
+             {renderUserTable(
+               categorizedUsers.admins,
+               'Administradores',
+               <Settings className="w-5 h-5 text-blue-600" />,
+               'bg-blue-100'
+             )}
+             
+             {/* Comunidad */}
+             {renderUserTable(
+               categorizedUsers.community,
+               'Comunidad',
+               <Users className="w-5 h-5 text-green-600" />,
+               'bg-green-100'
+             )}
+           </div>
+         )}
+       </div>
+     );
+   };
 
    const renderRegistrations = () => (
      <div className="space-y-6">
-       <div className="card">
-         <h3 className="text-lg font-semibold text-gray-900 mb-4">Solicitudes de Registro (Solo Lectura)</h3>
-        
+       <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+         <h3 className="text-lg font-semibold text-gray-900 mb-4">Solicitudes de Registro Pendientes</h3>
+         
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
@@ -487,7 +963,7 @@ const AdminDashboard: React.FC = () => {
         ) : (
           <div className="space-y-4">
             {pendingRegistrations.map((request) => (
-              <div key={request.id} className="p-4 border border-gray-200 rounded-lg">
+              <div key={request.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                 <div className="flex justify-between items-start">
                   <div>
                     <h4 className="font-medium text-gray-900">{request.displayName}</h4>
@@ -499,9 +975,28 @@ const AdminDashboard: React.FC = () => {
                       {getTimeAgo(request.createdAt)}
                     </p>
                   </div>
-                  <div className="text-sm text-gray-500">
-                    Pendiente de aprobación por Super Administrador
-                  </div>
+                  {isSuperAdmin() ? (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleApproveRegistration(request.id, request.requestedRole)}
+                        className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Aprobar</span>
+                      </button>
+                      <button
+                        onClick={() => setShowRejectModal({ requestId: request.id, reason: '' })}
+                        className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        <span>Rechazar</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500">
+                      Pendiente de aprobación por Super Administrador
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -516,7 +1011,7 @@ const AdminDashboard: React.FC = () => {
       {selectedUser ? (
         <div className="space-y-6">
           {/* Header con información del usuario */}
-          <div className="card">
+          <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
@@ -531,7 +1026,7 @@ const AdminDashboard: React.FC = () => {
               </div>
               <button
                 onClick={() => setSelectedUser(null)}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 border border-gray-200"
               >
                 Volver a Lista
               </button>
@@ -539,7 +1034,7 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Gestor de permisos */}
-          <div className="card">
+          <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
             <PermissionManager
               targetUser={selectedUser}
               onPermissionsUpdated={handlePermissionsUpdated}
@@ -548,7 +1043,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="card">
+          <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Gestión de Permisos de Usuarios
             </h3>
@@ -563,7 +1058,7 @@ const AdminDashboard: React.FC = () => {
                 {users
                   .filter(user => user.role === 'admin' && user.isActive)
                   .map((user) => (
-                    <div key={user.uid} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                    <div key={user.uid} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center justify-between">
                         <div>
                           <h5 className="font-medium text-gray-900">{user.displayName}</h5>
@@ -578,7 +1073,7 @@ const AdminDashboard: React.FC = () => {
                         </div>
                          <button
                            onClick={() => loadUserPermissions(user)}
-                           className="flex items-center space-x-1 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                           className="flex items-center space-x-1 px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
                          >
                            <Key className="w-3 h-3" />
                            <span>Gestionar</span>
@@ -598,7 +1093,7 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Información sobre permisos */}
-          <div className="card">
+          <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
             <h4 className="font-medium text-gray-900 mb-4">Información sobre Permisos</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -628,12 +1123,95 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 
+   const renderLogs = () => (
+     <div className="space-y-6">
+       <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+         <div className="flex justify-between items-center mb-4">
+           <h3 className="text-lg font-semibold text-gray-900">Logs del Sistema</h3>
+           <button
+             onClick={async () => {
+               try {
+                 console.log('🔄 Recargando logs manualmente...');
+                 const logsData = await getServerLogs(50);
+                 console.log('📋 Logs recargados:', logsData);
+                 setSystemLogs(logsData);
+               } catch (error) {
+                 console.error('❌ Error al recargar logs:', error);
+               }
+             }}
+             className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+           >
+             🔄 Recargar
+           </button>
+         </div>
+         
+         {loading ? (
+           <div className="text-center py-8">
+             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
+             <p className="text-gray-500 mt-2">Cargando logs...</p>
+           </div>
+         ) : systemLogs.length === 0 ? (
+           <div className="text-center py-8">
+             <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+             <p className="text-gray-500 mb-2">No hay logs del sistema</p>
+             <p className="text-sm text-gray-400">Los logs aparecerán aquí cuando se realicen acciones en el sistema</p>
+           </div>
+         ) : (
+           <div className="overflow-x-auto">
+             <table className="min-w-full divide-y divide-gray-200">
+               <thead className="bg-gray-50">
+                 <tr>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nivel</th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalles</th>
+                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                 </tr>
+               </thead>
+               <tbody className="bg-white divide-y divide-gray-200">
+                 {systemLogs.map((log) => (
+                   <tr key={log.id}>
+                     <td className="px-6 py-4 whitespace-nowrap">
+                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                         log.level === 'ERROR' ? 'bg-red-100 text-red-800' :
+                         log.level === 'WARN' ? 'bg-yellow-100 text-yellow-800' :
+                         log.level === 'INFO' ? 'bg-blue-100 text-blue-800' :
+                         'bg-gray-100 text-gray-800'
+                       }`}>
+                         {log.level}
+                       </span>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                       {log.details?.userEmail || 'Sistema'}
+                     </td>
+                     <td className="px-6 py-4 text-sm text-gray-500">
+                       <div>
+                         <div className="font-medium">{log.message}</div>
+                         {log.details && Object.keys(log.details).length > 0 && (
+                           <div className="text-xs text-gray-400 mt-1">
+                             {JSON.stringify(log.details, null, 2)}
+                           </div>
+                         )}
+                       </div>
+                     </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                       {getTimeAgo(new Date(log.timestamp))}
+                     </td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
+           </div>
+         )}
+       </div>
+     </div>
+   );
+
    const renderSecurity = () => (
      <div className="space-y-6">
-       <div className="card">
-         <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitoreo de Seguridad (Solo Lectura)</h3>
+       <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+         <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitoreo de Seguridad</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="p-4 bg-gray-50 rounded-lg">
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex items-center space-x-3 mb-3">
               <Camera className="w-6 h-6 text-green-600" />
               <h4 className="font-medium text-gray-900">Cámaras de Seguridad</h4>
@@ -650,7 +1228,7 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="p-4 bg-gray-50 rounded-lg">
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="flex items-center space-x-3 mb-3">
               <Bell className="w-6 h-6 text-red-600" />
               <h4 className="font-medium text-gray-900">Alertas de Pánico</h4>
@@ -672,23 +1250,76 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 
+  const renderSettings = () => (
+    <div className="space-y-6">
+      <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Configuración del Sistema</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <h4 className="font-medium text-gray-900">Registro de Nuevos Usuarios</h4>
+              <p className="text-sm text-gray-600">Permitir registro automático</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" className="sr-only peer" defaultChecked />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <h4 className="font-medium text-gray-900">Notificaciones por Email</h4>
+              <p className="text-sm text-gray-600">Enviar alertas por correo</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" className="sr-only peer" defaultChecked />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
         {/* Header */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm border-b">
+          <div className="w-full px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-6">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Panel de Administración</h1>
+                <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">Panel de Administración</h1>
                 <p className="text-gray-600">Administrador - Calle Jerusalén</p>
               </div>
                <div className="flex items-center space-x-4">
+                {/* Toggle sidebar button with rotation animation */}
+                <button
+                  className={`inline-flex items-center justify-center p-2 rounded-lg transition-all duration-300 transform hover:scale-105 active:scale-95 ${
+                    sidebarOpen || !sidebarCollapsed 
+                      ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 shadow-lg shadow-indigo-200/50' 
+                      : 'text-gray-600 hover:bg-gray-100 shadow-sm hover:shadow-md'
+                  }`}
+                  aria-label={sidebarOpen || !sidebarCollapsed ? "Cerrar menú" : "Abrir menú"}
+                  onClick={toggleSidebar}
+                >
+                  <div className="relative w-6 h-6">
+                    <X className={`absolute inset-0 w-6 h-6 transition-all duration-300 ${
+                      sidebarOpen || !sidebarCollapsed 
+                        ? 'opacity-100 rotate-0 scale-100' 
+                        : 'opacity-0 rotate-45 scale-75'
+                    }`} />
+                    <Menu className={`absolute inset-0 w-6 h-6 transition-all duration-300 ${
+                      sidebarOpen || !sidebarCollapsed 
+                        ? 'opacity-0 -rotate-45 scale-75' 
+                        : 'opacity-100 rotate-0 scale-100'
+                    }`} />
+                  </div>
+                </button>
                  {/* User Menu */}
                  <UserMenu />
                  
                  {/* Indicador de estado de conexión */}
-                 <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
+                 <div className={`hidden sm:flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
                    connectionStatus === 'connected' ? 'bg-green-100 text-green-800' :
                    connectionStatus === 'error' ? 'bg-yellow-100 text-yellow-800' :
                    'bg-red-100 text-red-800'
@@ -705,7 +1336,7 @@ const AdminDashboard: React.FC = () => {
                    </span>
                  </div>
                  
-                 <span className="px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
+                 <span className="hidden sm:inline px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
                    {userProfile?.role === 'super_admin' ? 'Super Administrador' : 'Administrador'}
                  </span>
                </div>
@@ -713,36 +1344,683 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {/* Tabs */}
-          <div className="border-b border-gray-200 mb-8">
-            <nav className="-mb-px flex space-x-8">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <tab.icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+          <div className="flex gap-6">
+            {/* Sidebar - desktop collapsible */}
+            <aside className={`${sidebarCollapsed ? '-translate-x-full opacity-0 w-0' : 'translate-x-0 opacity-100 w-64'} transition-all duration-500 ease-in-out shrink-0 hidden md:block`}> 
+              <div className="sticky top-6">
+                <div className={`${sidebarCollapsed ? 'p-2' : 'p-3'} transform transition-all duration-500 bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden`}>
+                  {/* User mini card */}
+                  <div className={`${sidebarCollapsed ? 'flex justify-center opacity-0' : 'flex opacity-100'} items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200 transition-all duration-500 delay-75`}>
+                    <div className="h-10 w-10 rounded-full bg-indigo-600 text-white grid place-items-center text-sm font-semibold">
+                      {getInitials(userProfile?.displayName || userProfile?.email || '')}
+                    </div>
+                    <div className={`min-w-0 transition-all duration-500 delay-150 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden scale-0' : 'opacity-100 scale-100'}`}>
+                      <p className="text-sm font-semibold text-gray-900 truncate">{userProfile?.displayName || userProfile?.email}</p>
+                      <p className="text-xs text-gray-600 truncate">{userProfile?.role === 'super_admin' ? 'Super Administrador' : 'Administrador'}</p>
+                    </div>
+                  </div>
 
-          {/* Content */}
-          {activeTab === 'overview' && renderOverview()}
-          {activeTab === 'users' && renderUsers()}
-          {activeTab === 'registrations' && renderRegistrations()}
-          {activeTab === 'permissions' && renderPermissions()}
-          {activeTab === 'security' && renderSecurity()}
+                  <div className={`${sidebarCollapsed ? 'px-1 py-2 opacity-0' : 'px-2 py-3 opacity-100'} transition-all duration-500 delay-100`}> 
+                    <p className={`text-xs font-semibold text-gray-500 uppercase tracking-wider transition-all duration-500 delay-200 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden scale-0' : 'opacity-100 scale-100'}`}>Navegación</p>
+                  </div>
+                  <nav className="mt-1 space-y-1">
+                    {visibleNavItems.map((item, index) => (
+                      <button
+                        key={item.id}
+                        onClick={() => handleNavClick(item.id)}
+                        className={`group w-full flex items-center gap-3 ${sidebarCollapsed ? 'px-2 justify-center opacity-0' : 'px-3 opacity-100'} py-2 rounded-xl text-sm font-medium transition-all border relative overflow-hidden ${
+                          activeTab === item.id
+                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm'
+                            : 'text-gray-700 border-transparent hover:bg-gray-50 hover:border-gray-200'
+                        }`}
+                        style={{ transitionDelay: `${200 + (index * 50)}ms` }}
+                        title={sidebarCollapsed ? item.label : undefined}
+                      >
+                        <span className={`absolute left-0 top-0 h-full w-1 rounded-r-xl transition-colors ${activeTab === item.id ? 'bg-indigo-500' : 'bg-transparent group-hover:bg-gray-200'}`}></span>
+                        <item.icon className={`w-4 h-4 ${activeTab === item.id ? 'text-indigo-600' : 'text-gray-500 group-hover:text-gray-700'} ${sidebarCollapsed ? 'flex-shrink-0' : ''}`} />
+                        <span className={`${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden scale-0' : 'opacity-100 scale-100 flex-1'} text-left transition-all duration-500`}>{item.label}</span>
+                        {item.id === 'registrations' && pendingCount > 0 && (
+                          <span className={`ml-auto inline-flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full bg-red-100 text-red-700 transition-all duration-500 ${sidebarCollapsed ? 'opacity-0 w-0 overflow-hidden scale-0' : 'opacity-100 scale-100'}`}>
+                            {pendingCount}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+              </div>
+            </aside>
+
+            {/* Sidebar - mobile drawer */}
+            {sidebarOpen && (
+              <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true">
+                <div 
+                  className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-all duration-500 animate-in fade-in" 
+                  onClick={() => setSidebarOpen(false)}
+                ></div>
+                <div className="absolute inset-y-0 left-0 w-72 bg-white shadow-2xl p-4 transform transition-transform duration-500 ease-out animate-in slide-in-from-left">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-base font-semibold text-gray-900">Menú</h2>
+                    <button
+                      className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
+                      aria-label="Cerrar menú"
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {/* User mini card */}
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200 mb-3">
+                    <div className="h-10 w-10 rounded-full bg-indigo-600 text-white grid place-items-center text-sm font-semibold">
+                      {getInitials(userProfile?.displayName || userProfile?.email || '')}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{userProfile?.displayName || userProfile?.email}</p>
+                      <p className="text-xs text-gray-600 truncate">{userProfile?.role === 'super_admin' ? 'Super Administrador' : 'Administrador'}</p>
+                    </div>
+                  </div>
+                  <div className="border border-gray-200 rounded-lg p-2">
+                    <nav className="space-y-1">
+                      {visibleNavItems.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => handleNavClick(item.id)}
+                          className={`group w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-all border relative overflow-hidden ${
+                            activeTab === item.id
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200 shadow-sm'
+                              : 'text-gray-700 border-transparent hover:bg-gray-50 hover:border-gray-200'
+                          }`}
+                        >
+                          <span className={`absolute left-0 top-0 h-full w-1 rounded-r-xl transition-colors ${activeTab === item.id ? 'bg-indigo-500' : 'bg-transparent group-hover:bg-gray-200'}`}></span>
+                          <item.icon className={`w-4 h-4 ${activeTab === item.id ? 'text-indigo-600' : 'text-gray-500 group-hover:text-gray-700'}`} />
+                          <span className="flex-1 text-left">{item.label}</span>
+                          {item.id === 'registrations' && pendingCount > 0 && (
+                            <span className="ml-auto inline-flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full bg-red-100 text-red-700">
+                              {pendingCount}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </nav>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Main content */}
+            <main className="flex-1 min-w-0">
+              {/* Guardas de permisos por sección */}
+              {activeTab === 'overview' && (
+                isSuperAdmin() || hasAnyPermission((userProfile?.permissions || []) as Permission[], ['analytics.view', 'reports.view', 'logs.view', 'users.view', 'security.view'] as Permission[])
+                  ? renderOverview()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver el resumen.</p></div>
+              )}
+              {activeTab === 'users' && (
+                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'users.view')
+                  ? renderUsers()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver usuarios.</p></div>
+              )}
+              {activeTab === 'registrations' && (
+                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'registrations.view')
+                  ? renderRegistrations()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver solicitudes.</p></div>
+              )}
+              {activeTab === 'logs' && (
+                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'logs.view')
+                  ? renderLogs()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver logs.</p></div>
+              )}
+              {activeTab === 'permissions' && (
+                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'permissions.view')
+                  ? renderPermissions()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para gestionar permisos.</p></div>
+              )}
+              {activeTab === 'security' && (
+                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'security.view')
+                  ? renderSecurity()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver seguridad.</p></div>
+              )}
+              {activeTab === 'settings' && (
+                isSuperAdmin() || hasAnyPermission((userProfile?.permissions || []) as Permission[], ['settings.view'] as any[])
+                  ? renderSettings()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver configuración.</p></div>
+              )}
+            </main>
+          </div>
         </div>
       </div>
+
+      {/* Modal de confirmación elegante */}
+      {showConfirmModal && (
+        <ConfirmationModal
+          isOpen={!!showConfirmModal}
+          onClose={() => setShowConfirmModal(null)}
+          onConfirm={handleConfirmAction}
+          title={showConfirmModal.action}
+          description={showConfirmModal.description}
+          icon={showConfirmModal.icon}
+          confirmText={showConfirmModal.confirmText}
+          confirmClass={showConfirmModal.confirmClass}
+          user={showConfirmModal.user}
+        />
+      )}
+
+      {/* Modal para crear usuario */}
+      {showCreateUser && (
+        <CreateUserModal
+          onClose={() => setShowCreateUser(false)}
+          onSubmit={handleCreateUser}
+        />
+      )}
+
+      {/* Modal para editar usuario */}
+      {showEditUser && (
+        <EditUserModal
+          user={showEditUser}
+          onClose={() => setShowEditUser(null)}
+          onSubmit={(updates) => handleUpdateUser(showEditUser.uid, updates, showEditUser.email)}
+        />
+      )}
+
+      {/* Modal para rechazar solicitud */}
+      {showRejectModal && (
+        <RejectModal
+          requestId={showRejectModal.requestId}
+          onClose={() => setShowRejectModal(null)}
+          onSubmit={(reason) => {
+            handleRejectRegistration(showRejectModal.requestId, reason);
+            setShowRejectModal(null);
+          }}
+        />
+      )}
     </ProtectedRoute>
+  );
+};
+
+// Componente para crear usuario
+const CreateUserModal: React.FC<{
+  onClose: () => void;
+  onSubmit: (userData: { email: string; password: string; displayName: string; role: UserRole }) => void;
+}> = ({ onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    displayName: '',
+    role: 'comunidad' as UserRole
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+
+  // Función para verificar email con debounce
+  const checkEmailAvailability = async (email: string) => {
+    if (!email || !email.includes('@')) {
+      setEmailError(null);
+      return;
+    }
+
+    setIsCheckingEmail(true);
+    setEmailError(null);
+
+    try {
+      const exists = await checkEmailExists(email);
+      
+      if (exists) {
+        setEmailError('Este email ya está registrado en el sistema');
+      } else {
+        setEmailError(null);
+      }
+    } catch (error) {
+      console.error('Error al verificar email:', error);
+      setEmailError(null);
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
+
+  // Debounce para verificar email
+  const [emailTimeout, setEmailTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Cleanup del timeout al desmontar el componente
+  React.useEffect(() => {
+    return () => {
+      if (emailTimeout) {
+        clearTimeout(emailTimeout);
+      }
+    };
+  }, [emailTimeout]);
+  
+  const handleEmailChange = (email: string) => {
+    setFormData({ ...formData, email });
+    
+    // Limpiar timeout anterior
+    if (emailTimeout) {
+      clearTimeout(emailTimeout);
+    }
+    
+    // Establecer nuevo timeout
+    const timeout = setTimeout(() => {
+      checkEmailAvailability(email);
+    }, 500);
+    
+    setEmailTimeout(timeout);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Verificar si hay errores de email
+    if (emailError) {
+      alert('❌ Por favor, corrige el error del email antes de continuar');
+      return;
+    }
+    
+    // Verificar si se está validando el email
+    if (isCheckingEmail) {
+      alert('⏳ Por favor, espera a que termine la validación del email');
+      return;
+    }
+    
+    onSubmit(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Crear Nuevo Usuario</h3>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre Completo
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.displayName}
+              onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email
+            </label>
+            <div className="relative">
+              <input
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) => handleEmailChange(e.target.value)}
+                className={`w-full px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-2 text-gray-900 bg-white ${
+                  emailError 
+                    ? 'border-red-300 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-primary-500'
+                }`}
+                placeholder="usuario@ejemplo.com"
+              />
+              {isCheckingEmail && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                </div>
+              )}
+              {!isCheckingEmail && formData.email && !emailError && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <svg className="h-4 w-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+              {!isCheckingEmail && emailError && (
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                  <svg className="h-4 w-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+              )}
+            </div>
+            {emailError && (
+              <p className="mt-1 text-sm text-red-600">{emailError}</p>
+            )}
+            {isCheckingEmail && (
+              <p className="mt-1 text-sm text-blue-600">Verificando disponibilidad...</p>
+            )}
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Contraseña
+            </label>
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                minLength={6}
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+                placeholder="Mínimo 6 caracteres"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rol
+            </label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+            >
+              <option value="comunidad">Residente</option>
+              <option value="admin">Administrador</option>
+              <option value="super_admin">Super Administrador</option>
+            </select>
+          </div>
+          
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+            >
+              Crear Usuario
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Componente para editar usuario
+const EditUserModal: React.FC<{
+  user: UserProfile;
+  onClose: () => void;
+  onSubmit: (updates: Partial<UserProfile>) => void;
+}> = ({ user, onClose, onSubmit }) => {
+  const [formData, setFormData] = useState({
+    displayName: user.displayName,
+    role: user.role,
+    isActive: user.isActive
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Editar Usuario</h3>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nombre Completo
+            </label>
+            <input
+              type="text"
+              required
+              value={formData.displayName}
+              onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email (solo lectura)
+            </label>
+            <input
+              type="email"
+              value={user.email}
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-500"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Rol
+            </label>
+            <select
+              value={formData.role}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value as UserRole })}
+              disabled={isMainSuperAdmin(user.email)}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white ${
+                isMainSuperAdmin(user.email) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              <option value="comunidad">Residente</option>
+              <option value="admin">Administrador</option>
+              <option value="super_admin">Super Administrador</option>
+            </select>
+            {isMainSuperAdmin(user.email) && (
+              <p className="text-xs text-yellow-600 mt-1">⭐ El rol del super administrador principal no puede ser modificado</p>
+            )}
+          </div>
+          
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="isActive"
+              checked={formData.isActive}
+              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+            />
+            <label htmlFor="isActive" className="ml-2 block text-sm text-gray-700">
+              Usuario activo
+            </label>
+          </div>
+          
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+            >
+              Actualizar Usuario
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Componente para rechazar solicitud
+const RejectModal: React.FC<{
+  requestId: string;
+  onClose: () => void;
+  onSubmit: (reason: string) => void;
+}> = ({ onClose, onSubmit }) => {
+  const [reason, setReason] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (reason.trim()) {
+      onSubmit(reason.trim());
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Rechazar Solicitud</h3>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Motivo del rechazo
+            </label>
+            <textarea
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
+              rows={4}
+              placeholder="Explica por qué se rechaza esta solicitud..."
+            />
+          </div>
+          
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={!reason.trim()}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Rechazar Solicitud
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Componente de confirmación elegante
+const ConfirmationModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+  confirmText: string;
+  confirmClass: string;
+  user: UserProfile;
+}> = ({ isOpen, onClose, onConfirm, title, description, icon, confirmText, confirmClass, user }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md transform transition-all">
+        {/* Header con gradiente */}
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 rounded-t-2xl border-b border-gray-200">
+          <div className="flex items-center space-x-3">
+            <div className="flex-shrink-0">
+              {icon}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+              <p className="text-sm text-gray-600">Confirmación de acción</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Contenido */}
+        <div className="px-6 py-6">
+          {/* Información del usuario */}
+          <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
+            <div className="flex items-center space-x-3">
+              <div className="h-12 w-12 rounded-full bg-indigo-100 flex items-center justify-center">
+                <span className="text-lg font-semibold text-indigo-600">
+                  {(user.displayName || user.email).charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {user.displayName || 'Sin nombre'}
+                </p>
+                <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                <div className="flex items-center space-x-2 mt-1">
+                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                    user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
+                    user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                    user.role === 'comunidad' ? 'bg-green-100 text-green-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {user.role}
+                  </span>
+                  <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                    user.status === 'active' ? 'bg-green-100 text-green-800' :
+                    user.status === 'inactive' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {user.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Descripción */}
+          <div className="mb-6">
+            <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
+              {description}
+            </p>
+          </div>
+
+          {/* Advertencia para acciones críticas */}
+          {(title.includes('Eliminar') || title.includes('Desactivar')) && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-medium text-red-800">Acción crítica</h4>
+                  <p className="text-sm text-red-700 mt-1">
+                    Esta acción tendrá un impacto inmediato en el acceso del usuario al sistema.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer con botones */}
+        <div className="bg-gray-50 px-6 py-4 rounded-b-2xl border-t border-gray-200">
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onConfirm}
+              className={`px-4 py-2 text-sm font-medium text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors ${confirmClass}`}
+            >
+              {confirmText}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
