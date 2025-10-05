@@ -2,6 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mejorar visibilidad de controles de Google Maps */
+.gm-style .gm-control {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border: 1px solid #ddd !important;
+  color: #333 !important;
+  font-weight: 500 !important;
+  text-shadow: none !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+}
+
+.gm-style .gm-control:hover {
+  background-color: #f5f5f5 !important;
+  border-color: #999 !important;
+}
+
+.gm-style .gm-control-active {
+  background-color: #fff !important;
+  border: 1px solid #007bff !important;
+  color: #007bff !important;
+  font-weight: 600 !important;
+}
+
+.gm-style .gm-control-wrapper {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  padding: 4px !important;
+}
+
+/* Mejorar botones de tipo de mapa */
+.gm-style .gm-style-mtc {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.gm-style .gm-style-mtc .gm-style-mtc button {
+  background-color: transparent !important;
+  color: #333 !important;
+  font-weight: 500 !important;
+  border: none !important;
+  padding: 8px 12px !important;
+  margin: 2px !important;
+  border-radius: 4px !important;
+}
+
+.gm-style .gm-style-mtc .gm-style-mtc button:hover {
+  background-color: #f5f5f5 !important;
+}
+
+.gm-style .gm-style-mtc .gm-style-mtc button.gm-style-mtc-selected {
+  background-color: #007bff !important;
+  color: white !important;
+  font-weight: 600 !important;
+}
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {

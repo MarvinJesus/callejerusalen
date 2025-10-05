@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 
 interface CulturalTradition {
   id?: string;
-  name: string;
+  title: string;
   description: string;
   category: string;
   image: string;
@@ -119,7 +119,7 @@ const TraditionsPage: React.FC = () => {
   const filteredTraditions = historyData?.traditions.filter(tradition => {
     if (!tradition) return false;
     
-    const matchesSearch = (tradition.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (tradition.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (tradition.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = !selectedCategory || (tradition.category || '') === selectedCategory;
     const matchesImportance = !selectedImportance || (tradition.importance || '') === selectedImportance;
@@ -318,7 +318,7 @@ const TraditionsPage: React.FC = () => {
                   <div className="h-48 bg-gray-200 relative overflow-hidden">
                     <img
                       src={tradition.image}
-                      alt={tradition.name}
+                      alt={tradition.title}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
@@ -340,7 +340,7 @@ const TraditionsPage: React.FC = () => {
                           {tradition.importance}
                         </span>
                       </div>
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{tradition.name}</h3>
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{tradition.title}</h3>
                     </div>
                   </div>
 

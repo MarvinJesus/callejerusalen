@@ -536,34 +536,74 @@ const HistoryPage: React.FC = () => {
                 <Link 
                   key={index}
                   href={link.url} 
-                  className={`flex items-center space-x-3 p-4 ${link.color} rounded-lg hover:opacity-80 transition-colors duration-200`}
+                  className="group flex items-center space-x-4 p-6 bg-gradient-to-br from-primary-50 to-primary-100 border border-primary-200 rounded-xl hover:from-primary-100 hover:to-primary-200 hover:border-primary-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
                 >
-                  {getIconByName(link.icon)}
-                  <span className="font-medium">{link.title}</span>
+                  <div className="flex-shrink-0 w-12 h-12 bg-primary-600 rounded-lg flex items-center justify-center text-white group-hover:bg-primary-700 transition-colors duration-300">
+                    {getIconByName(link.icon)}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-primary-900 group-hover:text-primary-800 transition-colors duration-300">
+                      {link.title}
+                    </h3>
+                    <p className="text-sm text-primary-700 group-hover:text-primary-600 transition-colors duration-300">
+                      {link.description}
+                    </p>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-primary-600 group-hover:text-primary-700 group-hover:translate-x-1 transition-all duration-300" />
                 </Link>
               ))
             ) : (
               <>
                 <Link 
                   href="/visitantes/lugares" 
-                  className="flex items-center space-x-3 p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors duration-200"
+                  className="group flex items-center space-x-4 p-6 bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
                 >
-                  <MapPin className="w-6 h-6 text-blue-600" />
-                  <span className="font-medium text-blue-900">Lugares de Interés</span>
+                  <div className="flex-shrink-0 w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center text-white group-hover:bg-blue-700 transition-colors duration-300">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-blue-900 group-hover:text-blue-800 transition-colors duration-300">
+                      Lugares de Interés
+                    </h3>
+                    <p className="text-sm text-blue-700 group-hover:text-blue-600 transition-colors duration-300">
+                      Descubre los sitios más importantes de la comunidad
+                    </p>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-blue-600 group-hover:text-blue-700 group-hover:translate-x-1 transition-all duration-300" />
                 </Link>
                 <Link 
                   href="/visitantes/eventos" 
-                  className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors duration-200"
+                  className="group flex items-center space-x-4 p-6 bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl hover:from-green-100 hover:to-green-200 hover:border-green-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
                 >
-                  <Calendar className="w-6 h-6 text-green-600" />
-                  <span className="font-medium text-green-900">Eventos Culturales</span>
+                  <div className="flex-shrink-0 w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center text-white group-hover:bg-green-700 transition-colors duration-300">
+                    <Calendar className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-green-900 group-hover:text-green-800 transition-colors duration-300">
+                      Eventos Culturales
+                    </h3>
+                    <p className="text-sm text-green-700 group-hover:text-green-600 transition-colors duration-300">
+                      Participa en nuestras celebraciones tradicionales
+                    </p>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-green-600 group-hover:text-green-700 group-hover:translate-x-1 transition-all duration-300" />
                 </Link>
                 <Link 
                   href="/visitantes/contacto" 
-                  className="flex items-center space-x-3 p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors duration-200"
+                  className="group flex items-center space-x-4 p-6 bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl hover:from-purple-100 hover:to-purple-200 hover:border-purple-300 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1"
                 >
-                  <Users className="w-6 h-6 text-purple-600" />
-                  <span className="font-medium text-purple-900">Contacto</span>
+                  <div className="flex-shrink-0 w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center text-white group-hover:bg-purple-700 transition-colors duration-300">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-purple-900 group-hover:text-purple-800 transition-colors duration-300">
+                      Contacto
+                    </h3>
+                    <p className="text-sm text-purple-700 group-hover:text-purple-600 transition-colors duration-300">
+                      Conéctate con nuestra comunidad
+                    </p>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-purple-600 group-hover:text-purple-700 group-hover:translate-x-1 transition-all duration-300" />
                 </Link>
               </>
             )}

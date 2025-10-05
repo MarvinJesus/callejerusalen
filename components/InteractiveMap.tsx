@@ -176,6 +176,56 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
     };
   }, [map, places, isGoogleMapsLoaded, onPlaceSelect]);
 
+  // Manejar lugar seleccionado
+  useEffect(() => {
+    if (!map || !selectedPlace || !isGoogleMapsLoaded) return;
+
+    const { lat, lng } = selectedPlace.coordinates;
+    
+    // Centrar el mapa en el lugar seleccionado
+    map.setCenter({ lat, lng });
+    map.setZoom(18);
+
+    // Crear Street View para el lugar seleccionado
+    const streetViewService = new google.maps.StreetViewService();
+    streetViewService.getPanorama({
+      location: { lat, lng },
+      radius: 50
+    }, (data, status) => {
+      if (status === 'OK' && data) {
+        // Crear nuevo panorama para el lugar seleccionado
+        const panorama = new google.maps.StreetViewPanorama(document.getElementById('interactive-map')!, {
+          position: { lat, lng },
+          pov: {
+            heading: 0, // Dirección por defecto
+            pitch: 0 // Nivel de la calle
+          },
+          zoom: 1,
+          visible: true,
+          addressControl: true,
+          linksControl: true,
+          panControl: true,
+          enableCloseButton: true,
+          showRoadLabels: true
+        });
+
+        // Establecer Street View en el mapa
+        map.setStreetView(panorama);
+        setIsStreetView(true);
+      } else {
+        // Si no hay Street View disponible, ocultar Street View y mostrar mapa normal
+        const streetView = map.getStreetView();
+        if (streetView) {
+          streetView.setVisible(false);
+          setIsStreetView(false);
+        }
+        // Centrar en el lugar sin Street View
+        map.setCenter({ lat, lng });
+        map.setZoom(18);
+      }
+    });
+  }, [selectedPlace, map, isGoogleMapsLoaded]);
+
   const getMarkerIcon = (category: string) => {
     const colors: { [key: string]: string } = {
       miradores: '#3B82F6', // Azul
@@ -222,8 +272,10 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 }
               }
             }}
-            className={`flex items-center space-x-1 px-3 py-1 rounded-lg text-sm transition-colors ${
-              isStreetView ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'
+            className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm ${
+              isStreetView 
+                ? 'bg-blue-600 text-white shadow-md hover:bg-blue-700' 
+                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400'
             }`}
           >
             <Eye className="w-4 h-4" />
@@ -240,7 +292,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
               }
             }}
-            className="flex items-center space-x-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
+            className="flex items-center space-x-1 px-3 py-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm"
           >
             <Eye className="w-4 h-4" />
             <span>Satélite</span>
@@ -256,7 +308,7 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 map.setMapTypeId(google.maps.MapTypeId.ROADMAP);
               }
             }}
-            className="flex items-center space-x-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm transition-colors"
+            className="flex items-center space-x-1 px-3 py-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm"
           >
             <Navigation className="w-4 h-4" />
             <span>Mapa</span>
@@ -264,7 +316,53 @@ const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </div>
       </div>
       
-      <div id="interactive-map" className="w-full h-96 rounded-lg border border-gray-200"></div>
+      <div className="relative">
+        <div id="interactive-map" className="w-full h-96 rounded-lg border border-gray-200"></div>
+        <style jsx>{`
+          #interactive-map .gm-style-cc {
+            display: none !important;
+          }
+          #interactive-map .gm-style .gm-style-iw-c {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+            border-radius: 8px !important;
+          }
+          #interactive-map .gm-style .gm-style-iw-tc {
+            display: none !important;
+          }
+          #interactive-map .gm-style .gm-style-iw-d {
+            overflow: hidden !important;
+            border-radius: 8px !important;
+          }
+          /* Mejorar visibilidad de controles nativos de Google Maps */
+          #interactive-map .gm-control-active {
+            background-color: #fff !important;
+            border: 1px solid #ccc !important;
+            color: #333 !important;
+            font-weight: 500 !important;
+          }
+          #interactive-map .gm-control {
+            background-color: #fff !important;
+            border: 1px solid #ddd !important;
+            color: #333 !important;
+            font-weight: 500 !important;
+          }
+          #interactive-map .gm-control:hover {
+            background-color: #f5f5f5 !important;
+            border-color: #999 !important;
+          }
+          /* Mejorar controles de tipo de mapa */
+          #interactive-map .gm-style .gm-control-wrapper {
+            background-color: rgba(255, 255, 255, 0.95) !important;
+            border-radius: 4px !important;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1) !important;
+          }
+          #interactive-map .gm-style .gm-control-wrapper .gm-control {
+            color: #333 !important;
+            font-weight: 500 !important;
+            text-shadow: none !important;
+          }
+        `}</style>
+      </div>
       
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
         <div className="flex items-center space-x-1">

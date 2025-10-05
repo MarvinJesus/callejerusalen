@@ -202,3 +202,4 @@ Una vez implementada la solución optimizada:
 **¿Necesitas ayuda?** Revisa los logs de Firebase o contacta al equipo de desarrollo.
 
 
+

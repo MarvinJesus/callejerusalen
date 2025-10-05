@@ -42,9 +42,86 @@ const MapPage: React.FC = () => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [mapComponent, setMapComponent] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   const getStreetViewUrl = (lat: number, lng: number) =>
     `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}&heading=0&pitch=0&fov=80`;
+
+  // Función dedicada para activar Street View
+  const activateStreetView = (lat: number, lng: number, pointName: string) => {
+    console.log(`=== ACTIVATING STREET VIEW ===`);
+    console.log(`Point: ${pointName}`);
+    console.log(`Coordinates: ${lat}, ${lng}`);
+    console.log('Map state:', { 
+      map: !!map, 
+      mapComponent: !!mapComponent, 
+      mapReady,
+      googleMaps: !!(window.google && window.google.maps)
+    });
+    
+    // Verificar que Google Maps esté disponible
+    if (!window.google || !window.google.maps) {
+      console.log('❌ Google Maps not available, opening in new tab');
+      const streetViewUrl = getStreetViewUrl(lat, lng);
+      window.open(streetViewUrl, '_blank');
+      return;
+    }
+
+    // Si el mapa no está listo, intentar esperar un poco y reintentar
+    if (!mapReady || !map) {
+      console.log('⏳ Map not ready, waiting and retrying...');
+      setTimeout(() => {
+        activateStreetView(lat, lng, pointName);
+      }, 500);
+      return;
+    }
+
+    // Método 1: Intentar usar el método del mapComponent (más confiable)
+    if (mapComponent?.showStreetView && typeof mapComponent.showStreetView === 'function') {
+      console.log('🔄 Method 1: Using mapComponent.showStreetView');
+      try {
+        const success = mapComponent.showStreetView(lat, lng, 0, 0);
+        if (success) {
+          console.log('✅ Street View activated via mapComponent');
+          return;
+        } else {
+          console.log('❌ mapComponent.showStreetView returned false');
+        }
+      } catch (error) {
+        console.error('❌ Error in mapComponent.showStreetView:', error);
+      }
+    } else {
+      console.log('❌ mapComponent.showStreetView not available');
+    }
+
+    // Método 2: Usar el mapa directamente
+    if (map && typeof map.getStreetView === 'function') {
+      console.log('🔄 Method 2: Using direct map Street View');
+      try {
+        const panorama = map.getStreetView();
+        console.log('Panorama object:', panorama);
+        
+        if (panorama && typeof panorama.setPosition === 'function') {
+          panorama.setPosition({ lat, lng });
+          panorama.setPov({ heading: 0, pitch: 0 });
+          panorama.setVisible(true);
+          console.log('✅ Street View activated via direct map');
+          return;
+        } else {
+          console.log('❌ Panorama methods not available');
+        }
+      } catch (error) {
+        console.error('❌ Error using direct map Street View:', error);
+      }
+    } else {
+      console.log('❌ Direct map Street View not available');
+    }
+
+    // Fallback: Abrir en nueva pestaña
+    console.log('🔄 Fallback: Opening Street View in new tab');
+    const streetViewUrl = getStreetViewUrl(lat, lng);
+    window.open(streetViewUrl, '_blank');
+  };
 
   // Función para convertir lugares de la API a puntos del mapa
   const convertPlacesToMapPoints = (places: any[]): MapPoint[] => {
@@ -191,6 +268,34 @@ const MapPage: React.FC = () => {
     fetchRealData();
   }, [user]); // Recargar cuando cambie el usuario para mostrar/ocultar cámaras
 
+  // Efecto para inicializar el estado del mapa cuando se carga la página
+  useEffect(() => {
+    console.log('Mapa page mounted, initializing...');
+    // Asegurar que el estado inicial esté correcto
+    setMapReady(false);
+    setMap(null);
+    setMapComponent(null);
+    
+    // Verificar si Google Maps ya está disponible
+    const checkGoogleMaps = () => {
+      if (window.google && window.google.maps) {
+        console.log('✅ Google Maps already available');
+        setMapReady(true);
+      } else {
+        console.log('⏳ Google Maps not yet available, waiting...');
+        // Reintentar después de un breve delay
+        setTimeout(checkGoogleMaps, 500);
+      }
+    };
+    
+    checkGoogleMaps();
+  }, []);
+
+  // Efecto para debuggear el estado del mapa
+  useEffect(() => {
+    console.log('Map state changed:', { map: !!map, mapComponent: !!mapComponent, mapReady });
+  }, [map, mapComponent, mapReady]);
+
   useEffect(() => {
     let filtered = allPoints;
 
@@ -281,6 +386,27 @@ const MapPage: React.FC = () => {
               >
                 <Eye className="w-4 h-4" />
                 <span>Ver Todo</span>
+              </button>
+
+              {/* Botón de prueba para Street View */}
+              <button
+                onClick={() => {
+                  console.log('Test Street View button clicked');
+                  console.log('Map state:', { map: !!map, mapComponent: !!mapComponent, mapReady });
+                  activateStreetView(10.02280446907578, -84.07857158309207, 'Test Location');
+                }}
+                className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors text-sm ${
+                  mapReady 
+                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                    : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                }`}
+                disabled={!mapReady}
+                title={mapReady ? 'Probar Street View' : 'Esperando que el mapa se cargue...'}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-3.33 0-10 1.67-10 5v1h20v-1c0-3.33-6.67-5-10-5z"/>
+                </svg>
+                <span>{mapReady ? 'Test Street View' : 'Cargando...'}</span>
               </button>
             </div>
           </div>
@@ -403,17 +529,35 @@ const MapPage: React.FC = () => {
               </div>
             </div>
           ) : (
-            <ImprovedMapComponent
-              points={filteredPoints}
-              center={[10.02280446907578, -84.07857158309207]}
-              zoom={20}
-              height="600px"
-              showControls={true}
-              onMapLoad={(mapInstance) => {
-                setMap(mapInstance);
-                setMapComponent(mapInstance);
-              }}
-            />
+            <>
+              <ImprovedMapComponent
+                points={filteredPoints}
+                center={[10.02280446907578, -84.07857158309207]}
+                zoom={20}
+                height="600px"
+                showControls={true}
+                onMapLoad={(mapInstance) => {
+                  console.log('=== MAP LOADED CALLBACK ===');
+                  console.log('mapInstance:', mapInstance);
+                  
+                  if (mapInstance && mapInstance.showStreetView) {
+                    console.log('✅ showStreetView method is available');
+                  } else {
+                    console.log('❌ showStreetView method is NOT available');
+                  }
+                  
+                  // Actualizar estado de manera síncrona
+                  setMap(mapInstance);
+                  setMapComponent(mapInstance);
+                  
+                  // Marcar como listo inmediatamente
+                  setMapReady(true);
+                  console.log('✅ Map state updated and ready');
+                }}
+              />
+              {/* Contenedor oculto para Street View independiente */}
+              <div className="street-view-container" style={{ display: 'none', position: 'absolute', top: '-1000px' }}></div>
+            </>
           )}
         </div>
 
@@ -483,23 +627,15 @@ const MapPage: React.FC = () => {
                     {/* Action: Street View */}
                     <div className="mt-3">
                       <button
-                        onClick={() => {
-                          console.log('Street View button clicked for:', point.name);
-                          console.log('mapComponent:', mapComponent);
-                          if (mapComponent?.showStreetView) {
-                            console.log('Calling showStreetView with coordinates:', point.coordinates[0], point.coordinates[1]);
-                            mapComponent.showStreetView(point.coordinates[0], point.coordinates[1], 0, 0);
-                          } else {
-                            console.log('showStreetView method not available');
-                          }
-                        }}
+                        onClick={() => activateStreetView(point.coordinates[0], point.coordinates[1], point.name)}
                         className="inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                         title="Ver en Street View"
+                        disabled={!mapReady}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 mr-1.5">
                           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-3.33 0-10 1.67-10 5v1h20v-1c0-3.33-6.67-5-10-5z"/>
                         </svg>
-                        Street View
+                        {mapReady ? 'Street View' : 'Cargando...'}
                       </button>
                     </div>
                   </div>

@@ -287,7 +287,7 @@ const PlacesPage: React.FC = () => {
                   />
                   <div className="absolute top-2 sm:top-3 right-2 sm:right-3 bg-white bg-opacity-90 px-2 sm:px-3 py-1 rounded-full flex items-center space-x-1">
                     <Star className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 fill-current" />
-                    <span className="text-xs sm:text-sm font-medium">{place.rating}</span>
+                    <span className="text-xs sm:text-sm font-medium text-gray-800">{place.rating}</span>
                   </div>
                   <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3">
                     <span className="bg-primary-600 text-white px-2 py-1 rounded-full text-xs font-medium">

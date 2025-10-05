@@ -101,23 +101,51 @@ const ImprovedMapComponent: React.FC<ImprovedMapComponentProps> = ({
       const mapWithMethods = {
         ...mapInstance,
         showStreetView: (lat: number, lng: number, heading: number = 0, pitch: number = 0) => {
-          console.log('showStreetView called with:', { lat, lng, heading, pitch });
+          console.log('=== showStreetView method called ===');
+          console.log('Parameters:', { lat, lng, heading, pitch });
+          console.log('mapInstance:', mapInstance);
+          console.log('window.google:', !!window.google);
+          
           if (!mapInstance || !window.google) {
-            console.log('Map instance or Google Maps not available');
-            return;
+            console.log('❌ Map instance or Google Maps not available');
+            return false;
           }
-          const pano = mapInstance.getStreetView();
-          console.log('Street View panorama:', pano);
-          pano.setPosition({ lat, lng });
-          pano.setPov({ heading, pitch });
-          pano.setVisible(true);
-          setPanorama(pano);
-          console.log('Street View activated');
+          
+          try {
+            console.log('🔄 Getting Street View panorama...');
+            const pano = mapInstance.getStreetView();
+            console.log('Street View panorama:', pano);
+            
+            if (pano && typeof pano.setPosition === 'function') {
+              console.log('🔄 Setting Street View position and POV...');
+              pano.setPosition({ lat, lng });
+              pano.setPov({ heading, pitch });
+              pano.setVisible(true);
+              setPanorama(pano);
+              console.log('✅ Street View activated successfully');
+              return true;
+            } else {
+              console.log('❌ Street View panorama not available or invalid');
+              return false;
+            }
+          } catch (error) {
+            console.error('❌ Error in showStreetView:', error);
+            return false;
+          }
         }
       };
       
       if (onMapLoad) {
+        console.log('🔄 Executing onMapLoad callback...');
+        
+        // Ejecutar inmediatamente
         onMapLoad(mapWithMethods);
+        
+        // Ejecutar con timeout para asegurar disponibilidad
+        setTimeout(() => {
+          console.log('🔄 Re-executing onMapLoad callback after timeout');
+          onMapLoad(mapWithMethods);
+        }, 100);
       }
     } catch (error) {
       console.error('Error inicializando mapa:', error);
