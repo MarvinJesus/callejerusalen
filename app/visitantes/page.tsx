@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
@@ -28,6 +28,41 @@ import {
 
 const VisitorsHomePage: React.FC = () => {
   const { user, userProfile } = useAuth();
+
+  // Estado para indicadores reales
+  const [stats, setStats] = useState({
+    totalPlaces: 0,
+    pulperias: 0,
+    miradores: 0,
+    zonasVerdes: 0,
+    loading: true,
+  });
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        setStats(prev => ({ ...prev, loading: true }));
+        const response = await fetch('/api/places');
+        if (!response.ok) throw new Error('Error al cargar lugares');
+        const data = await response.json();
+        const places = Array.isArray(data?.places) ? data.places : [];
+
+        const totalPlaces = places.length;
+        const pulperias = places.filter((p: any) => (p.category || '').toLowerCase() === 'pulperias').length;
+        const miradores = places.filter((p: any) => (p.category || '').toLowerCase() === 'miradores').length;
+        const zonasVerdes = places.filter((p: any) => {
+          const c = (p.category || '').toLowerCase();
+          return c === 'parques' || c === 'naturaleza';
+        }).length;
+
+        setStats({ totalPlaces, pulperias, miradores, zonasVerdes, loading: false });
+      } catch (e) {
+        console.error('Error cargando indicadores reales /visitantes:', e);
+        setStats({ totalPlaces: 0, pulperias: 0, miradores: 0, zonasVerdes: 0, loading: false });
+      }
+    };
+    loadStats();
+  }, []);
 
   const quickActions = [
     {
@@ -75,10 +110,10 @@ const VisitorsHomePage: React.FC = () => {
   ];
 
   const communityStats = [
-    { label: 'Lugares de Interés', value: '15+', icon: <MapPin className="w-5 h-5" /> },
-    { label: 'Pulperías y Tiendas', value: '8+', icon: <Store className="w-5 h-5" /> },
-    { label: 'Miradores Naturales', value: '5+', icon: <Mountain className="w-5 h-5" /> },
-    { label: 'Zonas Verdes', value: '12+', icon: <TreePine className="w-5 h-5" /> }
+    { label: 'Lugares de Interés', value: stats.totalPlaces.toString(), icon: <MapPin className="w-5 h-5" /> },
+    { label: 'Pulperías y Tiendas', value: stats.pulperias.toString(), icon: <Store className="w-5 h-5" /> },
+    { label: 'Miradores Naturales', value: stats.miradores.toString(), icon: <Mountain className="w-5 h-5" /> },
+    { label: 'Zonas Verdes', value: stats.zonasVerdes.toString(), icon: <TreePine className="w-5 h-5" /> }
   ];
 
   const upcomingEvents = [

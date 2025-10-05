@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { logoutUser } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 import { 
   Home, 
   User, 
@@ -26,14 +27,18 @@ import toast from 'react-hot-toast';
 const Navbar: React.FC = () => {
   const { user, userProfile, loading } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const router = useRouter();
 
   const handleLogout = async () => {
     try {
       await logoutUser();
       toast.success('Sesión cerrada correctamente');
       setIsMenuOpen(false);
+      // Redirigir al home después del logout exitoso
+      router.push('/');
     } catch (error) {
       toast.error('Error al cerrar sesión');
+      console.error('Error al cerrar sesión:', error);
     }
   };
 
