@@ -29,7 +29,12 @@ import {
   Plus,
   Edit,
   Trash2,
-  RotateCcw
+  RotateCcw,
+  BookOpen,
+  Calendar,
+  Map,
+  Store,
+  Navigation
 } from 'lucide-react';
 import { 
   getAllUsers, 
@@ -85,6 +90,9 @@ const AdminDashboard: React.FC = () => {
     confirmText: string;
     confirmClass: string;
   } | null>(null);
+  const [historyData, setHistoryData] = useState<any>(null);
+  const [eventStats, setEventStats] = useState<{[key: string]: any}>({});
+  const [mapPlaces, setMapPlaces] = useState<any[]>([]);
 
   // Función para verificar si el usuario es super admin
   const isSuperAdmin = () => {
@@ -104,6 +112,10 @@ const AdminDashboard: React.FC = () => {
       : [{ id: 'permissions', label: 'Permisos', icon: Key, required: ['permissions.view'] as Permission[] }]
     ),
     { id: 'security', label: 'Seguridad', icon: Shield, required: ['security.view'] as Permission[] },
+    { id: 'history', label: 'Historias', icon: BookOpen, required: ['community.view'] as Permission[] },
+    { id: 'events', label: 'Eventos', icon: Calendar, required: ['community.events'] as Permission[] },
+    { id: 'places', label: 'Lugares', icon: Map, required: ['community.places'] as Permission[] },
+    { id: 'services', label: 'Servicios', icon: Store, required: ['community.services'] as Permission[] },
     { id: 'settings', label: 'Configuración', icon: Settings, required: ['settings.view'] as any[] },
   ];
 
@@ -124,13 +136,94 @@ const AdminDashboard: React.FC = () => {
     }
   }, [userProfile, activeTab]);
 
+  // Función para cargar datos de historia
+  const loadHistoryData = async () => {
+    try {
+      const response = await fetch('/api/admin/history');
+      if (response.ok) {
+        const data = await response.json();
+        setHistoryData(data.historyData);
+      }
+    } catch (error) {
+      console.error('Error al cargar datos de historia:', error);
+    }
+  };
+
+  // Función para cargar estadísticas de eventos
+  const loadEventStats = async () => {
+    try {
+      if (!historyData?.events) return;
+      
+      const stats: {[key: string]: any} = {};
+      
+      // Cargar estadísticas reales para cada evento
+      for (let i = 0; i < historyData.events.length; i++) {
+        try {
+          const response = await fetch(`/api/events/${i}/stats`);
+          if (response.ok) {
+            const data = await response.json();
+            stats[i] = {
+              confirmedRegistrations: data.confirmedRegistrations || 0,
+              totalRegistrations: data.totalRegistrations || 0,
+              pendingRegistrations: data.pendingRegistrations || 0,
+              cancelledRegistrations: data.cancelledRegistrations || 0,
+              blockedRegistrations: data.blockedRegistrations || 0
+            };
+          } else {
+            stats[i] = {
+              confirmedRegistrations: 0,
+              totalRegistrations: 0,
+              pendingRegistrations: 0,
+              cancelledRegistrations: 0,
+              blockedRegistrations: 0
+            };
+          }
+        } catch (error) {
+          console.error(`Error al cargar estadísticas del evento ${i}:`, error);
+          stats[i] = {
+            confirmedRegistrations: 0,
+            totalRegistrations: 0,
+            pendingRegistrations: 0,
+            cancelledRegistrations: 0,
+            blockedRegistrations: 0
+          };
+        }
+      }
+      
+      setEventStats(stats);
+    } catch (error) {
+      console.error('Error al cargar estadísticas de eventos:', error);
+    }
+  };
+
+  // Función para cargar lugares del mapa
+  const loadMapPlaces = async () => {
+    try {
+      const response = await fetch('/api/admin/places');
+      if (response.ok) {
+        const data = await response.json();
+        setMapPlaces(data.places || []);
+      }
+    } catch (error) {
+      console.error('Error al cargar lugares del mapa:', error);
+    }
+  };
 
   // Cargar datos al montar el componente
   useEffect(() => {
     if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || isSuperAdmin()) {
       loadDashboardData();
+      loadHistoryData();
+      loadMapPlaces();
     }
   }, [userProfile, userStatusFilter]);
+
+  // Cargar estadísticas de eventos cuando se carguen los datos de historia
+  useEffect(() => {
+    if (historyData?.events) {
+      loadEventStats();
+    }
+  }, [historyData]);
 
   // Abrir sidebar por defecto en pantallas medianas+ y cerrarlo en mobile
   useEffect(() => {
@@ -1250,6 +1343,489 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 
+  const renderHistory = () => (
+    <div className="space-y-6">
+      <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Gestión de Historias</h3>
+          <Link 
+            href="/admin/history"
+            className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>Ir a Gestión de Historias</span>
+          </Link>
+        </div>
+        <p className="text-gray-600 mb-6">
+          Administra el contenido histórico de la comunidad, incluyendo tradiciones, eventos pasados y patrimonio cultural.
+        </p>
+        
+        {/* Indicadores de Contenido */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+          <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="text-2xl font-bold text-primary-600 mb-1">
+              {historyData?.periods?.length || 0}
+            </div>
+            <p className="text-xs text-gray-600">Períodos</p>
+          </div>
+          <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+            <div className="text-2xl font-bold text-primary-600 mb-1">
+              {historyData?.traditions?.length || 0}
+            </div>
+            <p className="text-xs text-gray-600">Tradiciones</p>
+          </div>
+          <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+            <div className="text-2xl font-bold text-primary-600 mb-1">
+              {historyData?.events?.length || 0}
+            </div>
+            <p className="text-xs text-gray-600">Eventos</p>
+          </div>
+          <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
+            <div className="text-2xl font-bold text-primary-600 mb-1">
+              {historyData?.places?.length || 0}
+            </div>
+            <p className="text-xs text-gray-600">Lugares</p>
+          </div>
+          <div className="text-center p-3 bg-pink-50 rounded-lg border border-pink-200">
+            <div className="text-2xl font-bold text-primary-600 mb-1">
+              {historyData?.gallery?.length || 0}
+            </div>
+            <p className="text-xs text-gray-600">Imágenes</p>
+          </div>
+          <div className="text-center p-3 bg-indigo-50 rounded-lg border border-indigo-200">
+            <div className="text-2xl font-bold text-primary-600 mb-1">
+              {historyData?.services?.length || 0}
+            </div>
+            <p className="text-xs text-gray-600">Servicios</p>
+          </div>
+        </div>
+
+        {/* Secciones de Gestión */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <BookOpen className="w-5 h-5 text-blue-600" />
+              <h4 className="font-medium text-blue-900">Historias</h4>
+            </div>
+            <p className="text-sm text-blue-700">Gestiona historias y tradiciones</p>
+          </div>
+          <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <Map className="w-5 h-5 text-green-600" />
+              <h4 className="font-medium text-green-900">Lugares Históricos</h4>
+            </div>
+            <p className="text-sm text-green-700">Administra lugares con valor histórico</p>
+          </div>
+          <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+            <div className="flex items-center space-x-2 mb-2">
+              <Calendar className="w-5 h-5 text-purple-600" />
+              <h4 className="font-medium text-purple-900">Períodos</h4>
+            </div>
+            <p className="text-sm text-purple-700">Organiza eventos por períodos</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderEvents = () => {
+    // Calcular totales de estadísticas
+    const totalEvents = historyData?.events?.length || 0;
+    const totalConfirmed = Object.values(eventStats).reduce((sum: number, stats: any) => sum + (stats.confirmedRegistrations || 0), 0);
+    const totalPending = Object.values(eventStats).reduce((sum: number, stats: any) => sum + (stats.pendingRegistrations || 0), 0);
+    const totalCancelled = Object.values(eventStats).reduce((sum: number, stats: any) => sum + (stats.cancelledRegistrations || 0), 0);
+    const totalRegistrations = Object.values(eventStats).reduce((sum: number, stats: any) => sum + (stats.totalRegistrations || 0), 0);
+
+    return (
+      <div className="space-y-6">
+        <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Gestión de Eventos y Actividades</h3>
+            <Link 
+              href="/admin/history/events"
+              className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Ir a Gestión de Eventos</span>
+            </Link>
+          </div>
+          <p className="text-gray-600 mb-6">
+            Administra eventos comunitarios, actividades culturales y celebraciones de la comunidad.
+          </p>
+          
+          {/* Indicadores de Estadísticas */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
+            <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="text-2xl font-bold text-primary-600 mb-1">
+                {totalEvents}
+              </div>
+              <p className="text-xs text-gray-600">Eventos</p>
+            </div>
+            <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+              <div className="text-2xl font-bold text-green-600 mb-1">
+                {totalConfirmed}
+              </div>
+              <p className="text-xs text-gray-600">Confirmados</p>
+            </div>
+            <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div className="text-2xl font-bold text-yellow-600 mb-1">
+                {totalPending}
+              </div>
+              <p className="text-xs text-gray-600">Pendientes</p>
+            </div>
+            <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+              <div className="text-2xl font-bold text-red-600 mb-1">
+                {totalCancelled}
+              </div>
+              <p className="text-xs text-gray-600">Cancelados</p>
+            </div>
+            <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="text-2xl font-bold text-purple-600 mb-1">
+                {totalRegistrations}
+              </div>
+              <p className="text-xs text-gray-600">Total</p>
+            </div>
+          </div>
+
+          {/* Secciones de Gestión */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <Calendar className="w-5 h-5 text-blue-600" />
+                <h4 className="font-medium text-blue-900">Eventos</h4>
+              </div>
+              <p className="text-sm text-blue-700">Gestiona eventos comunitarios</p>
+            </div>
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <Activity className="w-5 h-5 text-green-600" />
+                <h4 className="font-medium text-green-900">Actividades</h4>
+              </div>
+              <p className="text-sm text-green-700">Organiza actividades culturales</p>
+            </div>
+            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <FileText className="w-5 h-5 text-purple-600" />
+                <h4 className="font-medium text-purple-900">Galería</h4>
+              </div>
+              <p className="text-sm text-purple-700">Administra imágenes de eventos</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPlaces = () => {
+    // Agrupar lugares históricos por categoría
+    const placesByCategory = historyData?.places?.reduce((acc: any, place: any) => {
+      const category = place.category || 'Sin Categoría';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {}) || {};
+
+    // Agrupar por nivel de importancia
+    const placesBySignificance = historyData?.places?.reduce((acc: any, place: any) => {
+      const significance = place.significance || 'Sin Clasificar';
+      acc[significance] = (acc[significance] || 0) + 1;
+      return acc;
+    }, {}) || {};
+
+    const totalHistoricalPlaces = historyData?.places?.length || 0;
+
+    // Estadísticas de lugares del mapa
+    const mapPlacesStats = {
+      total: mapPlaces.length,
+      active: mapPlaces.filter(p => p.isActive).length,
+      inactive: mapPlaces.filter(p => !p.isActive).length,
+      categories: Array.from(new Set(mapPlaces.map(p => p.category))).length,
+    };
+
+    // Agrupar lugares del mapa por categoría
+    const mapPlacesByCategory = mapPlaces.reduce((acc: any, place: any) => {
+      const category = place.category || 'Sin Categoría';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {});
+
+    return (
+      <div className="space-y-6">
+        <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
+            <h3 className="text-lg font-semibold text-gray-900">Gestión de Lugares</h3>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Link 
+                href="/admin/history/places"
+                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
+              >
+                <MapPin className="w-4 h-4" />
+                <span>Ir a Gestión de Lugares Históricos</span>
+              </Link>
+              <Link 
+                href="/admin/places"
+                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+              >
+                <Map className="w-4 h-4" />
+                <span>Ir a Lugares del Mapa</span>
+              </Link>
+            </div>
+          </div>
+          <p className="text-gray-600 mb-6">
+            Administra lugares de interés, puntos de referencia y ubicaciones importantes de la comunidad. 
+            Incluye tanto lugares históricos como lugares actuales mostrados en el mapa interactivo.
+          </p>
+          
+          {/* Indicadores de Lugares Históricos */}
+          <div className="mb-6">
+            <h4 className="text-md font-semibold text-gray-800 mb-4">Lugares Históricos por Categoría</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+              {Object.entries(placesByCategory).map(([category, count]) => (
+                <div key={category} className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-xl font-bold text-primary-600 mb-1">
+                    {count as number}
+                  </div>
+                  <p className="text-xs text-gray-600 leading-tight">{category}</p>
+                </div>
+              ))}
+              {totalHistoricalPlaces > 0 && (
+                <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-xl font-bold text-gray-600 mb-1">
+                    {totalHistoricalPlaces}
+                  </div>
+                  <p className="text-xs text-gray-600">Total</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Indicadores por Nivel de Importancia */}
+          <div className="mb-6">
+            <h4 className="text-md font-semibold text-gray-800 mb-4">Por Nivel de Importancia</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {Object.entries(placesBySignificance).map(([significance, count]) => {
+                const colorClass = significance === 'Muy Importante' ? 'bg-red-50 border-red-200 text-red-600' :
+                                 significance === 'Importante' ? 'bg-orange-50 border-orange-200 text-orange-600' :
+                                 significance === 'Moderada' ? 'bg-yellow-50 border-yellow-200 text-yellow-600' :
+                                 'bg-green-50 border-green-200 text-green-600';
+                
+                return (
+                  <div key={significance} className={`text-center p-3 rounded-lg border ${colorClass}`}>
+                    <div className="text-xl font-bold mb-1">
+                      {count as number}
+                    </div>
+                    <p className="text-xs text-gray-600 leading-tight">{significance}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Indicadores de Lugares del Mapa */}
+          <div className="mb-6">
+            <h4 className="text-md font-semibold text-gray-800 mb-4">Lugares del Mapa por Categoría</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+              {Object.entries(mapPlacesByCategory).map(([category, count]) => (
+                <div key={category} className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="text-xl font-bold text-green-600 mb-1">
+                    {count as number}
+                  </div>
+                  <p className="text-xs text-gray-600 leading-tight">{category}</p>
+                </div>
+              ))}
+              {mapPlacesStats.total > 0 && (
+                <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-xl font-bold text-gray-600 mb-1">
+                    {mapPlacesStats.total}
+                  </div>
+                  <p className="text-xs text-gray-600">Total</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Estadísticas Generales de Lugares del Mapa */}
+          <div className="mb-6">
+            <h4 className="text-md font-semibold text-gray-800 mb-4">Estado de Lugares del Mapa</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="text-xl font-bold text-green-600 mb-1">
+                  {mapPlacesStats.active}
+                </div>
+                <p className="text-xs text-gray-600">Activos</p>
+              </div>
+              <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+                <div className="text-xl font-bold text-red-600 mb-1">
+                  {mapPlacesStats.inactive}
+                </div>
+                <p className="text-xs text-gray-600">Inactivos</p>
+              </div>
+              <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <div className="text-xl font-bold text-purple-600 mb-1">
+                  {mapPlacesStats.categories}
+                </div>
+                <p className="text-xs text-gray-600">Categorías</p>
+              </div>
+              <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="text-xl font-bold text-gray-600 mb-1">
+                  {mapPlacesStats.total}
+                </div>
+                <p className="text-xs text-gray-600">Total</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Secciones de Gestión */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <MapPin className="w-5 h-5 text-blue-600" />
+                <h4 className="font-medium text-blue-900">Lugares Históricos</h4>
+              </div>
+              <p className="text-sm text-blue-700">Gestiona lugares con valor histórico</p>
+            </div>
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <Map className="w-5 h-5 text-green-600" />
+                <h4 className="font-medium text-green-900">Lugares del Mapa</h4>
+              </div>
+              <p className="text-sm text-green-700">Administra lugares mostrados en el mapa</p>
+            </div>
+            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <Eye className="w-5 h-5 text-purple-600" />
+                <h4 className="font-medium text-purple-900">Puntos de Referencia</h4>
+              </div>
+              <p className="text-sm text-purple-700">Administra puntos importantes</p>
+            </div>
+            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <Navigation className="w-5 h-5 text-orange-600" />
+                <h4 className="font-medium text-orange-900">Mapa Interactivo</h4>
+              </div>
+              <p className="text-sm text-orange-700">Visualiza y gestiona el mapa</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderServices = () => {
+    // Estadísticas de servicios históricos
+    const servicesStats = {
+      total: historyData?.services?.length || 0,
+      active: historyData?.services?.filter((s: any) => s.isActive).length || 0,
+      inactive: historyData?.services?.filter((s: any) => !s.isActive).length || 0,
+      categories: new Set(historyData?.services?.map((s: any) => s.category)).size || 0,
+    };
+
+    // Agrupar servicios por categoría
+    const servicesByCategory = historyData?.services?.reduce((acc: any, service: any) => {
+      const category = service.category || 'Sin Categoría';
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {}) || {};
+
+    return (
+      <div className="space-y-6">
+        <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Gestión de Servicios Locales</h3>
+            <Link 
+              href="/admin/history/services"
+              className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <Store className="w-4 h-4" />
+              <span>Ir a Gestión de Servicios</span>
+            </Link>
+          </div>
+          <p className="text-gray-600 mb-6">
+            Administra servicios locales, comercios, restaurantes y establecimientos de la comunidad.
+          </p>
+          
+          {/* Indicadores de Servicios por Categoría */}
+          <div className="mb-6">
+            <h4 className="text-md font-semibold text-gray-800 mb-4">Servicios Locales por Categoría</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+              {Object.entries(servicesByCategory).map(([category, count]) => (
+                <div key={category} className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-xl font-bold text-primary-600 mb-1">
+                    {count as number}
+                  </div>
+                  <p className="text-xs text-gray-600 leading-tight">{category}</p>
+                </div>
+              ))}
+              {servicesStats.total > 0 && (
+                <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="text-xl font-bold text-gray-600 mb-1">
+                    {servicesStats.total}
+                  </div>
+                  <p className="text-xs text-gray-600">Total</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Estadísticas Generales de Servicios */}
+          <div className="mb-6">
+            <h4 className="text-md font-semibold text-gray-800 mb-4">Estado de Servicios Locales</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+                <div className="text-xl font-bold text-green-600 mb-1">
+                  {servicesStats.active}
+                </div>
+                <p className="text-xs text-gray-600">Activos</p>
+              </div>
+              <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+                <div className="text-xl font-bold text-red-600 mb-1">
+                  {servicesStats.inactive}
+                </div>
+                <p className="text-xs text-gray-600">Inactivos</p>
+              </div>
+              <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <div className="text-xl font-bold text-purple-600 mb-1">
+                  {servicesStats.categories}
+                </div>
+                <p className="text-xs text-gray-600">Categorías</p>
+              </div>
+              <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="text-xl font-bold text-gray-600 mb-1">
+                  {servicesStats.total}
+                </div>
+                <p className="text-xs text-gray-600">Total</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Secciones de Gestión */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <Store className="w-5 h-5 text-blue-600" />
+                <h4 className="font-medium text-blue-900">Comercios</h4>
+              </div>
+              <p className="text-sm text-blue-700">Gestiona tiendas y comercios</p>
+            </div>
+            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <Activity className="w-5 h-5 text-green-600" />
+                <h4 className="font-medium text-green-900">Restaurantes</h4>
+              </div>
+              <p className="text-sm text-green-700">Administra restaurantes locales</p>
+            </div>
+            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <div className="flex items-center space-x-2 mb-2">
+                <Shield className="w-5 h-5 text-purple-600" />
+                <h4 className="font-medium text-purple-900">Servicios</h4>
+              </div>
+              <p className="text-sm text-purple-700">Gestiona servicios comunitarios</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderSettings = () => (
     <div className="space-y-6">
       <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
@@ -1480,6 +2056,26 @@ const AdminDashboard: React.FC = () => {
                 isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'security.view')
                   ? renderSecurity()
                   : <div className="card"><p className="text-gray-700">No tienes permiso para ver seguridad.</p></div>
+              )}
+              {activeTab === 'history' && (
+                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'community.view')
+                  ? renderHistory()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver historias.</p></div>
+              )}
+              {activeTab === 'events' && (
+                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'community.events')
+                  ? renderEvents()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver eventos.</p></div>
+              )}
+              {activeTab === 'places' && (
+                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'community.places')
+                  ? renderPlaces()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver lugares.</p></div>
+              )}
+              {activeTab === 'services' && (
+                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'community.services')
+                  ? renderServices()
+                  : <div className="card"><p className="text-gray-700">No tienes permiso para ver servicios.</p></div>
               )}
               {activeTab === 'settings' && (
                 isSuperAdmin() || hasAnyPermission((userProfile?.permissions || []) as Permission[], ['settings.view'] as any[])

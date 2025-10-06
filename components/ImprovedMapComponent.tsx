@@ -138,13 +138,13 @@ const ImprovedMapComponent: React.FC<ImprovedMapComponentProps> = ({
       if (onMapLoad) {
         console.log('🔄 Executing onMapLoad callback...');
         
-        // Ejecutar inmediatamente
-        onMapLoad(mapWithMethods);
+        // Pasar la instancia real del mapa de Google Maps
+        onMapLoad(mapInstance);
         
         // Ejecutar con timeout para asegurar disponibilidad
         setTimeout(() => {
           console.log('🔄 Re-executing onMapLoad callback after timeout');
-          onMapLoad(mapWithMethods);
+          onMapLoad(mapInstance);
         }, 100);
       }
     } catch (error) {

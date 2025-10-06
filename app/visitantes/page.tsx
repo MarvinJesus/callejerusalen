@@ -111,7 +111,7 @@ const VisitorsHomePage: React.FC = () => {
 
   const communityStats = [
     { label: 'Lugares de Interés', value: stats.totalPlaces.toString(), icon: <MapPin className="w-5 h-5" /> },
-    { label: 'Pulperías y Tiendas', value: stats.pulperias.toString(), icon: <Store className="w-5 h-5" /> },
+    { label: 'Servicios', value: stats.pulperias.toString(), icon: <Store className="w-5 h-5" /> },
     { label: 'Miradores Naturales', value: stats.miradores.toString(), icon: <Mountain className="w-5 h-5" /> },
     { label: 'Zonas Verdes', value: stats.zonasVerdes.toString(), icon: <TreePine className="w-5 h-5" /> }
   ];
