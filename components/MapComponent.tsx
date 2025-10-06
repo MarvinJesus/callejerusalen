@@ -71,7 +71,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
     return !isNaN(coord) && isFinite(coord) && coord !== 0;
   };
 
-  const validCenter = isValidCoordinate(center[0]) && isValidCoordinate(center[1]) 
+  const validCenter: [number, number] = isValidCoordinate(center[0]) && isValidCoordinate(center[1]) 
     ? center 
     : [10.02424263, -84.07890636];
 
