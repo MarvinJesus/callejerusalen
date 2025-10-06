@@ -5,6 +5,7 @@ import './themes.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { Toaster } from 'react-hot-toast';
+import FloatingHomeButton from '@/components/FloatingHomeButton';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -26,6 +27,7 @@ export default function RootLayout({
         <ThemeProvider>
           <AuthProvider>
             {children}
+            <FloatingHomeButton />
             <Toaster
               position="top-right"
               toastOptions={{

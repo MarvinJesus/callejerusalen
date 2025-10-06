@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import UserMenu from '@/components/UserMenu';
 import { useAuth } from '@/context/AuthContext';
-import { Calendar, Edit, Trash2, Plus, ArrowLeft, X, Check, AlertCircle, Clock, MapPin, Users, Star, Camera, Search, Filter, SortAsc, SortDesc } from 'lucide-react';
+import { Calendar, Edit, Trash2, Plus, ArrowLeft, X, Check, AlertCircle, Clock, MapPin, Users, Star, Camera, Search, Filter, SortAsc, SortDesc, Archive } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -27,6 +27,7 @@ interface CommunityEvent {
   isRecurring: boolean;
   recurringPattern?: string;
   order: number;
+  isArchived?: boolean;
 }
 
 interface HistoryPageData {
@@ -59,6 +60,8 @@ const AdminEventsPage: React.FC = () => {
   const [statsLoading, setStatsLoading] = useState(false);
   const [initialHistoryData, setInitialHistoryData] = useState<HistoryPageData | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState<number | null>(null);
+  const [showUnarchiveConfirm, setShowUnarchiveConfirm] = useState<number | null>(null);
   
   // Estados para filtros y búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -470,8 +473,13 @@ const AdminEventsPage: React.FC = () => {
     }
   };
 
-  // Función para determinar si un evento está archivado (ya pasó)
+  // Función para determinar si un evento está archivado
   const isEventArchived = (event: CommunityEvent) => {
+    // Respeta el archivado manual
+    if (event.isArchived) {
+      return true;
+    }
+
     // Si no tiene fecha, no se archiva
     if (!event.date || event.date.trim() === '') {
       console.log('📅 Evento sin fecha:', event.title, '- NO archivado');
@@ -515,6 +523,100 @@ const AdminEventsPage: React.FC = () => {
     } catch (error) {
       console.error('❌ Error procesando fecha:', event.title, 'Fecha:', event.date, error);
       return false;
+    }
+  };
+
+  const confirmArchiveEvent = (index: number) => {
+    setShowArchiveConfirm(index);
+  };
+
+  const archiveEvent = async (index: number) => {
+    if (!historyData || index < 0 || index >= historyData.events.length) {
+      toast.error('Índice de evento inválido');
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const updatedEvents = historyData.events.map((ev, i) =>
+        i === index ? { ...ev, isArchived: true } : ev
+      );
+
+      const updatedHistoryData = { ...historyData, events: updatedEvents };
+      setHistoryData(updatedHistoryData);
+
+      const response = await fetch('/api/admin/history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedHistoryData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al archivar el evento');
+      }
+
+      setInitialHistoryData(updatedHistoryData);
+      setHasChanges(false);
+      setShowArchiveConfirm(null);
+      setRefreshKey(prev => prev + 1);
+      toast.success('Evento archivado exitosamente');
+    } catch (error: any) {
+      console.error('Error al archivar evento:', error);
+      toast.error(error.message || 'Error al archivar el evento');
+      setHistoryData(historyData);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmUnarchiveEvent = (index: number) => {
+    setShowUnarchiveConfirm(index);
+  };
+
+  const unarchiveEvent = async (index: number) => {
+    if (!historyData || index < 0 || index >= historyData.events.length) {
+      toast.error('Índice de evento inválido');
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      const updatedEvents = historyData.events.map((ev, i) =>
+        i === index ? { ...ev, isArchived: false } : ev
+      );
+
+      const updatedHistoryData = { ...historyData, events: updatedEvents };
+      setHistoryData(updatedHistoryData);
+
+      const response = await fetch('/api/admin/history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedHistoryData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al desarchivar el evento');
+      }
+
+      setInitialHistoryData(updatedHistoryData);
+      setHasChanges(false);
+      setShowUnarchiveConfirm(null);
+      setRefreshKey(prev => prev + 1);
+      toast.success('Evento desarchivado exitosamente');
+    } catch (error: any) {
+      console.error('Error al desarchivar evento:', error);
+      toast.error(error.message || 'Error al desarchivar el evento');
+      setHistoryData(historyData);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -812,82 +914,7 @@ const AdminEventsPage: React.FC = () => {
             </nav>
           </div>
           
-          {/* Información del tab activo */}
-          <div className="mt-4">
-            {activeTab === 'active' ? (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center text-sm text-gray-600">
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                    <span>Mostrando eventos futuros y eventos sin fecha específica</span>
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => {
-                      console.log('🔍 DEBUG: Información de todos los eventos');
-                      historyData?.events.forEach((event, index) => {
-                        console.log(`Evento ${index + 1}:`, {
-                          title: event.title,
-                          date: event.date,
-                          isRecurring: event.isRecurring,
-                          isArchived: isEventArchived(event)
-                        });
-                      });
-                    }}
-                    className="text-xs text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Debug Info
-                  </button>
-                  <button
-                    onClick={() => {
-                      console.log('🔄 FORZANDO RECARGA DE CONTEO');
-                      setRefreshKey(prev => prev + 1);
-                    }}
-                    className="text-xs text-green-600 hover:text-green-800 underline"
-                  >
-                    Recargar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center text-sm text-gray-600">
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
-                    <span>Mostrando eventos que ya han pasado (no incluye eventos recurrentes)</span>
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => {
-                      console.log('🔍 DEBUG: Información de todos los eventos');
-                      historyData?.events.forEach((event, index) => {
-                        console.log(`Evento ${index + 1}:`, {
-                          title: event.title,
-                          date: event.date,
-                          isRecurring: event.isRecurring,
-                          isArchived: isEventArchived(event)
-                        });
-                      });
-                    }}
-                    className="text-xs text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Debug Info
-                  </button>
-                  <button
-                    onClick={() => {
-                      console.log('🔄 FORZANDO RECARGA DE CONTEO');
-                      setRefreshKey(prev => prev + 1);
-                    }}
-                    className="text-xs text-green-600 hover:text-green-800 underline"
-                  >
-                    Recargar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Información del tab (eliminada: mensajes y botones de debug/recarga) */}
         </div>
 
         {/* Lista de Eventos */}
@@ -1012,6 +1039,15 @@ const AdminEventsPage: React.FC = () => {
                           Gestionar Usuarios
                         </Link>
                         <button
+                          onClick={() => confirmArchiveEvent(originalIndex)}
+                          disabled={saving}
+                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-amber-700 bg-white border border-amber-300 rounded-md hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                          title="Archivar evento"
+                        >
+                          <Archive className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
+                          Archivar
+                        </button>
+                        <button
                           onClick={() => editEvent(event, originalIndex)}
                           disabled={saving}
                           className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
@@ -1033,6 +1069,23 @@ const AdminEventsPage: React.FC = () => {
                     ) : (
                       // Acciones para eventos archivados
                       <>
+                        <Link
+                          href={`/admin/history/events/${originalIndex}/users`}
+                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 border border-blue-300 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full sm:w-auto"
+                          title="Ver estados de usuarios que participaron"
+                        >
+                          <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
+                          Estados de Usuarios
+                        </Link>
+                        <button
+                          onClick={() => confirmUnarchiveEvent(originalIndex)}
+                          disabled={saving}
+                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-green-700 bg-white border border-green-300 rounded-md hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                          title="Desarchivar evento"
+                        >
+                          <Archive className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
+                          Desarchivar
+                        </button>
                         <button
                           onClick={() => editEvent(event, originalIndex)}
                           disabled={saving}
@@ -1531,6 +1584,126 @@ const AdminEventsPage: React.FC = () => {
                       <>
                         <Trash2 className="w-4 h-4 mr-2" />
                         Eliminar
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Confirmación de Archivado */}
+        {showArchiveConfirm !== null && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-2 sm:mx-0">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center mb-4">
+                  <div className="flex-shrink-0">
+                    <Archive className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-base sm:text-lg font-medium text-gray-900">
+                      Confirmar archivado
+                    </h3>
+                  </div>
+                </div>
+                <div className="mb-4 sm:mb-6">
+                  <p className="text-sm text-gray-600">
+                    ¿Deseas archivar este evento? Podrás verlo en la pestaña de archivados.
+                  </p>
+                  {historyData?.events[showArchiveConfirm] && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-md">
+                      <p className="text-sm font-medium text-gray-900">
+                        {historyData.events[showArchiveConfirm].title}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {historyData.events[showArchiveConfirm].category} - {historyData.events[showArchiveConfirm].type}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
+                  <button
+                    onClick={() => setShowArchiveConfirm(null)}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm sm:text-base"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => archiveEvent(showArchiveConfirm)}
+                    disabled={saving}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-sm sm:text-base"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Archivando...
+                      </>
+                    ) : (
+                      <>
+                        <Archive className="w-4 h-4 mr-2" />
+                        Archivar
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Confirmación de Desarchivado */}
+        {showUnarchiveConfirm !== null && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-2 sm:mx-0">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center mb-4">
+                  <div className="flex-shrink-0">
+                    <Archive className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-base sm:text-lg font-medium text-gray-900">
+                      Confirmar desarchivado
+                    </h3>
+                  </div>
+                </div>
+                <div className="mb-4 sm:mb-6">
+                  <p className="text-sm text-gray-600">
+                    ¿Deseas mover este evento de vuelta a vigentes?
+                  </p>
+                  {historyData?.events[showUnarchiveConfirm] && (
+                    <div className="mt-3 p-3 bg-gray-50 rounded-md">
+                      <p className="text-sm font-medium text-gray-900">
+                        {historyData.events[showUnarchiveConfirm].title}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {historyData.events[showUnarchiveConfirm].category} - {historyData.events[showUnarchiveConfirm].type}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
+                  <button
+                    onClick={() => setShowUnarchiveConfirm(null)}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors text-sm sm:text-base"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => unarchiveEvent(showUnarchiveConfirm)}
+                    disabled={saving}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors text-sm sm:text-base"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Moviendo...
+                      </>
+                    ) : (
+                      <>
+                        <Archive className="w-4 h-4 mr-2" />
+                        Desarchivar
                       </>
                     )}
                   </button>
