@@ -747,6 +747,27 @@ const AdminDashboard: React.FC = () => {
           ))}
         </div>
 
+        {/* Quick action: Área Segura de Reunión */}
+        <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-red-50 border border-red-200">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Área Segura de Reunión</h3>
+                <p className="text-sm text-gray-600">Administra la información pública de emergencia (punto de reunión, indicaciones, mapa e imagen).</p>
+              </div>
+            </div>
+            <Link
+              href="/admin/emergency"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+            >
+              Gestionar
+            </Link>
+          </div>
+        </div>
+
         {/* Recent Activities */}
         <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Actividad Reciente</h3>

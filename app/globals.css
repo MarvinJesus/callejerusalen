@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Leaflet CSS - Importar estilos necesarios para mapas */
+@import 'leaflet/dist/leaflet.css';
+
 /* Mejorar visibilidad de controles de Google Maps */
 .gm-style .gm-control {
   background-color: rgba(255, 255, 255, 0.95) !important;

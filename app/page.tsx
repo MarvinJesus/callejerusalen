@@ -8,10 +8,38 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { MapPin, Shield, Eye, Users, Camera, AlertTriangle, UserPlus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import React, { useEffect, useState } from 'react';
+import SimpleMapComponent from '@/components/SimpleMapComponent';
 
 export default function HomePage() {
   const { userProfile, loginAsGuest, isGuest } = useAuth();
   const { totalUsers } = useRealStats();
+  const [emergency, setEmergency] = useState<null | {
+    title: string;
+    subtitle?: string;
+    description: string;
+    safeAreaName: string;
+    safeAreaAddress?: string;
+    imageUrl?: string;
+    tips: string[];
+    instructions: string[];
+    map: { lat: number; lng: number; zoom?: number };
+    isActive: boolean;
+  }>(null);
+
+  useEffect(() => {
+    const loadEmergency = async () => {
+      try {
+        const res = await fetch('/api/emergency', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.emergency) setEmergency(data.emergency);
+      } catch (e) {
+        console.error('Error cargando info de emergencia:', e);
+      }
+    };
+    loadEmergency();
+  }, []);
 
   return (
     <div className="min-h-screen bg-theme">
@@ -442,6 +470,89 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Emergency Safe Area Section */}
+      {emergency?.isActive && (
+        <section className="py-16 px-4 sm:px-6 lg:px-8 bg-red-50 border-y border-red-100">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <AlertTriangle className="w-7 h-7 text-red-600" />
+              <h2 className="text-3xl font-bold text-red-900 text-center">{emergency.title}</h2>
+            </div>
+            {emergency.subtitle && (
+              <p className="text-center text-red-800 mb-6">{emergency.subtitle}</p>
+            )}
+
+            {/* Imagen y contenido en dos columnas */}
+            <div className="grid md:grid-cols-2 gap-8 items-start mb-8">
+              <div className="space-y-4">
+                {emergency.imageUrl ? (
+                  <img src={emergency.imageUrl} alt="Área segura" className="w-full h-64 object-cover rounded-lg border" />
+                ) : (
+                  <div className="w-full h-64 rounded-lg border bg-white flex items-center justify-center text-gray-400">Imagen del área segura</div>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-gray-800 leading-relaxed">{emergency.description}</p>
+                <div className="p-4 bg-white rounded-lg border">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MapPin className="w-5 h-5 text-red-600" />
+                    <span className="font-semibold text-gray-900">{emergency.safeAreaName}</span>
+                  </div>
+                  {emergency.safeAreaAddress && (
+                    <p className="text-sm text-gray-600">{emergency.safeAreaAddress}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">Coordenadas: {emergency.map.lat.toFixed(6)}, {emergency.map.lng.toFixed(6)}</p>
+                </div>
+
+                {emergency.tips?.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Consejos</h3>
+                    <ul className="list-disc pl-5 space-y-1 text-gray-700">
+                      {emergency.tips.map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {emergency.instructions?.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Indicaciones</h3>
+                    <ol className="list-decimal pl-5 space-y-1 text-gray-700">
+                      {emergency.instructions.map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Mapa en fila completa */}
+            <div className="w-full">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Ubicación del Área Segura</h3>
+              <div className="w-full h-[500px] rounded-lg border overflow-hidden">
+                <SimpleMapComponent
+                  center={[emergency.map.lat, emergency.map.lng]}
+                  zoom={emergency.map.zoom || 16}
+                  height="100%"
+                  points={[{
+                    id: 'safe-area',
+                    name: emergency.safeAreaName,
+                    type: 'alert',
+                    coordinates: [emergency.map.lat, emergency.map.lng],
+                    description: emergency.description,
+                    address: emergency.safeAreaAddress || undefined,
+                  }]}
+                  showControls={true}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer className="footer-theme py-12 px-4 sm:px-6 lg:px-8">
