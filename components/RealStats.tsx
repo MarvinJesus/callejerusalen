@@ -95,8 +95,8 @@ const RealStats: React.FC<RealStatsProps> = ({ className = "" }) => {
           <div className="text-4xl font-bold text-white mb-2">
             {stats.totalUsers > 0 ? `${stats.totalUsers}` : '0'}
           </div>
-          <div className="text-primary-100 font-medium">Miembros Registrados</div>
-          <div className="text-primary-200 text-sm mt-2">Comunidad activa</div>
+          <div className="text-white font-medium opacity-90">Miembros Registrados</div>
+          <div className="text-white text-sm mt-2 opacity-70">Comunidad activa</div>
         </div>
       </div>
       
@@ -108,8 +108,8 @@ const RealStats: React.FC<RealStatsProps> = ({ className = "" }) => {
           <div className="text-4xl font-bold text-white mb-2">
             {stats.totalPlaces > 0 ? `${stats.totalPlaces}` : '0'}
           </div>
-          <div className="text-primary-100 font-medium">Lugares Registrados</div>
-          <div className="text-primary-200 text-sm mt-2">Miradores, pulperías y más</div>
+          <div className="text-white font-medium opacity-90">Lugares Registrados</div>
+          <div className="text-white text-sm mt-2 opacity-70">Miradores, pulperías y más</div>
         </div>
       </div>
       
@@ -119,8 +119,8 @@ const RealStats: React.FC<RealStatsProps> = ({ className = "" }) => {
             <Shield className="w-8 h-8 text-white" />
           </div>
           <div className="text-4xl font-bold text-white mb-2">{stats.activeCameras}</div>
-          <div className="text-primary-100 font-medium">Cámaras de Seguridad</div>
-          <div className="text-primary-200 text-sm mt-2">Protección comunitaria</div>
+          <div className="text-white font-medium opacity-90">Cámaras de Seguridad</div>
+          <div className="text-white text-sm mt-2 opacity-70">Protección comunitaria</div>
         </div>
       </div>
       
@@ -130,8 +130,8 @@ const RealStats: React.FC<RealStatsProps> = ({ className = "" }) => {
             <Eye className="w-8 h-8 text-white" />
           </div>
           <div className="text-4xl font-bold text-white mb-2">24/7</div>
-          <div className="text-primary-100 font-medium">Monitoreo</div>
-          <div className="text-primary-200 text-sm mt-2">Seguridad constante</div>
+          <div className="text-white font-medium opacity-90">Monitoreo</div>
+          <div className="text-white text-sm mt-2 opacity-70">Seguridad constante</div>
         </div>
       </div>
     </div>
