@@ -51,6 +51,7 @@ const EventsPage: React.FC = () => {
   const [showUpcoming, setShowUpcoming] = useState(true);
   const [userRegistrations, setUserRegistrations] = useState<any[]>([]);
   const [eventStats, setEventStats] = useState<{[key: string]: any}>({});
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const categories = [
     'Cultural',
@@ -111,62 +112,55 @@ const EventsPage: React.FC = () => {
   };
 
   const loadUserRegistrations = async () => {
-    if (!user) {
-      setUserRegistrations([]);
-      return;
-    }
-    
-    try {
-      // Usar el ID real del usuario autenticado
-      const userId = user.uid;
-      
-      // Obtener inscripciones reales del usuario
-      const response = await fetch(`/api/events/user/${userId}/registrations`);
-      if (response.ok) {
-        const data = await response.json();
-        setUserRegistrations(data.registrations || []);
-      } else {
-        console.error('Error al cargar inscripciones del usuario:', response.statusText);
-        setUserRegistrations([]);
-      }
-    } catch (error) {
-      console.error('Error al cargar inscripciones del usuario:', error);
-      setUserRegistrations([]);
-    }
+    // Por ahora, no cargar inscripciones para evitar problemas
+    setUserRegistrations([]);
   };
 
   const loadEventStats = async () => {
     try {
+      setStatsLoading(true);
       const stats: {[key: string]: any} = {};
       
       // Cargar estadísticas reales para cada evento
-      for (let i = 0; i < (historyData?.events.length || 0); i++) {
-        try {
-          const response = await fetch(`/api/events/${i}/stats`);
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`📊 Estadísticas del evento ${i}:`, data);
-            // La API devuelve las estadísticas directamente, no anidadas bajo 'stats'
-            stats[i] = data;
-          } else {
-            // Si no hay estadísticas, usar valores por defecto
-            stats[i] = {
-              confirmedRegistrations: 0,
-              totalRegistrations: 0
-            };
+      if (historyData?.events) {
+        const statsPromises = historyData.events.map(async (event, index) => {
+          try {
+            // Usar el índice como eventId para la API
+            const response = await fetch(`/api/events/${index}/stats`);
+            if (response.ok) {
+              const data = await response.json();
+              return {
+                index,
+                confirmedRegistrations: data.confirmedRegistrations || 0,
+                totalRegistrations: data.totalRegistrations || 0
+              };
+            }
+          } catch (error) {
+            console.error(`Error al cargar estadísticas del evento ${index}:`, error);
           }
-        } catch (error) {
-          // En caso de error, usar valores por defecto
-          stats[i] = {
+          return {
+            index,
             confirmedRegistrations: 0,
             totalRegistrations: 0
           };
-        }
+        });
+
+        const statsResults = await Promise.all(statsPromises);
+        
+        // Convertir a objeto indexado
+        statsResults.forEach(result => {
+          stats[result.index] = {
+            confirmedRegistrations: result.confirmedRegistrations,
+            totalRegistrations: result.totalRegistrations
+          };
+        });
       }
       
       setEventStats(stats);
     } catch (error) {
       console.error('Error al cargar estadísticas de eventos:', error);
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -364,10 +358,10 @@ const EventsPage: React.FC = () => {
 
             {/* Filtros */}
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                <select
+              <select
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-gray-800"
               >
                 <option value="">Todas las categorías</option>
                 {categories.map((category) => (
@@ -380,7 +374,7 @@ const EventsPage: React.FC = () => {
               <select
                 value={selectedType}
                 onChange={(e) => setSelectedType(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white text-gray-800"
               >
                 <option value="">Todos los tipos</option>
                 {eventTypes.map((type) => (
@@ -481,7 +475,7 @@ const EventsPage: React.FC = () => {
                 const maxParticipants = event.maxParticipants || 100;
                 const currentParticipants = eventStats[originalIndex]?.confirmedRegistrations || 0;
                 const percentage = maxParticipants > 0 ? (currentParticipants / maxParticipants) * 100 : 0;
-                const spotsLeft = maxParticipants - currentParticipants;
+                const spotsLeft = Math.max(0, maxParticipants - currentParticipants);
                 
                 return (
                   <div key={index} className="bg-green-50 border border-green-200 rounded-lg p-4 hover:bg-green-100 transition-colors">
@@ -520,20 +514,24 @@ const EventsPage: React.FC = () => {
                     {event.maxParticipants && (
                       <div className="mb-3">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-gray-600">Cupo</span>
+                          <span className="text-xs text-gray-600">Cupo disponible</span>
                           <span className="text-xs text-gray-500">
-                            {spotsLeft} de {maxParticipants}
+                            {spotsLeft} de {maxParticipants} lugares
                           </span>
                     </div>
                         <div className="w-full bg-gray-200 rounded-full h-1.5">
-                          <div 
-                            className={`h-1.5 rounded-full transition-all duration-300 ${
-                              percentage >= 90 ? 'bg-red-500' : 
-                              percentage >= 70 ? 'bg-yellow-500' : 
-                              'bg-green-500'
-                            }`}
-                            style={{ width: `${percentage}%` }}
-                          ></div>
+                          {statsLoading ? (
+                            <div className="h-1.5 bg-gray-300 rounded-full animate-pulse"></div>
+                          ) : (
+                            <div 
+                              className={`h-1.5 rounded-full transition-all duration-300 ${
+                                percentage >= 90 ? 'bg-red-500' : 
+                                percentage >= 70 ? 'bg-yellow-500' : 
+                                'bg-green-500'
+                              }`}
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          )}
                     </div>
                   </div>
                     )}
@@ -588,7 +586,7 @@ const EventsPage: React.FC = () => {
               const maxParticipants = event.maxParticipants || 100;
               const currentParticipants = eventStats[index]?.confirmedRegistrations || 0;
               const percentage = maxParticipants > 0 ? (currentParticipants / maxParticipants) * 100 : 0;
-              const spotsLeft = maxParticipants - currentParticipants;
+              const spotsLeft = Math.max(0, maxParticipants - currentParticipants);
               const isRegistered = isUserRegistered(index.toString());
               
               return (
@@ -671,29 +669,35 @@ const EventsPage: React.FC = () => {
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-sm font-medium text-gray-700">Cupo disponible</span>
                           <span className="text-sm text-gray-500">
-                            {spotsLeft} de {maxParticipants} lugares
+                            {spotsLeft} de {maxParticipants} lugares disponibles
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full transition-all duration-300 ${
-                              percentage >= 90 ? 'bg-red-500' : 
-                              percentage >= 70 ? 'bg-yellow-500' : 
-                              'bg-green-500'
-                            }`}
-                            style={{ width: `${percentage}%` }}
-                          ></div>
+                          {statsLoading ? (
+                            <div className="h-2 bg-gray-300 rounded-full animate-pulse"></div>
+                          ) : (
+                            <div 
+                              className={`h-2 rounded-full transition-all duration-300 ${
+                                percentage >= 90 ? 'bg-red-500' : 
+                                percentage >= 70 ? 'bg-yellow-500' : 
+                                'bg-green-500'
+                              }`}
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          )}
                         </div>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-xs text-gray-500">
                             {percentage.toFixed(0)}% ocupado
                           </span>
                           <span className={`text-xs font-medium ${
+                            spotsLeft === 0 ? 'text-red-600' :
                             spotsLeft <= 5 ? 'text-red-600' : 
                             spotsLeft <= 15 ? 'text-yellow-600' : 
                             'text-green-600'
                           }`}>
-                            {spotsLeft <= 5 ? '¡Últimos lugares!' : 
+                            {spotsLeft === 0 ? 'Sin cupo disponible' :
+                             spotsLeft <= 5 ? '¡Últimos lugares!' : 
                              spotsLeft <= 15 ? 'Pocos lugares' : 
                              'Disponible'}
                           </span>

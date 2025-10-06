@@ -361,52 +361,112 @@ const MapPage: React.FC = () => {
             <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
               <button
                 onClick={() => {
-                  if (map) {
-                    map.setCenter({ lat: 10.02280446907578, lng: -84.07857158309207 });
-                    map.setZoom(20);
+                  console.log('Centrar botón clickeado. Map ready:', mapReady, 'Map instance:', !!map);
+                  console.log('Map setCenter method:', typeof map?.setCenter);
+                  
+                  if (map && mapReady && typeof map.setCenter === 'function') {
+                    console.log('Centrando mapa en Calle Jerusalén...');
+                    try {
+                      map.setCenter({ lat: 10.02280446907578, lng: -84.07857158309207 });
+                      map.setZoom(20);
+                      console.log('✅ Mapa centrado correctamente');
+                    } catch (error) {
+                      console.error('❌ Error al centrar el mapa:', error);
+                    }
+                  } else {
+                    console.warn('Mapa no disponible para centrar. Estado:', {
+                      map: !!map,
+                      mapReady,
+                      setCenterMethod: typeof map?.setCenter
+                    });
                   }
                 }}
-                className="flex items-center space-x-1 px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
+                className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors text-sm ${
+                  mapReady && map && typeof map.setCenter === 'function'
+                    ? 'bg-primary-600 text-white hover:bg-primary-700' 
+                    : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                }`}
+                disabled={!mapReady || !map || typeof map?.setCenter !== 'function'}
+                title={
+                  mapReady && map && typeof map.setCenter === 'function'
+                    ? 'Centrar en Calle Jerusalén' 
+                    : 'Esperando que el mapa se cargue...'
+                }
               >
                 <MapPin className="w-4 h-4" />
-                <span>Centrar en Calle Jerusalén</span>
+                <span>
+                  {mapReady && map && typeof map.setCenter === 'function'
+                    ? 'Centrar en Calle Jerusalén' 
+                    : 'Cargando...'
+                  }
+                </span>
               </button>
               
               <button
                 onClick={() => {
-                  if (map && filteredPoints.length > 0) {
-                    const bounds = new google.maps.LatLngBounds();
-                    filteredPoints.forEach(point => {
-                      bounds.extend({ lat: point.coordinates[0], lng: point.coordinates[1] });
+                  console.log('Ver Todo botón clickeado. Map ready:', mapReady, 'Map instance:', !!map, 'Filtered points:', filteredPoints.length);
+                  console.log('Map fitBounds method:', typeof map?.fitBounds);
+                  
+                  if (map && mapReady && typeof map.fitBounds === 'function' && filteredPoints.length > 0) {
+                    console.log('Ajustando vista para mostrar todos los puntos...');
+                    try {
+                      const bounds = new google.maps.LatLngBounds();
+                      filteredPoints.forEach(point => {
+                        const lat = point.coordinates[0];
+                        const lng = point.coordinates[1];
+                        if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+                          bounds.extend({ lat, lng });
+                        }
+                      });
+                      
+                      if (!bounds.isEmpty()) {
+                        map.fitBounds(bounds);
+                        // Asegurar zoom mínimo para mejor detalle
+                        setTimeout(() => {
+                          if (map && typeof map.getZoom === 'function') {
+                            const currentZoom = map.getZoom();
+                            if (currentZoom && currentZoom > 18) {
+                              map.setZoom(18);
+                            }
+                          }
+                        }, 100);
+                        console.log('✅ Vista ajustada para mostrar todos los puntos');
+                      }
+                    } catch (error) {
+                      console.error('❌ Error al ajustar la vista:', error);
+                    }
+                  } else {
+                    console.warn('Mapa no disponible o no hay puntos para mostrar. Estado:', {
+                      map: !!map,
+                      mapReady,
+                      fitBoundsMethod: typeof map?.fitBounds,
+                      filteredPoints: filteredPoints.length
                     });
-                    map.fitBounds(bounds);
                   }
                 }}
-                className="flex items-center space-x-1 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
-              >
-                <Eye className="w-4 h-4" />
-                <span>Ver Todo</span>
-              </button>
-
-              {/* Botón de prueba para Street View */}
-              <button
-                onClick={() => {
-                  console.log('Test Street View button clicked');
-                  console.log('Map state:', { map: !!map, mapComponent: !!mapComponent, mapReady });
-                  activateStreetView(10.02280446907578, -84.07857158309207, 'Test Location');
-                }}
                 className={`flex items-center space-x-1 px-3 py-2 rounded-lg transition-colors text-sm ${
-                  mapReady 
-                    ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  mapReady && map && typeof map.fitBounds === 'function' && filteredPoints.length > 0
+                    ? 'bg-gray-600 text-white hover:bg-gray-700' 
                     : 'bg-gray-400 text-gray-200 cursor-not-allowed'
                 }`}
-                disabled={!mapReady}
-                title={mapReady ? 'Probar Street View' : 'Esperando que el mapa se cargue...'}
+                disabled={!mapReady || !map || typeof map?.fitBounds !== 'function' || filteredPoints.length === 0}
+                title={
+                  !mapReady || !map || typeof map?.fitBounds !== 'function'
+                    ? 'Esperando que el mapa se cargue...' 
+                    : filteredPoints.length === 0 
+                      ? 'No hay puntos para mostrar' 
+                      : 'Ver todos los puntos'
+                }
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-3.33 0-10 1.67-10 5v1h20v-1c0-3.33-6.67-5-10-5z"/>
-                </svg>
-                <span>{mapReady ? 'Test Street View' : 'Cargando...'}</span>
+                <Eye className="w-4 h-4" />
+                <span>
+                  {!mapReady || !map || typeof map?.fitBounds !== 'function'
+                    ? 'Cargando...' 
+                    : filteredPoints.length === 0 
+                      ? 'Sin puntos' 
+                      : `Ver Todo (${filteredPoints.length})`
+                  }
+                </span>
               </button>
             </div>
           </div>
@@ -539,11 +599,43 @@ const MapPage: React.FC = () => {
                 onMapLoad={(mapInstance) => {
                   console.log('=== MAP LOADED CALLBACK ===');
                   console.log('mapInstance:', mapInstance);
+                  console.log('mapInstance type:', typeof mapInstance);
+                  console.log('mapInstance.setCenter:', typeof mapInstance?.setCenter);
                   
-                  if (mapInstance && mapInstance.showStreetView) {
-                    console.log('✅ showStreetView method is available');
-                  } else {
-                    console.log('❌ showStreetView method is NOT available');
+                  // Agregar método showStreetView a la instancia del mapa
+                  if (mapInstance && typeof mapInstance.setCenter === 'function') {
+                    mapInstance.showStreetView = (lat: number, lng: number, heading: number = 0, pitch: number = 0) => {
+                      console.log('=== showStreetView method called ===');
+                      console.log('Parameters:', { lat, lng, heading, pitch });
+                      
+                      if (!mapInstance || !window.google) {
+                        console.log('❌ Map instance or Google Maps not available');
+                        return false;
+                      }
+                      
+                      try {
+                        console.log('🔄 Getting Street View panorama...');
+                        const pano = mapInstance.getStreetView();
+                        console.log('Street View panorama:', pano);
+                        
+                        if (pano && typeof pano.setPosition === 'function') {
+                          console.log('🔄 Setting Street View position and POV...');
+                          pano.setPosition({ lat, lng });
+                          pano.setPov({ heading, pitch });
+                          pano.setVisible(true);
+                          console.log('✅ Street View activated successfully');
+                          return true;
+                        } else {
+                          console.log('❌ Street View panorama not available or invalid');
+                          return false;
+                        }
+                      } catch (error) {
+                        console.error('❌ Error in showStreetView:', error);
+                        return false;
+                      }
+                    };
+                    
+                    console.log('✅ showStreetView method added to map instance');
                   }
                   
                   // Actualizar estado de manera síncrona

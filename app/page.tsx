@@ -5,6 +5,7 @@ import RealStats from '@/components/RealStats';
 import HeroStats from '@/components/HeroStats';
 import { useRealStats } from '@/hooks/useRealStats';
 import Link from 'next/link';
+import Image from 'next/image';
 import { MapPin, Shield, Eye, Users, Camera, AlertTriangle, UserPlus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -30,13 +31,35 @@ export default function HomePage() {
                 Calle Jerusalén, Heredia
               </div>
               
-              <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
-                Bienvenido a{' '}
-                <span className="text-primary-600 relative">
-                  Calle Jerusalén
-                  <div className="absolute -bottom-2 left-0 w-full h-1 bg-primary-200 rounded-full"></div>
-                </span>
-              </h1>
+              {/* Mobile-only large image for better visibility */}
+              <div className="flex justify-center mb-4 md:hidden">
+                <Image
+                  src="/arboljerusalen.png"
+                  alt="Árbol Calle Jerusalén"
+                  width={160}
+                  height={160}
+                  className="h-28 w-28 object-contain"
+                  priority
+                />
+              </div>
+
+              <div className="flex items-center justify-center lg:justify-start gap-5 mb-6">
+                <Image
+                  src="/arboljerusalen.png"
+                  alt="Árbol Calle Jerusalén"
+                  width={128}
+                  height={128}
+                  className="hidden md:block md:h-24 md:w-24 lg:h-28 lg:w-28 object-contain flex-shrink-0"
+                  priority
+                />
+                <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight">
+                  Bienvenido a{' '}
+                  <span className="text-primary-600 relative">
+                    Calle Jerusalén
+                    <div className="absolute -bottom-2 left-0 w-full h-1 bg-primary-200 rounded-full"></div>
+                  </span>
+                </h1>
+              </div>
               
               <p className="text-xl text-gray-600 mb-8 leading-relaxed">
                 Tu plataforma comunitaria digital para conectar residentes y visitantes. 

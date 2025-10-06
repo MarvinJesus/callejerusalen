@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Eye, EyeOff, Save, X, MapPin, Clock, Phone, Star, Search, Filter } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, EyeOff, Save, X, MapPin, Clock, Phone, Star, Search, Filter, ArrowLeft } from 'lucide-react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import UserMenu from '@/components/UserMenu';
 import { useAuth } from '@/context/AuthContext';
@@ -167,10 +167,20 @@ const ServicesManagementPage: React.FC = () => {
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Servicios Locales</h1>
-                <p className="text-gray-600 mt-1">Gestiona los servicios locales de Calle Jerusalén</p>
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center py-4 sm:py-6 space-y-4 lg:space-y-0">
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                <button
+                  onClick={() => window.history.back()}
+                  className="inline-flex items-center text-gray-600 hover:text-primary-600 transition-colors text-sm sm:text-base"
+                  title="Volver a la página anterior"
+                >
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  Volver Atrás
+                </button>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Servicios Locales</h1>
+                  <p className="text-sm sm:text-base text-gray-600 mt-1">Gestiona los servicios locales de Calle Jerusalén</p>
+                </div>
               </div>
               <div className="flex items-center space-x-4">
                 <UserMenu />

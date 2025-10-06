@@ -5,7 +5,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import PlaceList from '@/components/PlaceList';
 import UserMenu from '@/components/UserMenu';
 import { useAuth } from '@/context/AuthContext';
-import { MapPin, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { MapPin, AlertCircle, CheckCircle, Loader2, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export interface Place {
@@ -137,10 +137,20 @@ const AdminPlacesPage: React.FC = () => {
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Gestión de Lugares</h1>
-                <p className="text-gray-600">Administra los lugares de interés de Calle Jerusalén</p>
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center py-4 sm:py-6 space-y-4 lg:space-y-0">
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                <button
+                  onClick={() => window.history.back()}
+                  className="inline-flex items-center text-gray-600 hover:text-primary-600 transition-colors text-sm sm:text-base"
+                  title="Volver a la página anterior"
+                >
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  Volver Atrás
+                </button>
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Gestión de Lugares</h1>
+                  <p className="text-sm sm:text-base text-gray-600">Administra los lugares de interés de Calle Jerusalén</p>
+                </div>
               </div>
               <div className="flex items-center space-x-4">
                 <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-medium rounded-full">

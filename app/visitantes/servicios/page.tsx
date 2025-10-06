@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, MapPin, Clock, Phone, Star, Navigation, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
+import { Search, Filter, MapPin, Clock, Phone, Star, Navigation, ExternalLink, Eye, ArrowLeft, Home } from 'lucide-react';
 import { LocalService } from '@/lib/history-service';
 
 const ServicesPage: React.FC = () => {
@@ -117,6 +118,35 @@ const ServicesPage: React.FC = () => {
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          {/* Navegación de regreso */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => window.history.back()}
+                className="inline-flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+                title="Volver atrás"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Volver</span>
+              </button>
+              <Link
+                href="/"
+                className="inline-flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
+                title="Ir al inicio"
+              >
+                <Home className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Inicio</span>
+              </Link>
+            </div>
+            
+            {/* Información adicional del lado derecho */}
+            <div className="flex items-center text-sm text-gray-500">
+              <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-xs font-medium">
+                {filteredServices.length} servicios disponibles
+              </span>
+            </div>
+          </div>
+
           <div className="text-center">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">
               Servicios Locales de Calle Jerusalén
@@ -206,7 +236,12 @@ const ServicesPage: React.FC = () => {
 
                 {/* Contenido */}
                 <div className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">{service.name}</h3>
+                  <Link 
+                    href={`/visitantes/servicios/${service.id}`}
+                    className="block hover:text-primary-600 transition-colors"
+                  >
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-600 transition-colors">{service.name}</h3>
+                  </Link>
                   <p className="text-gray-600 text-sm mb-4 line-clamp-3">{service.description}</p>
                   
                   {/* Información de contacto */}
@@ -226,17 +261,26 @@ const ServicesPage: React.FC = () => {
                   </div>
 
                   {/* Botones de acción */}
-                  <div className="flex space-x-3">
-                    <button
-                      onClick={() => handleViewOnMap(service)}
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
-                    >
-                      <Navigation className="w-4 h-4 mr-2" />
-                      Ver en Mapa
-                    </button>
+                  <div className="space-y-3">
+                    <div className="flex space-x-2">
+                      <Link
+                        href={`/visitantes/servicios/${service.id}`}
+                        className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-primary-300 shadow-sm text-sm font-medium rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Ver Detalles
+                      </Link>
+                      <button
+                        onClick={() => handleViewOnMap(service)}
+                        className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                      >
+                        <Navigation className="w-4 h-4 mr-2" />
+                        Mapa
+                      </button>
+                    </div>
                     <button
                       onClick={() => handleCallService(service.phone)}
-                      className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                      className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
                     >
                       <Phone className="w-4 h-4 mr-2" />
                       Llamar

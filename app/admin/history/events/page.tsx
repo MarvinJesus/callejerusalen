@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import UserMenu from '@/components/UserMenu';
 import { useAuth } from '@/context/AuthContext';
-import { Calendar, Edit, Trash2, Plus, ArrowLeft, X, Check, AlertCircle, Clock, MapPin, Users, Star, Camera } from 'lucide-react';
+import { Calendar, Edit, Trash2, Plus, ArrowLeft, X, Check, AlertCircle, Clock, MapPin, Users, Star, Camera, Search, Filter, SortAsc, SortDesc } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -56,8 +56,21 @@ const AdminEventsPage: React.FC = () => {
   const [newHighlight, setNewHighlight] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [eventStats, setEventStats] = useState<{[key: string]: any}>({});
+  const [statsLoading, setStatsLoading] = useState(false);
   const [initialHistoryData, setInitialHistoryData] = useState<HistoryPageData | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
+  
+  // Estados para filtros y búsqueda
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedType, setSelectedType] = useState('');
+  const [showRecurringOnly, setShowRecurringOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<'date' | 'title' | 'participants'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  // Estados para tabs y archivado
+  const [activeTab, setActiveTab] = useState<'active' | 'archived'>('active');
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const categories = [
     'Cultural',
@@ -100,10 +113,24 @@ const AdminEventsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (historyData?.events) {
+    if (historyData?.events && historyData.events.length > 0) {
       loadEventStats();
+      
+      // Debug: Mostrar información de eventos al cargar
+      console.log('🔄 Eventos cargados, verificando archivado...');
+      const counts = getEventCounts();
+      console.log('📊 Conteos calculados:', counts);
     }
   }, [historyData]);
+
+  // Recalcular conteos cuando cambie el refreshKey
+  useEffect(() => {
+    if (historyData?.events && historyData.events.length > 0) {
+      console.log('🔄 Recalculando conteos...');
+      const counts = getEventCounts();
+      console.log('📊 Conteos recalculados:', counts);
+    }
+  }, [refreshKey, historyData]);
 
   const loadHistoryData = async () => {
     try {
@@ -117,10 +144,11 @@ const AdminEventsPage: React.FC = () => {
       }
 
       const data = await response.json();
+      
       setHistoryData(data.historyData);
       setInitialHistoryData(data.historyData);
     } catch (error) {
-      console.error('Error al cargar datos de historia:', error);
+      console.error('❌ Error al cargar datos de historia:', error);
       setError('Error al cargar datos de historia');
     } finally {
       setLoading(false);
@@ -247,6 +275,10 @@ const AdminEventsPage: React.FC = () => {
       setInitialHistoryData(updatedHistoryData);
       setHasChanges(false);
       setShowDeleteConfirm(null);
+      
+      // Recargar estadísticas después de eliminar
+      await loadEventStats();
+      
       toast.success('Evento eliminado exitosamente');
     } catch (error: any) {
       console.error('Error al eliminar evento:', error);
@@ -259,52 +291,58 @@ const AdminEventsPage: React.FC = () => {
 
   const loadEventStats = async () => {
     try {
+      setStatsLoading(true);
       const stats: {[key: string]: any} = {};
       
       // Cargar estadísticas reales para cada evento
-      for (let i = 0; i < (historyData?.events.length || 0); i++) {
-        try {
-          console.log(`📊 Obteniendo estadísticas del evento ${i}`);
-          const response = await fetch(`/api/events/${i}/stats`);
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`✅ Estadísticas del evento ${i}:`, data);
-            // Usar las propiedades directamente de la respuesta
-            stats[i] = {
-              confirmedRegistrations: data.confirmedRegistrations || 0,
-              totalRegistrations: data.totalRegistrations || 0,
-              pendingRegistrations: data.pendingRegistrations || 0,
-              cancelledRegistrations: data.cancelledRegistrations || 0,
-              blockedRegistrations: data.blockedRegistrations || 0
-            };
-          } else {
-            console.log(`❌ Error al obtener estadísticas del evento ${i}:`, response.status);
-            // Si no hay estadísticas, usar valores por defecto
-            stats[i] = {
-              confirmedRegistrations: 0,
-              totalRegistrations: 0,
-              pendingRegistrations: 0,
-              cancelledRegistrations: 0,
-              blockedRegistrations: 0
-            };
+      if (historyData?.events) {
+        const statsPromises = historyData.events.map(async (event, index) => {
+          try {
+            // Usar el índice como eventId para la API
+            const response = await fetch(`/api/events/${index}/stats`);
+            if (response.ok) {
+              const data = await response.json();
+              return {
+                index,
+                confirmedRegistrations: data.confirmedRegistrations || 0,
+                totalRegistrations: data.totalRegistrations || 0,
+                pendingRegistrations: data.pendingRegistrations || 0,
+                cancelledRegistrations: data.cancelledRegistrations || 0,
+                blockedRegistrations: data.blockedRegistrations || 0
+              };
+            }
+          } catch (error) {
+            console.error(`Error al cargar estadísticas del evento ${index}:`, error);
           }
-        } catch (error) {
-          console.error(`❌ Error al cargar estadísticas del evento ${i}:`, error);
-          // En caso de error, usar valores por defecto
-          stats[i] = {
+          return {
+            index,
             confirmedRegistrations: 0,
             totalRegistrations: 0,
             pendingRegistrations: 0,
             cancelledRegistrations: 0,
             blockedRegistrations: 0
           };
-        }
+        });
+
+        const statsResults = await Promise.all(statsPromises);
+        
+        // Convertir a objeto indexado
+        statsResults.forEach(result => {
+          stats[result.index] = {
+            confirmedRegistrations: result.confirmedRegistrations,
+            totalRegistrations: result.totalRegistrations,
+            pendingRegistrations: result.pendingRegistrations,
+            cancelledRegistrations: result.cancelledRegistrations,
+            blockedRegistrations: result.blockedRegistrations
+          };
+        });
       }
       
-      console.log('📊 Estadísticas finales:', stats);
       setEventStats(stats);
     } catch (error) {
-      console.error('Error al cargar estadísticas de eventos:', error);
+      console.error('❌ Error al cargar estadísticas de eventos:', error);
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -368,6 +406,9 @@ const AdminEventsPage: React.FC = () => {
       setInitialHistoryData(updatedHistoryData);
       setHasChanges(false);
       
+      // Recargar estadísticas después de guardar
+      await loadEventStats();
+      
       toast.success('Evento guardado exitosamente');
     } catch (error: any) {
       console.error('Error al guardar evento:', error);
@@ -429,6 +470,153 @@ const AdminEventsPage: React.FC = () => {
     }
   };
 
+  // Función para determinar si un evento está archivado (ya pasó)
+  const isEventArchived = (event: CommunityEvent) => {
+    // Si no tiene fecha, no se archiva
+    if (!event.date || event.date.trim() === '') {
+      console.log('📅 Evento sin fecha:', event.title, '- NO archivado');
+      return false;
+    }
+    
+    // Los eventos recurrentes no se archivan automáticamente
+    if (event.isRecurring) {
+      console.log('🔄 Evento recurrente:', event.title, '- NO archivado');
+      return false;
+    }
+    
+    try {
+      // Crear fecha del evento
+      const eventDate = new Date(event.date);
+      
+      // Verificar si la fecha es válida
+      if (isNaN(eventDate.getTime())) {
+        console.warn('⚠️ Fecha inválida para evento:', event.title, 'Fecha:', event.date);
+        return false;
+      }
+      
+      // Crear fecha actual (inicio del día de hoy)
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Crear fecha del evento (inicio del día del evento)
+      const eventDateStart = new Date(eventDate);
+      eventDateStart.setHours(0, 0, 0, 0);
+      
+      const isArchived = eventDateStart < today;
+      
+      // Debug logging
+      console.log('🔍 Evento:', event.title);
+      console.log('📅 Fecha del evento:', eventDate.toLocaleDateString());
+      console.log('📅 Fecha actual:', today.toLocaleDateString());
+      console.log('📅 ¿Ya pasó?', isArchived ? 'SÍ' : 'NO');
+      console.log('---');
+      
+      return isArchived;
+    } catch (error) {
+      console.error('❌ Error procesando fecha:', event.title, 'Fecha:', event.date, error);
+      return false;
+    }
+  };
+
+  // Función para filtrar y ordenar eventos
+  const getFilteredAndSortedEvents = () => {
+    if (!historyData?.events) return [];
+
+    let filteredEvents = historyData.events.filter(event => {
+      // Filtro por tab (activos vs archivados)
+      const isArchived = isEventArchived(event);
+      const matchesTab = activeTab === 'active' ? !isArchived : isArchived;
+
+      // Filtro por término de búsqueda
+      const matchesSearch = !searchTerm || 
+        event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        event.organizer.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Filtro por categoría
+      const matchesCategory = !selectedCategory || event.category === selectedCategory;
+
+      // Filtro por tipo
+      const matchesType = !selectedType || event.type === selectedType;
+
+      // Filtro por eventos recurrentes
+      const matchesRecurring = !showRecurringOnly || event.isRecurring;
+
+      return matchesTab && matchesSearch && matchesCategory && matchesType && matchesRecurring;
+    });
+
+    // Ordenar eventos
+    filteredEvents.sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case 'date':
+          // Ordenar por fecha del evento, si no hay fecha usar el orden
+          const dateA = a.date ? new Date(a.date).getTime() : a.order;
+          const dateB = b.date ? new Date(b.date).getTime() : b.order;
+          comparison = dateA - dateB;
+          break;
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'participants':
+          const participantsA = eventStats[historyData.events.indexOf(a)]?.confirmedRegistrations || 0;
+          const participantsB = eventStats[historyData.events.indexOf(b)]?.confirmedRegistrations || 0;
+          comparison = participantsA - participantsB;
+          break;
+        default:
+          comparison = b.order - a.order; // Orden por defecto: más recientes primero
+      }
+
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+
+    return filteredEvents;
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedCategory('');
+    setSelectedType('');
+    setShowRecurringOnly(false);
+    setSortBy('date');
+    setSortOrder('desc');
+  };
+
+  const handleTabChange = (tab: 'active' | 'archived') => {
+    console.log('🔄 Cambiando a tab:', tab);
+    setActiveTab(tab);
+    setRefreshKey(prev => prev + 1); // Forzar re-render
+  };
+
+  // Función para obtener conteos de eventos
+  const getEventCounts = () => {
+    if (!historyData?.events) return { active: 0, archived: 0 };
+    
+    let activeCount = 0;
+    let archivedCount = 0;
+    
+    console.log('📊 Calculando conteos de eventos...');
+    console.log('📊 Total de eventos:', historyData.events.length);
+    
+    historyData.events.forEach((event, index) => {
+      const isArchived = isEventArchived(event);
+      console.log(`📊 Evento ${index + 1}: "${event.title}" - Archivado: ${isArchived}`);
+      
+      if (isArchived) {
+        archivedCount++;
+      } else {
+        activeCount++;
+      }
+    });
+    
+    console.log('📊 Conteos finales - Activos:', activeCount, 'Archivados:', archivedCount);
+    
+    return { active: activeCount, archived: archivedCount };
+  };
+
+
   if (loading) {
     return (
       <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
@@ -453,13 +641,14 @@ const AdminEventsPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center py-4 sm:py-6 space-y-4 lg:space-y-0">
             <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
-              <Link
-                href="/admin/history"
+              <button
+                onClick={() => window.history.back()}
                 className="inline-flex items-center text-gray-600 hover:text-primary-600 transition-colors text-sm sm:text-base"
+                title="Volver a la página anterior"
               >
                 <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                Volver a Historia
-              </Link>
+                Volver Atrás
+              </button>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Eventos y Actividades</h1>
                 <p className="text-sm sm:text-base text-gray-600">Gestiona los eventos y actividades de la comunidad</p>
@@ -498,22 +687,238 @@ const AdminEventsPage: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+        {/* Filtros y Búsqueda */}
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
+            {/* Búsqueda */}
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Buscar eventos por título, descripción, ubicación u organizador..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm sm:text-base"
+                />
+              </div>
+            </div>
+
+            {/* Filtros */}
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm text-gray-900 bg-white"
+              >
+                <option value="">Todas las categorías</option>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm text-gray-900 bg-white"
+              >
+                <option value="">Todos los tipos</option>
+                {eventTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={`${sortBy}-${sortOrder}`}
+                onChange={(e) => {
+                  const [newSortBy, newSortOrder] = e.target.value.split('-');
+                  setSortBy(newSortBy as 'date' | 'title' | 'participants');
+                  setSortOrder(newSortOrder as 'asc' | 'desc');
+                }}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm text-gray-900 bg-white"
+              >
+                <option value="date-desc">Más recientes primero</option>
+                <option value="date-asc">Más antiguos primero</option>
+                <option value="title-asc">Título A-Z</option>
+                <option value="title-desc">Título Z-A</option>
+                <option value="participants-desc">Más inscritos</option>
+                <option value="participants-asc">Menos inscritos</option>
+              </select>
+
+              <label className="flex items-center px-3 py-2 border border-gray-300 rounded-md bg-white">
+                <input
+                  type="checkbox"
+                  checked={showRecurringOnly}
+                  onChange={(e) => setShowRecurringOnly(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="ml-2 text-sm text-gray-700">Solo recurrentes</span>
+              </label>
+
+              {(searchTerm || selectedCategory || selectedType || showRecurringOnly || sortBy !== 'date' || sortOrder !== 'desc') && (
+                <button
+                  onClick={clearFilters}
+                  className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs para Eventos Activos y Archivados */}
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6 sm:mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => handleTabChange('active')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'active'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Eventos Vigentes
+                <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
+                  activeTab === 'active'
+                    ? 'bg-primary-100 text-primary-600'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {getEventCounts().active}
+                </span>
+              </button>
+              <button
+                onClick={() => handleTabChange('archived')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'archived'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Eventos Archivados
+                <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${
+                  activeTab === 'archived'
+                    ? 'bg-primary-100 text-primary-600'
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {getEventCounts().archived}
+                </span>
+              </button>
+            </nav>
+          </div>
+          
+          {/* Información del tab activo */}
+          <div className="mt-4">
+            {activeTab === 'active' ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                    <span>Mostrando eventos futuros y eventos sin fecha específica</span>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => {
+                      console.log('🔍 DEBUG: Información de todos los eventos');
+                      historyData?.events.forEach((event, index) => {
+                        console.log(`Evento ${index + 1}:`, {
+                          title: event.title,
+                          date: event.date,
+                          isRecurring: event.isRecurring,
+                          isArchived: isEventArchived(event)
+                        });
+                      });
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Debug Info
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log('🔄 FORZANDO RECARGA DE CONTEO');
+                      setRefreshKey(prev => prev + 1);
+                    }}
+                    className="text-xs text-green-600 hover:text-green-800 underline"
+                  >
+                    Recargar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full mr-2"></div>
+                    <span>Mostrando eventos que ya han pasado (no incluye eventos recurrentes)</span>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => {
+                      console.log('🔍 DEBUG: Información de todos los eventos');
+                      historyData?.events.forEach((event, index) => {
+                        console.log(`Evento ${index + 1}:`, {
+                          title: event.title,
+                          date: event.date,
+                          isRecurring: event.isRecurring,
+                          isArchived: isEventArchived(event)
+                        });
+                      });
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Debug Info
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log('🔄 FORZANDO RECARGA DE CONTEO');
+                      setRefreshKey(prev => prev + 1);
+                    }}
+                    className="text-xs text-green-600 hover:text-green-800 underline"
+                  >
+                    Recargar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Lista de Eventos */}
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-900">Eventos Configurados</h2>
-            <button
-              onClick={addEvent}
-              disabled={saving}
-              className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Agregar Evento
-            </button>
+            <div>
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900">
+                {activeTab === 'active' ? 'Eventos Vigentes' : 'Eventos Archivados'}
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                {getFilteredAndSortedEvents().length} de {activeTab === 'active' ? getEventCounts().active : getEventCounts().archived} eventos {activeTab === 'active' ? 'vigentes' : 'archivados'}
+                {(searchTerm || selectedCategory || selectedType || showRecurringOnly) && ' (filtrados)'}
+              </p>
+            </div>
+            {activeTab === 'active' && (
+              <button
+                onClick={addEvent}
+                disabled={saving}
+                className="inline-flex items-center justify-center px-3 sm:px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Agregar Evento
+              </button>
+            )}
           </div>
 
           <div className="space-y-4">
-            {historyData?.events.map((event, index) => (
+            {getFilteredAndSortedEvents().map((event, index) => {
+              // Encontrar el índice original del evento para las estadísticas
+              const originalIndex = historyData?.events.findIndex(e => e === event) ?? 0;
+              return (
               <div key={index} className="bg-white rounded-lg shadow-sm p-4 sm:p-6 hover:shadow-md transition-shadow">
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between space-y-4 lg:space-y-0">
                   <div className="flex-1 min-w-0">
@@ -527,6 +932,11 @@ const AdminEventsPage: React.FC = () => {
                       {event.isRecurring && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 w-fit">
                           Recurrente
+                        </span>
+                      )}
+                      {activeTab === 'archived' && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 w-fit">
+                          Archivado
                         </span>
                       )}
                       <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded w-fit">
@@ -568,7 +978,18 @@ const AdminEventsPage: React.FC = () => {
                       )}
                       <span className="flex items-center text-blue-600">
                         <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 flex-shrink-0" />
-                        {eventStats[index]?.confirmedRegistrations || 0} inscritos
+                        {statsLoading ? (
+                          <span className="animate-pulse">Cargando...</span>
+                        ) : (
+                          <>
+                            {eventStats[originalIndex]?.confirmedRegistrations || 0} inscritos
+                            {eventStats[originalIndex]?.totalRegistrations > eventStats[originalIndex]?.confirmedRegistrations && (
+                              <span className="ml-1 text-orange-600">
+                                ({eventStats[originalIndex]?.totalRegistrations - eventStats[originalIndex]?.confirmedRegistrations} pendientes)
+                              </span>
+                            )}
+                          </>
+                        )}
                       </span>
                       {event.image && (
                         <span className="flex items-center text-green-600">
@@ -579,38 +1000,87 @@ const AdminEventsPage: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 lg:ml-4 lg:flex-shrink-0">
-                    <Link
-                      href={`/admin/history/events/${index}/users`}
-                      className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 border border-blue-300 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full sm:w-auto"
-                      title="Gestionar usuarios inscritos"
-                    >
-                      <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
-                      Gestionar Usuarios
-                    </Link>
-                    <button
-                      onClick={() => editEvent(event, index)}
-                      disabled={saving}
-                      className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-                      title="Editar evento"
-                    >
-                      <Edit className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => confirmDeleteEvent(index)}
-                      disabled={saving}
-                      className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
-                      title="Eliminar evento"
-                    >
-                      <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
-                      Eliminar
-                    </button>
+                    {activeTab === 'active' ? (
+                      // Acciones para eventos vigentes
+                      <>
+                        <Link
+                          href={`/admin/history/events/${originalIndex}/users`}
+                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-blue-700 bg-blue-50 border border-blue-300 rounded-md hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full sm:w-auto"
+                          title="Gestionar usuarios inscritos"
+                        >
+                          <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
+                          Gestionar Usuarios
+                        </Link>
+                        <button
+                          onClick={() => editEvent(event, originalIndex)}
+                          disabled={saving}
+                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                          title="Editar evento"
+                        >
+                          <Edit className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => confirmDeleteEvent(originalIndex)}
+                          disabled={saving}
+                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                          title="Eliminar evento"
+                        >
+                          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
+                          Eliminar
+                        </button>
+                      </>
+                    ) : (
+                      // Acciones para eventos archivados
+                      <>
+                        <button
+                          onClick={() => editEvent(event, originalIndex)}
+                          disabled={saving}
+                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                          title="Ver detalles del evento archivado"
+                        >
+                          <Edit className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
+                          Ver Detalles
+                        </button>
+                        <button
+                          onClick={() => confirmDeleteEvent(originalIndex)}
+                          disabled={saving}
+                          className="inline-flex items-center justify-center px-3 py-2 text-xs sm:text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+                          title="Eliminar permanentemente"
+                        >
+                          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1" />
+                          Eliminar Permanentemente
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
 
-            {historyData?.events.length === 0 && (
+            {getFilteredAndSortedEvents().length === 0 && (historyData?.events.length || 0) > 0 && (
+              <div className="text-center py-8 sm:py-12 px-4">
+                <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">
+                  {activeTab === 'active' ? 'No hay eventos vigentes' : 'No hay eventos archivados'}
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600 mb-4">
+                  {activeTab === 'active' 
+                    ? 'No hay eventos futuros que coincidan con los filtros aplicados'
+                    : 'No hay eventos pasados que coincidan con los filtros aplicados'
+                  }
+                </p>
+                <button
+                  onClick={clearFilters}
+                  className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 w-full sm:w-auto"
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            )}
+
+            {(historyData?.events.length || 0) === 0 && (
               <div className="text-center py-8 sm:py-12 px-4">
                 <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No hay eventos configurados</h3>
