@@ -43,13 +43,14 @@ const MapPage: React.FC = () => {
   const [mapComponent, setMapComponent] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
 
   const getStreetViewUrl = (lat: number, lng: number) =>
     `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}&heading=0&pitch=0&fov=80`;
 
-  // Función dedicada para activar Street View
-  const activateStreetView = (lat: number, lng: number, pointName: string) => {
-    console.log(`=== ACTIVATING STREET VIEW ===`);
+  // Función interna para activar Street View (sin scroll)
+  const tryActivateStreetView = (lat: number, lng: number, pointName: string): void => {
+    console.log(`=== TRYING TO ACTIVATE STREET VIEW ===`);
     console.log(`Point: ${pointName}`);
     console.log(`Coordinates: ${lat}, ${lng}`);
     console.log('Map state:', { 
@@ -67,11 +68,11 @@ const MapPage: React.FC = () => {
       return;
     }
 
-    // Si el mapa no está listo, intentar esperar un poco y reintentar
+    // Si el mapa no está listo, intentar esperar un poco y reintentar (sin scroll)
     if (!mapReady || !map) {
       console.log('⏳ Map not ready, waiting and retrying...');
       setTimeout(() => {
-        activateStreetView(lat, lng, pointName);
+        tryActivateStreetView(lat, lng, pointName);
       }, 500);
       return;
     }
@@ -121,6 +122,22 @@ const MapPage: React.FC = () => {
     console.log('🔄 Fallback: Opening Street View in new tab');
     const streetViewUrl = getStreetViewUrl(lat, lng);
     window.open(streetViewUrl, '_blank');
+  };
+
+  // Función principal para activar Street View con scroll
+  const activateStreetView = (lat: number, lng: number, pointName: string) => {
+    // Desplazar la página hacia el mapa SOLO UNA VEZ para mejorar la experiencia del usuario
+    if (mapContainerRef.current) {
+      mapContainerRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
+    
+    // Pequeño delay para que el scroll tenga efecto antes de activar Street View
+    setTimeout(() => {
+      tryActivateStreetView(lat, lng, pointName);
+    }, 300);
   };
 
   // Función para convertir lugares de la API a puntos del mapa
@@ -579,7 +596,7 @@ const MapPage: React.FC = () => {
         )}
 
         {/* Map */}
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div ref={mapContainerRef} className="bg-white rounded-lg shadow-md p-6">
           {loading ? (
             <div className="h-96 bg-gray-200 rounded-lg flex items-center justify-center">
               <div className="text-center">
