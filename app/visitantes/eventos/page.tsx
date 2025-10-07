@@ -514,9 +514,9 @@ const EventsPage: React.FC = () => {
                     {event.maxParticipants && (
                       <div className="mb-3">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-gray-600">Cupo disponible</span>
+                          <span className="text-xs text-gray-600">Inscritos</span>
                           <span className="text-xs text-gray-500">
-                            {spotsLeft} de {maxParticipants} lugares
+                            {currentParticipants} de {maxParticipants} inscritos ({percentage.toFixed(2)}%)
                           </span>
                     </div>
                         <div className="w-full bg-gray-200 rounded-full h-1.5">
@@ -533,13 +533,21 @@ const EventsPage: React.FC = () => {
                             ></div>
                           )}
                     </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-xs text-gray-500">
+                        {spotsLeft} disponibles
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {percentage.toFixed(2)}% ocupado
+                      </span>
+                    </div>
                   </div>
                     )}
 
                     {/* Botón de acción */}
                     <button
                       onClick={() => router.push(`/visitantes/eventos/${originalIndex}`)}
-                      className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 transition-colors"
+                      className="w-full inline-flex items-center justify-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 transition-colors whitespace-nowrap"
                     >
                       Ver detalles
                   </button>
@@ -667,9 +675,9 @@ const EventsPage: React.FC = () => {
                     {event.maxParticipants && (
                       <div className="mb-4">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-700">Cupo disponible</span>
+                          <span className="text-sm font-medium text-gray-700">Participantes inscritos</span>
                           <span className="text-sm text-gray-500">
-                            {spotsLeft} de {maxParticipants} lugares disponibles
+                            {currentParticipants} de {maxParticipants} inscritos ({percentage.toFixed(2)}%)
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -688,7 +696,7 @@ const EventsPage: React.FC = () => {
                         </div>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-xs text-gray-500">
-                            {percentage.toFixed(0)}% ocupado
+                            {spotsLeft} disponibles
                           </span>
                           <span className={`text-xs font-medium ${
                             spotsLeft === 0 ? 'text-red-600' :
@@ -696,10 +704,10 @@ const EventsPage: React.FC = () => {
                             spotsLeft <= 15 ? 'text-yellow-600' : 
                             'text-green-600'
                           }`}>
-                            {spotsLeft === 0 ? 'Sin cupo disponible' :
-                             spotsLeft <= 5 ? '¡Últimos lugares!' : 
-                             spotsLeft <= 15 ? 'Pocos lugares' : 
-                             'Disponible'}
+                            {spotsLeft === 0 ? 'Sin cupo' :
+                             spotsLeft <= 5 ? `¡Quedan ${spotsLeft}!` : 
+                             spotsLeft <= 15 ? `Quedan ${spotsLeft}` : 
+                             `${spotsLeft} disponibles`}
                           </span>
                         </div>
                       </div>
@@ -741,7 +749,7 @@ const EventsPage: React.FC = () => {
                       </div>
                       <button
                         onClick={() => router.push(`/visitantes/eventos/${index}`)}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-primary-600 bg-primary-100 hover:bg-primary-200 transition-colors"
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-primary-600 bg-primary-100 hover:bg-primary-200 transition-colors whitespace-nowrap"
                       >
                         Ver detalles
             </button>

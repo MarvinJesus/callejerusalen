@@ -17,10 +17,11 @@ const db = admin.firestore();
 const initialPlaces = [
   {
     name: 'Mirador de la Cruz',
-    description: 'Punto de observación natural que ofrece vistas panorámicas espectaculares de toda la región. Lugar sagrado y de peregrinación.',
+    description:
+      'Ubicado en las colinas de Concepción, este mirador ofrece vistas panorámicas del Valle Central, incluyendo San José, Heredia y Alajuela. Es un lugar de encuentro para caminantes, peregrinos y visitantes que buscan un espacio de paz y naturaleza.',
     category: 'miradores',
-    address: 'Cerro de la Cruz, Calle Jerusalén',
-    hours: '5:00 AM - 8:00 PM',
+    address: 'Cerro de la Cruz, Calle Jerusalén, Concepción, San Rafael de Heredia',
+    hours: '5:00 AM – 8:00 PM',
     rating: 4.9,
     image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
     images: [
@@ -28,7 +29,7 @@ const initialPlaces = [
       'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800',
       'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800'
     ],
-    coordinates: { lat: 19.4326, lng: -99.1332 },
+    coordinates: { lat: 10.0401, lng: -84.0862 },
     isActive: true,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -37,18 +38,19 @@ const initialPlaces = [
   },
   {
     name: 'Pulpería El Progreso',
-    description: 'La pulpería más antigua de Calle Jerusalén, en funcionamiento desde 1955. Ofrece productos tradicionales y es un punto de encuentro comunitario.',
+    description:
+      'Fundada en 1955, esta emblemática pulpería ha servido por décadas como punto de encuentro y abastecimiento para las familias de Calle Jerusalén. Conserva su estilo tradicional y mantiene la venta de productos locales y artesanales.',
     category: 'pulperias',
-    address: 'Calle Principal #45',
-    hours: '6:00 AM - 9:00 PM',
-    rating: 4.7,
+    address: 'Calle Principal #45, Calle Jerusalén, Concepción de San Rafael',
+    hours: '6:00 AM – 9:00 PM',
+    rating: 4.8,
     image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400',
     images: [
       'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800',
       'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800',
       'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800'
     ],
-    coordinates: { lat: 19.4336, lng: -99.1342 },
+    coordinates: { lat: 10.0399, lng: -84.0854 },
     isActive: true,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -56,19 +58,62 @@ const initialPlaces = [
     updatedBy: 'admin'
   },
   {
-    name: 'Parque Central',
-    description: 'Hermoso parque con áreas verdes, juegos infantiles y pista de caminata. Centro de actividades comunitarias.',
+    name: 'Parque Central de Concepción',
+    description:
+      'Corazón de la comunidad, rodeado por árboles de ciprés y la iglesia local. Es el escenario principal de las actividades culturales y deportivas de la zona, donde vecinos se reúnen para eventos, ferias y celebraciones patronales.',
     category: 'parques',
-    address: 'Plaza Central, Calle Jerusalén',
-    hours: '6:00 AM - 10:00 PM',
-    rating: 4.5,
+    address: 'Plaza Central, Concepción, San Rafael de Heredia',
+    hours: '6:00 AM – 10:00 PM',
+    rating: 4.7,
     image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400',
     images: [
       'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800',
       'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
       'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800'
     ],
-    coordinates: { lat: 19.4316, lng: -99.1322 },
+    coordinates: { lat: 10.0396, lng: -84.0847 },
+    isActive: true,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: 'admin',
+    updatedBy: 'admin'
+  },
+  {
+    name: 'Iglesia de Concepción',
+    description:
+      'Templo católico de arquitectura tradicional herediana, construido en la primera mitad del siglo XX. Es uno de los edificios más representativos del distrito y punto central de las festividades religiosas.',
+    category: 'iglesias',
+    address: 'Frente al Parque Central, Concepción, San Rafael de Heredia',
+    hours: '6:00 AM – 6:00 PM',
+    rating: 4.9,
+    image: 'https://images.unsplash.com/photo-1508051123996-69f8caf4891e?w=400',
+    images: [
+      'https://images.unsplash.com/photo-1508051123996-69f8caf4891e?w=800',
+      'https://images.unsplash.com/photo-1528909514045-2fa4ac7a08ba?w=800',
+      'https://images.unsplash.com/photo-1528747008803-1baa6c662af1?w=800'
+    ],
+    coordinates: { lat: 10.0394, lng: -84.0845 },
+    isActive: true,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: 'admin',
+    updatedBy: 'admin'
+  },
+  {
+    name: 'Sendero Ecológico La Esperanza',
+    description:
+      'Pequeña ruta natural ubicada al norte de Calle Jerusalén, ideal para caminatas cortas, observación de aves y contacto con la naturaleza. Administrada por vecinos voluntarios.',
+    category: 'senderos',
+    address: 'Final norte de Calle Jerusalén, Concepción de San Rafael',
+    hours: '5:30 AM – 5:00 PM',
+    rating: 4.6,
+    image: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400',
+    images: [
+      'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800',
+      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800',
+      'https://images.unsplash.com/photo-1493810329807-1e7d2dfc73ef?w=800'
+    ],
+    coordinates: { lat: 10.0412, lng: -84.0868 },
     isActive: true,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
