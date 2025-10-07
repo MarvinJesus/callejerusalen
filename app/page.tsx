@@ -487,7 +487,7 @@ export default function HomePage() {
             <div className="grid md:grid-cols-2 gap-8 items-start mb-8">
               <div className="space-y-4">
                 {emergency.imageUrl ? (
-                  <img src={emergency.imageUrl} alt="Área segura" className="w-full h-64 object-cover rounded-lg border" />
+                  <img src={emergency.imageUrl} alt="Área segura" className="w-full h-80 object-cover rounded-lg border" />
                 ) : (
                   <div className="w-full h-64 rounded-lg border bg-white flex items-center justify-center text-gray-400">Imagen del área segura</div>
                 )}

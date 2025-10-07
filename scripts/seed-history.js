@@ -14,126 +14,134 @@ const db = getFirestore(app);
 // Datos de ejemplo para la historia
 const historyData = {
   title: 'Historia de Calle Jerusalén',
-  subtitle: 'Descubre la rica historia y tradiciones que han moldeado nuestra comunidad a lo largo de los años.',
+  subtitle: 'Descubre la rica historia, el crecimiento y las tradiciones que han dado forma a nuestra comunidad en Concepción de San Rafael de Heredia.',
   periods: [
     {
-      period: 'Fundación (1950-1960)',
-      title: 'Los Primeros Pobladores',
-      description: 'Calle Jerusalén fue fundada por un grupo de familias que buscaban un lugar tranquilo para establecerse. Las primeras casas se construyeron con materiales locales y siguiendo las tradiciones arquitectónicas de la región.',
+      period: 'Orígenes (1940-1960)',
+      title: 'De Finca a Comunidad',
+      description:
+        'La zona donde hoy se encuentra Calle Jerusalén formaba parte de antiguas fincas cafetaleras y agrícolas que abastecían a Heredia y San José. A mediados del siglo XX, las familias comenzaron a establecerse de forma permanente, atraídas por el clima fresco, la fertilidad del suelo y la tranquilidad del lugar.',
       image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400',
       highlights: [
-        'Primeras 12 familias se establecen',
-        'Construcción de la primera pulpería',
-        'Creación del comité comunal'
+        'División de terrenos de fincas cafetaleras',
+        'Llegada de familias fundadoras',
+        'Inicio de caminos rurales de acceso'
       ],
       order: 1
     },
     {
-      period: 'Crecimiento (1960-1980)',
-      title: 'Expansión y Desarrollo',
-      description: 'Durante estas décadas, la comunidad creció significativamente. Se construyeron las primeras escuelas, se establecieron más comercios y se formó la identidad cultural que caracteriza a Calle Jerusalén.',
+      period: 'Consolidación (1960-1980)',
+      title: 'Nace la Comunidad de Calle Jerusalén',
+      description:
+        'Durante estas décadas, el crecimiento de Concepción impulsó la creación de nuevos barrios, entre ellos Calle Jerusalén. Se construyeron las primeras viviendas formales, se organizó la comunidad y se mejoraron los caminos, conectando con el centro de Concepción y San Rafael. Los vecinos fundaron los primeros comités comunales y se fortaleció la vida social y religiosa.',
       image: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=400',
       highlights: [
-        'Construcción de la escuela primaria',
-        'Apertura de 5 nuevas pulperías',
-        'Creación del festival anual'
+        'Organización del primer comité comunal',
+        'Construcción de la primera escuela cercana',
+        'Apertura de la primera pulpería local'
       ],
       order: 2
     },
     {
       period: 'Modernización (1980-2000)',
-      title: 'Entrada al Siglo XXI',
-      description: 'La llegada de servicios básicos modernos transformó la vida en la comunidad. Se pavimentaron las calles principales, llegó la electricidad y se establecieron los servicios de salud.',
+      title: 'Avances y Servicios Básicos',
+      description:
+        'El progreso llegó con la pavimentación de calles, el acceso a electricidad, agua potable y telefonía. Se mejoró la conexión con el centro de San Rafael, y la comunidad comenzó a diversificarse con pequeños comercios y servicios. Esta etapa marcó el paso de una zona rural a una comunidad moderna con identidad propia.',
       image: 'https://images.unsplash.com/photo-1489599856878-46f6b2b5c6e9?w=400',
       highlights: [
-        'Pavimentación de calles principales',
-        'Instalación de red eléctrica',
-        'Construcción del centro de salud'
+        'Pavimentación de la calle principal',
+        'Conexión al sistema eléctrico nacional',
+        'Ampliación de la red de agua comunal'
       ],
       order: 3
     },
     {
       period: 'Actualidad (2000-Presente)',
-      title: 'Comunidad Moderna',
-      description: 'Hoy en día, Calle Jerusalén mantiene su esencia tradicional mientras abraza la modernidad. Es un ejemplo de desarrollo sostenible que preserva su patrimonio cultural.',
+      title: 'Tradición y Desarrollo',
+      description:
+        'Hoy, Calle Jerusalén es un punto residencial y cultural en crecimiento dentro de Concepción de San Rafael. La comunidad conserva su espíritu solidario y su amor por las costumbres heredianas, combinando la tranquilidad del pasado con el desarrollo moderno. Se promueven iniciativas de turismo rural, actividades culturales y sostenibilidad ambiental.',
       image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400',
       highlights: [
-        'Implementación de tecnología',
-        'Turismo comunitario',
-        'Preservación del patrimonio'
+        'Expansión residencial y turística',
+        'Proyectos de embellecimiento urbano',
+        'Actividades culturales y ecológicas'
       ],
       order: 4
     }
   ],
   traditions: [
     {
-      title: 'Fiesta de San Jerónimo',
-      description: 'Celebración anual en honor al santo patrono de la comunidad, con procesiones, música tradicional y comida típica.',
+      title: 'Fiesta de San Rafael Arcángel',
+      description:
+        'Celebración tradicional en honor al santo patrono del cantón, San Rafael Arcángel. Se realizan procesiones, misas y ferias gastronómicas, con participación de todas las comunidades, incluida Calle Jerusalén.',
       icon: 'Flag',
-      month: 'Septiembre',
+      month: 'Octubre',
       category: 'Religiosa',
       importance: 'Alta',
       image: 'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=800',
       practices: [
-        'Procesión por las calles principales',
-        'Misa comunitaria en la iglesia',
-        'Feria de comida tradicional',
-        'Juegos y actividades para niños',
-        'Bailes folclóricos'
+        'Procesión principal desde la iglesia central',
+        'Misa y bendición comunal',
+        'Feria de comidas típicas',
+        'Presentaciones folclóricas',
+        'Venta de productos locales'
       ],
       order: 1,
       isActive: true
     },
     {
-      title: 'Feria Artesanal',
-      description: 'Exposición de artesanías locales, productos agrícolas y comida tradicional de la región.',
-      icon: 'Star',
+      title: 'Feria del Café Herediano',
+      description:
+        'Evento que resalta la herencia cafetalera de la región. Productores locales muestran el proceso de tostado, molienda y degustación del café, un símbolo de la identidad de San Rafael y Concepción.',
+      icon: 'Coffee',
       month: 'Marzo',
       category: 'Cultural',
-      importance: 'Media',
+      importance: 'Alta',
       image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800',
       practices: [
-        'Exposición de artesanías',
-        'Venta de productos locales',
-        'Talleres de artesanía',
-        'Degustación de comida tradicional',
-        'Presentaciones culturales'
+        'Degustaciones de café local',
+        'Charlas sobre historia cafetalera',
+        'Talleres de barismo',
+        'Exposición de productos artesanales',
+        'Música en vivo'
       ],
       order: 2,
       isActive: true
     },
     {
-      title: 'Noche de Cuentos',
-      description: 'Tradición oral donde los ancianos comparten historias y leyendas de la comunidad.',
+      title: 'Noche de Historias y Leyendas',
+      description:
+        'Tradición oral que reúne a los vecinos para compartir relatos, anécdotas y leyendas locales heredadas de los abuelos, manteniendo viva la memoria comunal.',
       icon: 'BookOpen',
-      month: 'Todo el año',
+      month: 'Agosto',
       category: 'Cultural',
       importance: 'Media',
       image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
       practices: [
-        'Reuniones mensuales en el centro comunitario',
-        'Participación de todas las edades',
-        'Transmisión oral de historias',
-        'Refrigerios tradicionales',
-        'Intercambio de experiencias'
+        'Encuentros nocturnos en el salón comunal',
+        'Narración de historias antiguas',
+        'Música y tamales tradicionales',
+        'Participación de niños y adultos',
+        'Premio al mejor narrador'
       ],
       order: 3,
       isActive: true
     },
     {
-      title: 'Día del Maíz',
-      description: 'Celebración de la cosecha con platillos tradicionales y ceremonias de agradecimiento.',
+      title: 'Día del Agricultor Herediano',
+      description:
+        'Celebración en reconocimiento a los agricultores locales, con ferias de productos frescos y actividades culturales.',
       icon: 'TreePine',
-      month: 'Noviembre',
+      month: 'Mayo',
       category: 'Agrícola',
       importance: 'Media',
       image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800',
       practices: [
-        'Bendición de la cosecha',
-        'Preparación de platillos tradicionales',
-        'Exposición de productos agrícolas',
-        'Talleres de cocina tradicional',
-        'Ceremonia de agradecimiento a la tierra'
+        'Feria de productos agrícolas',
+        'Bendición de cosechas',
+        'Demostraciones de cultivo tradicional',
+        'Exposición de herramientas antiguas',
+        'Reconocimiento a familias fundadoras'
       ],
       order: 4,
       isActive: true
@@ -142,72 +150,76 @@ const historyData = {
   places: [
     {
       name: 'Casa de los Fundadores',
-      description: 'La primera casa construida en Calle Jerusalén, ahora convertida en museo comunitario.',
-      year: '1952',
+      description:
+        'Antigua vivienda de una de las familias que colonizó Calle Jerusalén en los años 50. Hoy funciona como pequeño museo comunitario donde se conservan fotografías y objetos de los primeros pobladores.',
+      year: '1953',
       significance: 'Patrimonio Histórico',
       category: 'Arquitectura',
       location: 'Calle Principal #1',
       image: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800',
       features: [
-        'Arquitectura colonial auténtica',
-        'Museo comunitario',
-        'Exposición de objetos históricos',
-        'Visitas guiadas disponibles',
-        'Patio central tradicional'
+        'Arquitectura herediana tradicional',
+        'Museo comunitario abierto al público',
+        'Colección de fotografías antiguas',
+        'Visitas guiadas',
+        'Patio central con jardín'
       ],
       order: 1,
       isActive: true
     },
     {
       name: 'Pulpería El Progreso',
-      description: 'La pulpería más antigua de la comunidad, en funcionamiento desde 1955.',
+      description:
+        'Comercio histórico fundado por la familia Hernández en 1955. Fue uno de los primeros puntos de encuentro de la comunidad, ofreciendo víveres y noticias locales.',
       year: '1955',
       significance: 'Comercio Tradicional',
       category: 'Comercio',
       location: 'Calle Central #15',
       image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800',
       features: [
-        'Productos locales frescos',
-        'Atención personalizada',
-        'Historia familiar preservada',
-        'Productos artesanales',
-        'Punto de encuentro comunitario'
+        'Atención familiar tradicional',
+        'Venta de productos locales',
+        'Reunión de vecinos y tertulias',
+        'Decoración original preservada',
+        'Lugar emblemático'
       ],
       order: 2,
       isActive: true
     },
     {
       name: 'Mirador de la Cruz',
-      description: 'Punto de observación natural que ofrece vistas panorámicas de toda la región.',
+      description:
+        'Punto natural ubicado en las colinas cercanas a Concepción, desde donde se observan los valles de Heredia y Alajuela. Es considerado un lugar de reflexión y peregrinación local.',
       year: 'Natural',
       significance: 'Lugar Sagrado',
       category: 'Natural',
       location: 'Cerro de la Cruz',
       image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800',
       features: [
-        'Vista panorámica de 360°',
-        'Cruz de madera centenaria',
-        'Sendero de acceso',
-        'Área de descanso',
-        'Lugar de peregrinación'
+        'Vista panorámica del Valle Central',
+        'Cruz de madera simbólica',
+        'Sendero rural de acceso',
+        'Punto de oración y descanso',
+        'Área verde protegida'
       ],
       order: 3,
       isActive: true
     },
     {
-      name: 'Escuela Central',
-      description: 'Primera escuela de la comunidad, construida con el esfuerzo de todos los vecinos.',
-      year: '1965',
+      name: 'Escuela de Concepción',
+      description:
+        'Fundada en la década de 1960, ha sido pilar educativo para generaciones de niños de Calle Jerusalén y comunidades vecinas.',
+      year: '1964',
       significance: 'Educación Comunitaria',
       category: 'Educación',
       location: 'Calle de la Educación #5',
       image: 'https://images.unsplash.com/photo-1497486751825-1233686d5d80?w=800',
       features: [
-        'Arquitectura educativa tradicional',
-        'Patio de recreo amplio',
-        'Biblioteca comunitaria',
-        'Aulas históricas preservadas',
-        'Centro de reuniones comunitarias'
+        'Amplio patio de recreo',
+        'Biblioteca comunal',
+        'Eventos cívicos y culturales',
+        'Clases de música y arte',
+        'Símbolo de unión comunitaria'
       ],
       order: 4,
       isActive: true
@@ -216,55 +228,55 @@ const historyData = {
   gallery: [
     {
       url: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400',
-      caption: 'Primeras casas de la comunidad',
+      caption: 'Primeras casas construidas sobre antiguos cafetales',
       order: 1
     },
     {
       url: 'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=400',
-      caption: 'Construcción de la escuela primaria',
+      caption: 'Vecinos construyendo la escuela comunitaria',
       order: 2
     },
     {
       url: 'https://images.unsplash.com/photo-1489599856878-46f6b2b5c6e9?w=400',
-      caption: 'Pavimentación de calles principales',
+      caption: 'Modernización de las calles y llegada de electricidad',
       order: 3
     },
     {
       url: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400',
-      caption: 'Comunidad moderna',
+      caption: 'Calle Jerusalén en la actualidad',
       order: 4
     },
     {
       url: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400',
-      caption: 'Fiesta de San Jerónimo',
+      caption: 'Celebración del Día de San Rafael Arcángel',
       order: 5
     },
     {
       url: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400',
-      caption: 'Feria artesanal anual',
+      caption: 'Feria del Café y productos locales',
       order: 6
     }
   ],
   exploreLinks: [
     {
       title: 'Lugares de Interés',
-      description: 'Descubre los sitios más importantes de la comunidad',
+      description: 'Descubre los sitios más emblemáticos de la comunidad',
       url: '/visitantes/lugares',
       icon: 'MapPin',
       color: 'bg-blue-50 hover:bg-blue-100',
       order: 1
     },
     {
-      title: 'Eventos Culturales',
-      description: 'Participa en nuestras celebraciones tradicionales',
+      title: 'Eventos y Tradiciones',
+      description: 'Participa en nuestras celebraciones culturales y religiosas',
       url: '/visitantes/eventos',
       icon: 'Calendar',
       color: 'bg-green-50 hover:bg-green-100',
       order: 2
     },
     {
-      title: 'Contacto',
-      description: 'Conéctate con nuestra comunidad',
+      title: 'Contacto Comunitario',
+      description: 'Conéctate con la organización local y el comité comunal',
       url: '/visitantes/contacto',
       icon: 'Users',
       color: 'bg-purple-50 hover:bg-purple-100',
@@ -275,6 +287,7 @@ const historyData = {
   createdAt: new Date(),
   updatedAt: new Date()
 };
+
 
 async function seedHistory() {
   try {

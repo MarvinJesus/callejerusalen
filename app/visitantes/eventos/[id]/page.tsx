@@ -57,9 +57,11 @@ export default function EventDetailPage() {
   }, [params.id]);
 
   useEffect(() => {
-    if (event && user) {
-      checkRegistrationStatus();
+    if (event) {
       loadEventStats();
+      if (user) {
+        checkRegistrationStatus();
+      }
     }
   }, [event, user]);
 
@@ -282,7 +284,7 @@ export default function EventDetailPage() {
   const maxParticipants = event.maxParticipants || 100;
   const currentParticipants = eventStats?.confirmedRegistrations || 0;
   const percentage = maxParticipants > 0 ? (currentParticipants / maxParticipants) * 100 : 0;
-  const spotsLeft = maxParticipants - currentParticipants;
+  const spotsLeft = Math.max(0, maxParticipants - currentParticipants);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -452,14 +454,19 @@ export default function EventDetailPage() {
             {/* Cupo y Estadísticas */}
             {event.maxParticipants && (
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Cupo del Evento</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Participantes Inscritos</h2>
                 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600">Participantes</span>
-                    <span className="text-2xl font-semibold text-gray-900">
-                      {currentParticipants} / {maxParticipants}
-                    </span>
+                    <span className="text-gray-600">Inscritos</span>
+                    <div className="text-right">
+                      <div className="text-2xl font-semibold text-gray-900">
+                        {currentParticipants} de {maxParticipants} inscritos
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        ({percentage.toFixed(2)}%)
+                      </div>
+                    </div>
                   </div>
 
                   <div className="w-full bg-gray-200 rounded-full h-3">
@@ -475,14 +482,18 @@ export default function EventDetailPage() {
 
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-500">
-                      {percentage.toFixed(0)}% ocupado
+                      {spotsLeft} disponibles
                     </span>
                     <span className={`text-sm font-medium ${
+                      spotsLeft <= 0 ? 'text-red-600' :
                       spotsLeft <= 5 ? 'text-red-600' : 
                       spotsLeft <= 15 ? 'text-yellow-600' : 
                       'text-green-600'
                     }`}>
-                      {spotsLeft} lugares disponibles
+                      {spotsLeft <= 0 ? 'Sin cupo' :
+                       spotsLeft <= 5 ? `¡Quedan ${spotsLeft}!` : 
+                       spotsLeft <= 15 ? `Quedan ${spotsLeft}` : 
+                       `${spotsLeft} disponibles`}
                     </span>
                   </div>
                 </div>

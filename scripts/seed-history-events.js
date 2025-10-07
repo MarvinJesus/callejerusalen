@@ -16,29 +16,29 @@ const db = getFirestore(app);
 // Datos de eventos para agregar al documento de historia
 const eventsData = [
   {
-    title: 'Festival de Música Folclórica',
-    description: 'Celebración anual de la música tradicional con presentaciones de grupos locales y regionales. Una noche llena de cultura y tradición.',
-    date: '2024-12-28',
-    time: '18:00',
-    location: 'Plaza Principal de Calle Jerusalén',
-    category: 'Cultural',
-    type: 'Festival',
-    organizer: 'Comité Cultural de Calle Jerusalén',
-    contact: '+1 (555) 567-8901',
-    image: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800',
-    maxParticipants: 300,
+    title: 'Fiesta Patronal de San Rafael Arcángel',
+    description:
+      'La celebración más importante del cantón, en honor al santo patrono. Incluye procesiones, misas, música folclórica, comidas típicas y actividades para toda la familia. Calle Jerusalén participa con decoraciones y eventos locales.',
+    date: '2025-10-24',
+    time: '08:00',
+    location: 'Iglesia y Plaza Central de San Rafael de Heredia',
+    category: 'Religiosa',
+    type: 'Celebración',
+    organizer: 'Comité Parroquial y Comunidad de Calle Jerusalén',
+    contact: '+506 2267-1234',
+    image: 'https://images.unsplash.com/photo-1508057198894-247b23fe5ade?w=800',
+    maxParticipants: 500,
     currentParticipants: 0,
     requirements: [
-      'Entrada gratuita',
-      'Traer silla plegable',
-      'Se permite comida y bebidas',
-      'Prohibido fumar en el área'
+      'Entrada libre',
+      'Vestimenta respetuosa',
+      'Prohibido el consumo de alcohol en el perímetro'
     ],
     highlights: [
-      'Más de 8 grupos musicales',
-      'Música folclórica auténtica',
-      'Venta de artesanías',
-      'Fuegos artificiales al final'
+      'Procesión principal con imágenes religiosas',
+      'Bendición comunal',
+      'Feria de comidas típicas',
+      'Música folclórica y bailes tradicionales'
     ],
     isRecurring: true,
     recurringPattern: 'Anual',
@@ -48,91 +48,93 @@ const eventsData = [
     updatedAt: new Date()
   },
   {
-    title: 'Noche de Cuentos Tradicionales',
-    description: 'Una velada mágica donde los ancianos de la comunidad comparten las historias y leyendas que han pasado de generación en generación.',
-    date: '2024-11-30',
-    time: '19:00',
-    location: 'Centro Comunitario',
+    title: 'Festival del Café Herediano',
+    description:
+      'Evento anual que celebra la herencia cafetalera de San Rafael y sus comunidades. Productores locales ofrecen degustaciones y talleres sobre cultivo y tostado del café. Calle Jerusalén participa con puestos de repostería y artesanías.',
+    date: '2025-11-10',
+    time: '09:00',
+    location: 'Parque Central de San Rafael de Heredia',
     category: 'Cultural',
-    type: 'Entretenimiento',
-    organizer: 'Grupo de Ancianos de Calle Jerusalén',
-    contact: '+1 (555) 234-5678',
-    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
-    maxParticipants: 80,
+    type: 'Feria',
+    organizer: 'Asociación de Productores de Café de San Rafael',
+    contact: '+506 2268-4520',
+    image: 'https://images.unsplash.com/photo-1517686469429-8bdb88b9d2d4?w=800',
+    maxParticipants: 300,
     currentParticipants: 0,
     requirements: [
       'Entrada gratuita',
-      'Traer silla plegable si es necesario',
-      'Se recomienda llegar temprano'
+      'Traer taza reutilizable',
+      'Se recomienda calzado cómodo'
     ],
     highlights: [
-      'Historias auténticas de la comunidad',
-      'Ambiente familiar y acogedor',
-      'Refrigerios tradicionales',
-      'Participación de todas las edades'
+      'Degustaciones de café artesanal',
+      'Exposición de tostadores locales',
+      'Charlas sobre historia cafetalera',
+      'Presentaciones artísticas en vivo'
     ],
     isRecurring: true,
-    recurringPattern: 'Mensual',
+    recurringPattern: 'Anual',
     order: 2,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date()
   },
   {
-    title: 'Feria Comunitaria de Artesanías',
-    description: 'Una celebración anual donde los artesanos locales muestran sus creaciones únicas. Incluye talleres, demostraciones y venta de productos artesanales.',
-    date: '2024-12-15',
-    time: '09:00',
-    location: 'Parque Central de Calle Jerusalén',
+    title: 'Noche de Cuentos y Leyendas',
+    description:
+      'Una noche mágica donde los mayores de la comunidad comparten relatos de antaño: apariciones, historias de fincas antiguas y anécdotas que forman parte de la identidad de Concepción y Calle Jerusalén.',
+    date: '2025-12-07',
+    time: '19:00',
+    location: 'Centro Comunitario de Calle Jerusalén',
     category: 'Cultural',
-    type: 'Feria',
-    organizer: 'Asociación de Artesanos de Calle Jerusalén',
-    contact: '+1 (555) 123-4567',
-    image: 'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800',
-    maxParticipants: 200,
+    type: 'Entretenimiento',
+    organizer: 'Comité Cultural de Calle Jerusalén',
+    contact: '+506 7012-4589',
+    image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
+    maxParticipants: 100,
     currentParticipants: 0,
     requirements: [
       'Entrada gratuita',
-      'Traer ropa cómoda',
-      'Se recomienda traer efectivo para compras'
+      'Traer silla o manta para sentarse',
+      'Se recomienda abrigo por el clima fresco'
     ],
     highlights: [
-      'Más de 50 artesanos participantes',
-      'Talleres gratuitos para niños',
-      'Comida típica local',
-      'Música en vivo'
+      'Historias contadas por los abuelos',
+      'Leyendas heredianas tradicionales',
+      'Música acústica local',
+      'Café y pan casero gratuitos'
     ],
     isRecurring: true,
-    recurringPattern: 'Anual',
+    recurringPattern: 'Mensual (último sábado)',
     order: 3,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date()
   },
   {
-    title: 'Torneo de Fútbol Comunitario',
-    description: 'Competencia deportiva anual que reúne a equipos de diferentes barrios. Incluye categorías para niños, jóvenes y adultos.',
-    date: '2024-12-08',
+    title: 'Torneo Deportivo Interbarrios',
+    description:
+      'Competencia deportiva que une a los diferentes barrios de Concepción. Calle Jerusalén participa con su equipo local en fútbol y voleibol, promoviendo la sana convivencia y el deporte comunitario.',
+    date: '2025-12-15',
     time: '08:00',
-    location: 'Cancha Deportiva Municipal',
+    location: 'Cancha Deportiva Municipal de Concepción',
     category: 'Deportivo',
     type: 'Competencia',
-    organizer: 'Liga Deportiva de Calle Jerusalén',
-    contact: '+1 (555) 345-6789',
+    organizer: 'Comité Deportivo de Concepción',
+    contact: '+506 6045-3399',
     image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=800',
-    maxParticipants: 120,
+    maxParticipants: 150,
     currentParticipants: 0,
     requirements: [
-      'Inscripción previa requerida',
-      'Certificado médico vigente',
+      'Inscripción previa gratuita',
       'Equipo deportivo completo',
-      'Cuota de inscripción: $10'
+      'Certificado médico recomendado'
     ],
     highlights: [
-      'Premios para los primeros lugares',
-      'Categorías por edades',
-      'Comida y bebidas disponibles',
-      'Transmisión en vivo'
+      'Categorías infantil, juvenil y adulto',
+      'Entrega de medallas y trofeos',
+      'Stand de comidas típicas',
+      'Música y animación'
     ],
     isRecurring: true,
     recurringPattern: 'Anual',
@@ -142,32 +144,33 @@ const eventsData = [
     updatedAt: new Date()
   },
   {
-    title: 'Taller de Cocina Tradicional',
-    description: 'Aprende a preparar los platillos típicos de la región con las recetas tradicionales que han pasado de generación en generación.',
-    date: '2024-12-22',
+    title: 'Taller de Cocina Típica Costarricense',
+    description:
+      'Aprende a preparar platos tradicionales como tamales, picadillos y empanadas. Las cocineras locales de Calle Jerusalén enseñan recetas que forman parte del patrimonio gastronómico herediano.',
+    date: '2025-12-22',
     time: '14:00',
-    location: 'Cocina Comunitaria',
+    location: 'Cocina Comunitaria de Calle Jerusalén',
     category: 'Educativo',
     type: 'Taller',
-    organizer: 'Grupo de Mujeres Cocineras',
-    contact: '+1 (555) 456-7890',
+    organizer: 'Grupo de Mujeres Emprendedoras de Calle Jerusalén',
+    contact: '+506 6004-8877',
     image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800',
     maxParticipants: 25,
     currentParticipants: 0,
     requirements: [
       'Inscripción previa requerida',
-      'Traer delantal y gorro de cocina',
-      'Cuota de materiales: $15',
+      'Traer delantal y recipiente para llevar',
+      'Cuota de materiales: ₡5.000',
       'Edad mínima: 12 años'
     ],
     highlights: [
-      'Recetas auténticas de la región',
-      'Ingredientes frescos incluidos',
-      'Degustación de los platillos preparados',
+      'Recetas tradicionales de la región',
+      'Uso de ingredientes locales frescos',
+      'Degustación al final del taller',
       'Recetario impreso incluido'
     ],
     isRecurring: true,
-    recurringPattern: 'Bimensual',
+    recurringPattern: 'Trimestral',
     order: 5,
     isActive: true,
     createdAt: new Date(),
@@ -192,16 +195,22 @@ async function seedHistoryEvents() {
     console.log('📋 Documento de historia encontrado:', historyData.title);
     console.log(`📊 Eventos actuales: ${historyData.events?.length || 0}`);
     
-    // Agregar los nuevos eventos al documento de historia
-    const updatedEvents = [...(historyData.events || []), ...eventsData];
-    
+    // Eliminar todos los eventos existentes
+    console.log('🗑️ Eliminando todos los eventos existentes...');
     await doc.ref.update({
-      events: updatedEvents,
+      events: [],
+      updatedAt: new Date()
+    });
+    console.log('✅ Eventos eliminados exitosamente!');
+    
+    // Agregar los nuevos eventos al documento de historia
+    await doc.ref.update({
+      events: eventsData,
       updatedAt: new Date()
     });
     
     console.log('✅ Eventos agregados exitosamente al documento de historia!');
-    console.log(`📊 Total de eventos ahora: ${updatedEvents.length}`);
+    console.log(`📊 Total de eventos ahora: ${eventsData.length}`);
     
     // Mostrar los eventos agregados
     console.log('🎉 Eventos agregados:');
