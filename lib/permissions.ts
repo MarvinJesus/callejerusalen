@@ -7,8 +7,7 @@ export type Permission =
   | 'users.create'
   | 'users.edit'
   | 'users.delete'
-  | 'users.activate'
-  | 'users.deactivate'
+  | 'users.manage_status'
   
   // Gestión de roles y permisos
   | 'roles.view'
@@ -58,8 +57,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   'users.create',
   'users.edit',
   'users.delete',
-  'users.activate',
-  'users.deactivate',
+  'users.manage_status',
   
   // Gestión de roles y permisos
   'roles.view',
@@ -110,8 +108,7 @@ export const PERMISSION_GROUPS = {
     'users.create',
     'users.edit',
     'users.delete',
-    'users.activate',
-    'users.deactivate'
+    'users.manage_status'
   ] as Permission[],
   
   ROLE_MANAGEMENT: [
@@ -170,8 +167,7 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   'users.create': 'Crear nuevos usuarios en el sistema',
   'users.edit': 'Editar información de usuarios existentes',
   'users.delete': 'Eliminar usuarios del sistema',
-  'users.activate': 'Activar usuarios inactivos',
-  'users.deactivate': 'Desactivar usuarios activos',
+  'users.manage_status': 'Activar y desactivar usuarios',
   
   // Gestión de roles y permisos
   'roles.view': 'Ver roles disponibles en el sistema',

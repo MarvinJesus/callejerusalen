@@ -34,7 +34,8 @@ import {
   Calendar,
   Map,
   Store,
-  Navigation
+  Navigation,
+  Search
 } from 'lucide-react';
 import { 
   getAllUsers, 
@@ -58,9 +59,10 @@ import {
   UserStatus,
   checkEmailExists
 } from '@/lib/auth';
-import { Permission, hasPermission, hasAnyPermission } from '@/lib/permissions';
+import { Permission, hasPermission, hasAnyPermission, canPerformAction } from '@/lib/permissions';
 import PermissionManager from '@/components/PermissionManager';
 import { PermissionList } from '@/components/PermissionBadge';
+import UserSearch from '@/components/UserSearch';
 import { auth } from '@/lib/firebase';
 import { getServerLogs, getSystemMetrics, ServerLog } from '@/lib/server-logging';
 
@@ -80,6 +82,7 @@ const AdminDashboard: React.FC = () => {
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showEditUser, setShowEditUser] = useState<UserProfile | null>(null);
   const [showRejectModal, setShowRejectModal] = useState<{ requestId: string; reason: string } | null>(null);
+  const [showUserSearch, setShowUserSearch] = useState(false);
   const [userStatusFilter, setUserStatusFilter] = useState<'all' | 'active' | 'inactive' | 'deleted'>('all');
   const [showConfirmModal, setShowConfirmModal] = useState<{
     type: 'deactivate' | 'activate' | 'delete' | 'recover';
@@ -100,6 +103,35 @@ const AdminDashboard: React.FC = () => {
     if (userProfile?.role === 'super_admin') return true;
     if (userProfile?.email === 'mar90jesus@gmail.com') return true; // Email del super admin principal
     return false;
+  };
+
+  // Funciones helper para verificar permisos específicos
+  const canEditUsers = () => {
+    return userProfile && canPerformAction(userProfile.role, userProfile.permissions || [], 'users.edit');
+  };
+
+  const canCreateUsers = () => {
+    return userProfile && canPerformAction(userProfile.role, userProfile.permissions || [], 'users.create');
+  };
+
+  const canManageUserStatus = () => {
+    return userProfile && canPerformAction(userProfile.role, userProfile.permissions || [], 'users.manage_status');
+  };
+
+  const canDeleteUsers = () => {
+    return userProfile && canPerformAction(userProfile.role, userProfile.permissions || [], 'users.delete');
+  };
+
+  const canApproveRegistrations = () => {
+    return userProfile && canPerformAction(userProfile.role, userProfile.permissions || [], 'registrations.approve');
+  };
+
+  const canRejectRegistrations = () => {
+    return userProfile && canPerformAction(userProfile.role, userProfile.permissions || [], 'registrations.reject');
+  };
+
+  const canViewPermissions = () => {
+    return userProfile && canPerformAction(userProfile.role, userProfile.permissions || [], 'permissions.view');
   };
 
   const navItems = [
@@ -813,19 +845,37 @@ const AdminDashboard: React.FC = () => {
        return categories;
      };
 
-     const getStatusBadge = (status: UserStatus) => {
-       const statusConfig = {
-         'active': { color: 'bg-green-100 text-green-800', text: 'Activo' },
-         'inactive': { color: 'bg-yellow-100 text-yellow-800', text: 'Inactivo' },
-         'deleted': { color: 'bg-red-100 text-red-800', text: 'Eliminado' }
-       };
-       const config = statusConfig[status];
+   const getStatusBadge = (status: UserStatus) => {
+     // Si no hay status (como en super-admin), no mostrar badge
+     if (!status) {
+       return null;
+     }
+     
+     const statusConfig: Record<string, { color: string; text: string }> = {
+       'active': { color: 'bg-green-100 text-green-800', text: 'Activo' },
+       'inactive': { color: 'bg-yellow-100 text-yellow-800', text: 'Inactivo' },
+       'deleted': { color: 'bg-red-100 text-red-800', text: 'Eliminado' },
+       'pending': { color: 'bg-blue-100 text-blue-800', text: 'Pendiente' },
+       'blocked': { color: 'bg-gray-100 text-gray-800', text: 'Bloqueado' }
+     };
+     
+     // Validación robusta para evitar undefined
+     const config = statusConfig[status];
+     if (!config) {
+       console.warn(`Status desconocido encontrado: "${status}"`);
        return (
-         <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-           {config.text}
+         <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+           Desconocido
          </span>
        );
-     };
+     }
+     
+     return (
+       <span className={`px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
+         {config.text}
+       </span>
+     );
+   };
 
      const getDeletedUserInfo = (user: UserProfile) => {
        if (user.status !== 'deleted') return null;
@@ -889,6 +939,9 @@ const AdminDashboard: React.FC = () => {
                          <div className="ml-4">
                            <div className="text-sm font-medium text-gray-900">{user.displayName || 'Sin nombre'}</div>
                            <div className="text-sm text-gray-500">{user.email}</div>
+                           {isSuperAdmin() && (
+                             <div className="text-xs text-gray-400 font-mono">ID: {user.uid}</div>
+                           )}
                            {isMainSuperAdmin(user.email) && (
                              <div className="text-xs text-yellow-600 font-medium">⭐ Super Admin Principal</div>
                            )}
@@ -916,16 +969,18 @@ const AdminDashboard: React.FC = () => {
                        {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Nunca'}
                      </td>
                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                       <button
-                         onClick={() => setShowEditUser(user)}
-                         className="text-primary-600 hover:text-primary-900"
-                         title="Editar usuario"
-                       >
-                         <Edit className="w-4 h-4" />
-                       </button>
+                       {canEditUsers() && (
+                         <button
+                           onClick={() => setShowEditUser(user)}
+                           className="text-primary-600 hover:text-primary-900 transition-colors"
+                           title="Editar usuario"
+                         >
+                           <Edit className="w-4 h-4" />
+                         </button>
+                       )}
                        {canDeleteUser(user.email) && (
                          <>
-                           {user.status === 'active' && (
+                           {user.status === 'active' && canManageUserStatus() && (
                              <button
                                onClick={() => showConfirmationModal(user, 'deactivate')}
                                className="text-yellow-600 hover:text-yellow-900 transition-colors"
@@ -934,7 +989,7 @@ const AdminDashboard: React.FC = () => {
                                <UserX className="w-4 h-4" />
                              </button>
                            )}
-                           {user.status === 'inactive' && (
+                           {user.status === 'inactive' && canManageUserStatus() && (
                              <button
                                onClick={() => handleReactivateUser(user)}
                                className="text-green-600 hover:text-green-900 transition-colors"
@@ -943,7 +998,7 @@ const AdminDashboard: React.FC = () => {
                                <UserCheck className="w-4 h-4" />
                              </button>
                            )}
-                           {user.status === 'deleted' && (
+                           {user.status === 'deleted' && canManageUserStatus() && (
                              <button
                                onClick={() => handleRecoverUser(user)}
                                className="text-blue-600 hover:text-blue-900 transition-colors"
@@ -952,7 +1007,7 @@ const AdminDashboard: React.FC = () => {
                                <RotateCcw className="w-4 h-4" />
                              </button>
                            )}
-                           {user.status !== 'deleted' && (
+                           {user.status !== 'deleted' && canDeleteUsers() && (
                              <button
                                onClick={() => handleDeleteUser(user)}
                                className="text-red-600 hover:text-red-900 transition-colors"
@@ -962,6 +1017,15 @@ const AdminDashboard: React.FC = () => {
                              </button>
                            )}
                          </>
+                       )}
+                       {canViewPermissions() && (
+                         <button
+                           onClick={() => loadUserPermissions(user)}
+                           className="text-purple-600 hover:text-purple-900 transition-colors"
+                           title="Gestionar permisos"
+                         >
+                           <Shield className="w-4 h-4" />
+                         </button>
                        )}
                      </td>
                    </tr>
@@ -979,15 +1043,28 @@ const AdminDashboard: React.FC = () => {
        <div className="space-y-6">
          <div className="flex justify-between items-center mb-4">
            <h2 className="text-xl font-semibold text-gray-900">Gestión de Usuarios</h2>
-           {isSuperAdmin() && (
-             <button
-               onClick={() => setShowCreateUser(true)}
-               className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-             >
-               <Plus className="w-4 h-4" />
-               <span>Crear Usuario</span>
-             </button>
-           )}
+           <div className="flex items-center space-x-3">
+             {isSuperAdmin() && (
+               <button
+                 onClick={() => setShowUserSearch(true)}
+                 className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                 title="Buscar usuario por ID - Solo Super Admin"
+               >
+                 <Search className="w-4 h-4" />
+                 <span>Buscar Usuario</span>
+               </button>
+             )}
+             {canCreateUsers() && (
+               <button
+                 onClick={() => setShowCreateUser(true)}
+                 className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                 title="Crear nuevo usuario"
+               >
+                 <Plus className="w-4 h-4" />
+                 <span>Crear Usuario</span>
+               </button>
+             )}
+           </div>
          </div>
 
          {/* Filtro de Estado */}
@@ -1089,26 +1166,32 @@ const AdminDashboard: React.FC = () => {
                       {getTimeAgo(request.createdAt)}
                     </p>
                   </div>
-                  {isSuperAdmin() ? (
+                  {canApproveRegistrations() || canRejectRegistrations() ? (
                     <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleApproveRegistration(request.id, request.requestedRole)}
-                        className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        <span>Aprobar</span>
-                      </button>
-                      <button
-                        onClick={() => setShowRejectModal({ requestId: request.id, reason: '' })}
-                        className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        <span>Rechazar</span>
-                      </button>
+                      {canApproveRegistrations() && (
+                        <button
+                          onClick={() => handleApproveRegistration(request.id, request.requestedRole)}
+                          className="flex items-center space-x-1 px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+                          title="Aprobar solicitud de registro"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          <span>Aprobar</span>
+                        </button>
+                      )}
+                      {canRejectRegistrations() && (
+                        <button
+                          onClick={() => setShowRejectModal({ requestId: request.id, reason: '' })}
+                          className="flex items-center space-x-1 px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                          title="Rechazar solicitud de registro"
+                        >
+                          <XCircle className="w-4 h-4" />
+                          <span>Rechazar</span>
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div className="text-sm text-gray-500">
-                      Pendiente de aprobación por Super Administrador
+                      Pendiente de aprobación por administrador autorizado
                     </div>
                   )}
                 </div>
@@ -1878,7 +1961,20 @@ const AdminDashboard: React.FC = () => {
   );
 
   return (
-    <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+    <ProtectedRoute 
+      allowedRoles={['admin', 'super_admin']}
+      requiredPermissions={[
+        'users.view',
+        'registrations.view',
+        'permissions.view',
+        'community.view',
+        'community.events',
+        'community.places',
+        'community.services',
+        'security.view'
+      ]}
+      requireAllPermissions={false}
+    >
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
         {/* Header */}
         <div className="bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 shadow-sm border-b">
@@ -2150,6 +2246,17 @@ const AdminDashboard: React.FC = () => {
             setShowRejectModal(null);
           }}
         />
+      )}
+
+      {/* Modal para búsqueda de usuario */}
+      {showUserSearch && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <UserSearch onClose={() => setShowUserSearch(false)} />
+            </div>
+          </div>
+        </div>
       )}
     </ProtectedRoute>
   );

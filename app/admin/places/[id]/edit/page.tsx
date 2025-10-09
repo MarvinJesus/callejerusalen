@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save, Trash2, Copy, Eye, MapPin, Clock, Star, Phone, Globe, Camera, Navigation, X, Plus } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import UserMenu from '@/components/UserMenu';
 
 interface Place {
@@ -333,8 +334,13 @@ export default function PlaceEditPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header con controles */}
+    <ProtectedRoute 
+      allowedRoles={['admin', 'super_admin']} 
+      requiredPermissions={['community.places', 'community.edit']}
+      requireAllPermissions={false}
+    >
+      <div className="min-h-screen bg-gray-50">
+        {/* Header con controles */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -994,6 +1000,7 @@ export default function PlaceEditPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 }

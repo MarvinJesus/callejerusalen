@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { registerUser, UserRole } from '@/lib/auth';
+import { registerUser, UserRole, logoutUser } from '@/lib/auth';
 import { Eye, EyeOff, Mail, Lock, User, ArrowLeft, Shield, Eye as EyeIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -18,16 +18,17 @@ const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   
   const { user } = useAuth();
   const router = useRouter();
 
-  // Redirigir si ya está autenticado
+  // Redirigir si ya está autenticado (pero NO durante el proceso de registro)
   React.useEffect(() => {
-    if (user) {
+    if (user && !isRegistering && !loading) {
       router.push('/');
     }
-  }, [user, router]);
+  }, [user, router, isRegistering, loading]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -62,16 +63,35 @@ const RegisterPage: React.FC = () => {
     if (!validateForm()) return;
     
     setLoading(true);
+    setIsRegistering(true); // ✅ Marcar que estamos en proceso de registro
 
     try {
+      console.log('📝 Iniciando proceso de registro...');
+      
+      // Registrar usuario - la función registerUser automáticamente inicia sesión
       await registerUser(
         formData.email,
         formData.password,
         formData.displayName,
         'comunidad' // Solo se pueden registrar usuarios de la comunidad
       );
-      toast.success('¡Cuenta de comunidad creada exitosamente!');
-      router.push('/');
+      
+      console.log('✅ Usuario registrado exitosamente');
+      
+      // Cerrar sesión inmediatamente para que el usuario deba hacer login
+      console.log('🚪 Cerrando sesión para redirigir al login...');
+      await logoutUser();
+      
+      // Mensaje de éxito
+      toast.success('¡Registro exitoso! Ahora inicia sesión con tus credenciales.', { duration: 3000 });
+      
+      // Esperar un momento para que el toast sea visible y el logout se complete
+      console.log('⏳ Esperando para asegurar logout completo...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Redirigir al login con parámetro para mostrar mensaje de bienvenida
+      console.log('↪️ Redirigiendo al login...');
+      router.push('/login?registered=true');
     } catch (error: any) {
       let errorMessage = 'Error al crear la cuenta';
       
@@ -84,6 +104,9 @@ const RegisterPage: React.FC = () => {
       }
       
       toast.error(errorMessage);
+      
+      // Resetear el flag de registro en caso de error
+      setIsRegistering(false);
     } finally {
       setLoading(false);
     }
@@ -166,10 +189,26 @@ const RegisterPage: React.FC = () => {
                 <Shield className="w-5 h-5 text-primary-600" />
                 <span className="text-sm font-medium text-primary-800">Registro de Comunidad</span>
               </div>
-              <p className="text-xs text-primary-700">
+              <p className="text-xs text-primary-700 mb-3">
                 Al registrarte como miembro de la comunidad, tendrás acceso completo a todas las funcionalidades de la comunidad, 
                 incluyendo cámaras de seguridad, botón de pánico y alertas comunitarias.
               </p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 space-y-2">
+                <p className="text-xs text-yellow-800">
+                  <strong>📋 Proceso de Registro:</strong>
+                </p>
+                <ol className="text-xs text-yellow-800 list-decimal list-inside space-y-1 ml-2">
+                  <li>Completa el formulario de registro</li>
+                  <li>Serás redirigido al login automáticamente</li>
+                  <li>Inicia sesión con tus credenciales</li>
+                  <li>Tu cuenta estará <strong>pendiente de aprobación</strong></li>
+                  <li>Un administrador revisará tu solicitud</li>
+                  <li>Recibirás acceso completo una vez aprobada</li>
+                </ol>
+                <p className="text-xs text-yellow-700 font-medium mt-2 pt-2 border-t border-yellow-300">
+                  ⏳ Tiempo de aprobación: Usualmente 24-48 horas
+                </p>
+              </div>
             </div>
 
             {/* Password */}
@@ -243,7 +282,7 @@ const RegisterPage: React.FC = () => {
                 disabled={loading}
                 className="w-full btn-theme-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Creando cuenta de comunidad...' : 'Registrarse como Miembro'}
+                {loading ? 'Enviando solicitud...' : 'Enviar Solicitud de Registro'}
               </button>
             </div>
           </form>

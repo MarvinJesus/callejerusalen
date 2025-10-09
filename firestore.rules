@@ -21,8 +21,10 @@ service cloud.firestore {
     
     // Usuarios pueden leer/escribir su propio perfil
     // Admins y super admins pueden leer/escribir todos los perfiles
+    // Permitir creación de perfil durante el registro
     match /users/{userId} {
-      allow read, write: if request.auth != null && 
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read, update, delete: if request.auth != null && 
         (request.auth.uid == userId || isAdminOrSuperAdmin());
     }
     
@@ -64,9 +66,10 @@ service cloud.firestore {
       allow read, write: if isSuperAdmin();
     }
     
-    // Solicitudes de registro - solo super admins pueden gestionar
+    // Solicitudes de registro - usuarios pueden crear sus propias solicitudes, super admins pueden gestionar todas
     match /registrationRequests/{requestId} {
-      allow read, write: if isSuperAdmin();
+      allow create: if request.auth != null && request.auth.uid == requestId;
+      allow read, update, delete: if isSuperAdmin();
     }
   }
 }
