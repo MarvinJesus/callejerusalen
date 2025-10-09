@@ -490,10 +490,21 @@ export const changeUserStatus = async (
 
     const userData = userDoc.data() as UserProfile;
     
-    // 🔐 PROTECCIÓN SUPER ADMIN: No se puede modificar el estado del super admin principal
+    // 🔐 PROTECCIÓN CRÍTICA: No se puede modificar el estado del super admin principal
     if (isMainSuperAdmin(userData.email)) {
       console.error('❌ Intento de modificar estado del Super Admin:', userData.email);
       throw new Error('No se puede modificar el estado del super administrador principal. Este usuario tiene protección permanente.');
+    }
+
+    // Obtener el perfil del usuario que está haciendo el cambio
+    const changerProfile = await getUserProfile(changedBy);
+    if (!changerProfile) {
+      throw new Error('Usuario que realiza el cambio no encontrado');
+    }
+
+    // 🔐 PROTECCIÓN: Solo super-admins pueden modificar el estado de otros super-admins
+    if (userData.role === 'super_admin' && changerProfile.role !== 'super_admin') {
+      throw new Error('Solo un super administrador puede modificar el estado de otro super administrador');
     }
 
     // Actualizar el estado del usuario
@@ -583,9 +594,27 @@ export const updateUserAsAdmin = async (
       throw new Error('Usuario no encontrado');
     }
 
-    // Verificar si es el super admin principal y se está intentando cambiar el rol
-    if (isMainSuperAdmin(userProfile.email) && updates.role && updates.role !== 'super_admin') {
-      throw new Error('No se puede cambiar el rol del super administrador principal');
+    // 🔐 PROTECCIÓN CRÍTICA: NADIE puede editar al super-admin principal
+    if (isMainSuperAdmin(userProfile.email)) {
+      throw new Error('No se puede editar al super administrador principal');
+    }
+
+    // Obtener el perfil del usuario que está haciendo la actualización
+    const updaterProfile = await getUserProfile(updatedBy);
+    if (!updaterProfile) {
+      throw new Error('Usuario actualizador no encontrado');
+    }
+
+    // 🔐 PROTECCIÓN: Solo super-admins pueden editar a otros super-admins
+    if (userProfile.role === 'super_admin' && updaterProfile.role !== 'super_admin') {
+      throw new Error('Solo un super administrador puede editar a otro super administrador');
+    }
+
+    // 🔐 PROTECCIÓN: Solo el super-admin principal puede asignar el rol de super_admin
+    if (updates.role === 'super_admin') {
+      if (updaterProfile.email !== 'mar90jesus@gmail.com') {
+        throw new Error('Solo el super administrador principal puede asignar el rol de Super Administrador');
+      }
     }
 
     const userRef = doc(db, 'users', uid);
@@ -618,6 +647,14 @@ export const approveRegistration = async (
   }
 
   try {
+    // 🔐 PROTECCIÓN: Solo el super-admin principal puede aprobar con rol de super_admin
+    if (approvedRole === 'super_admin') {
+      const approverProfile = await getUserProfile(approvedBy);
+      if (!approverProfile || approverProfile.email !== 'mar90jesus@gmail.com') {
+        throw new Error('Solo el super administrador principal puede aprobar usuarios con el rol de Super Administrador');
+      }
+    }
+
     // Obtener la solicitud de registro
     const requestRef = doc(db, 'registrationRequests', requestId);
     const requestDoc = await getDoc(requestRef);

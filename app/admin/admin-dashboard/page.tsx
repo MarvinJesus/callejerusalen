@@ -110,6 +110,42 @@ const AdminDashboard: React.FC = () => {
     return userProfile && canPerformAction(userProfile.role, userProfile.permissions || [], 'users.edit');
   };
 
+  // Función para verificar si el usuario actual puede editar a un usuario específico
+  const canEditSpecificUser = (targetUser: UserProfile) => {
+    if (!userProfile) return false;
+    
+    // NADIE puede editar al super-admin principal
+    if (isMainSuperAdmin(targetUser.email)) {
+      return false;
+    }
+    
+    // Solo super-admins pueden editar a otros super-admins
+    if (targetUser.role === 'super_admin') {
+      return userProfile.role === 'super_admin';
+    }
+    
+    // Para otros usuarios, verificar permisos normales
+    return canEditUsers();
+  };
+
+  // Función para verificar si el usuario actual puede eliminar/desactivar a un usuario específico
+  const canDeleteOrDeactivateSpecificUser = (targetUser: UserProfile) => {
+    if (!userProfile) return false;
+    
+    // NADIE puede eliminar/desactivar al super-admin principal
+    if (isMainSuperAdmin(targetUser.email)) {
+      return false;
+    }
+    
+    // Solo super-admins pueden eliminar/desactivar a otros super-admins
+    if (targetUser.role === 'super_admin') {
+      return userProfile.role === 'super_admin';
+    }
+    
+    // Para otros usuarios, verificar permisos normales
+    return canDeleteUser(targetUser.email);
+  };
+
   const canCreateUsers = () => {
     return userProfile && canPerformAction(userProfile.role, userProfile.permissions || [], 'users.create');
   };
@@ -460,10 +496,33 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleDeleteUser = (user: UserProfile) => {
+    // Validar que el usuario actual puede eliminar al usuario objetivo
+    if (!canDeleteOrDeactivateSpecificUser(user)) {
+      if (isMainSuperAdmin(user.email)) {
+        alert('❌ No se puede eliminar al super administrador principal');
+      } else if (user.role === 'super_admin' && userProfile?.role !== 'super_admin') {
+        alert('❌ Solo un super administrador puede eliminar a otro super administrador');
+      } else {
+        alert('❌ No tienes permisos para eliminar este usuario');
+      }
+      return;
+    }
     showConfirmationModal(user, 'delete');
   };
 
   const showConfirmationModal = (user: UserProfile, action: 'deactivate' | 'activate' | 'delete' | 'recover') => {
+    // Validar permisos antes de mostrar el modal
+    if (!canDeleteOrDeactivateSpecificUser(user)) {
+      if (isMainSuperAdmin(user.email)) {
+        alert('❌ No se puede modificar al super administrador principal');
+      } else if (user.role === 'super_admin' && userProfile?.role !== 'super_admin') {
+        alert('❌ Solo un super administrador puede modificar a otro super administrador');
+      } else {
+        alert('❌ No tienes permisos para realizar esta acción');
+      }
+      return;
+    }
+
     const confirmations = {
       deactivate: {
         action: 'Desactivar Usuario',
@@ -509,9 +568,15 @@ const AdminDashboard: React.FC = () => {
     const reason = prompt('¿Cuál es la razón para esta acción? (opcional)');
     if (reason === null) return; // Usuario canceló
 
-    // Verificar si se puede modificar el usuario
-    if (!canDeleteUser(user.email)) {
-      alert('No se puede modificar al super administrador principal');
+    // 🔐 PROTECCIÓN: Verificar permisos para modificar al usuario
+    if (!canDeleteOrDeactivateSpecificUser(user)) {
+      if (isMainSuperAdmin(user.email)) {
+        alert('❌ No se puede modificar al super administrador principal');
+      } else if (user.role === 'super_admin' && userProfile.role !== 'super_admin') {
+        alert('❌ Solo un super administrador puede modificar a otro super administrador');
+      } else {
+        alert('❌ No tienes permisos para realizar esta acción');
+      }
       setShowConfirmModal(null);
       return;
     }
@@ -591,9 +656,28 @@ const AdminDashboard: React.FC = () => {
   const handleUpdateUser = async (uid: string, updates: Partial<UserProfile>, userEmail: string) => {
     if (!userProfile?.uid) return;
     
+    // NADIE puede editar al super-admin principal
+    if (isMainSuperAdmin(userEmail)) {
+      alert('❌ No se puede editar al super administrador principal');
+      return;
+    }
+    
+    // Obtener el usuario que se está editando
+    const targetUser = users.find(u => u.uid === uid);
+    if (!targetUser) {
+      alert('❌ Usuario no encontrado');
+      return;
+    }
+    
+    // Solo super-admins pueden editar a otros super-admins
+    if (targetUser.role === 'super_admin' && userProfile.role !== 'super_admin') {
+      alert('❌ Solo un super administrador puede editar a otro super administrador');
+      return;
+    }
+    
     // Verificar si se puede modificar el rol del usuario
     if (updates.role && !canModifyUserRole(userEmail)) {
-      alert('No se puede cambiar el rol del super administrador principal');
+      alert('❌ No se puede cambiar el rol del super administrador principal');
       return;
     }
     
@@ -927,31 +1011,66 @@ const AdminDashboard: React.FC = () => {
                  </tr>
                </thead>
                <tbody className="bg-white divide-y divide-gray-200">
-                 {categoryUsers.map((user) => (
-                   <tr key={user.uid} className={isMainSuperAdmin(user.email) ? 'bg-yellow-50 border-l-4 border-yellow-400' : ''}>
-                     <td className="px-6 py-4 whitespace-nowrap">
-                       <div className="flex items-center">
-                         <div className="flex-shrink-0 h-10 w-10">
-                           <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                             <span className="text-sm font-medium text-primary-600">
-                               {user.displayName?.charAt(0) || user.email.charAt(0)}
-                             </span>
+                 {categoryUsers.map((user) => {
+                   // Determinar el estilo basado en el tipo de super-admin
+                   const isPrincipal = isMainSuperAdmin(user.email);
+                   const isSecondarySuperAdmin = user.role === 'super_admin' && !isPrincipal;
+                   
+                   const getRowStyle = () => {
+                     if (isPrincipal) {
+                       return 'bg-yellow-50 border-l-4 border-yellow-400'; // Super Admin Principal
+                     } else if (isSecondarySuperAdmin) {
+                       return 'bg-purple-50 border-l-4 border-purple-400'; // Super Admin Secundario
+                     }
+                     return ''; // Usuario normal
+                   };
+
+                   const getAvatarStyle = () => {
+                     if (isPrincipal) {
+                       return 'bg-yellow-100'; // Amarillo para principal
+                     } else if (isSecondarySuperAdmin) {
+                       return 'bg-purple-100'; // Púrpura para secundario
+                     }
+                     return 'bg-primary-100'; // Color por defecto
+                   };
+
+                   const getAvatarTextStyle = () => {
+                     if (isPrincipal) {
+                       return 'text-yellow-700'; // Texto amarillo para principal
+                     } else if (isSecondarySuperAdmin) {
+                       return 'text-purple-700'; // Texto púrpura para secundario
+                     }
+                     return 'text-primary-600'; // Color por defecto
+                   };
+
+                   return (
+                     <tr key={user.uid} className={getRowStyle()}>
+                       <td className="px-6 py-4 whitespace-nowrap">
+                         <div className="flex items-center">
+                           <div className="flex-shrink-0 h-10 w-10">
+                             <div className={`h-10 w-10 rounded-full ${getAvatarStyle()} flex items-center justify-center`}>
+                               <span className={`text-sm font-medium ${getAvatarTextStyle()}`}>
+                                 {user.displayName?.charAt(0) || user.email.charAt(0)}
+                               </span>
+                             </div>
+                           </div>
+                           <div className="ml-4">
+                             <div className="text-sm font-medium text-gray-900">{user.displayName || 'Sin nombre'}</div>
+                             <div className="text-sm text-gray-500">{user.email}</div>
+                             {isSuperAdmin() && (
+                               <div className="text-xs text-gray-400 font-mono">ID: {user.uid}</div>
+                             )}
+                             {isPrincipal && (
+                               <div className="text-xs text-yellow-600 font-medium">⭐ Super Admin Principal</div>
+                             )}
+                             {isSecondarySuperAdmin && (
+                               <div className="text-xs text-purple-600 font-medium">🔷 Super Admin</div>
+                             )}
+                             {getDeletedUserInfo(user)}
                            </div>
                          </div>
-                         <div className="ml-4">
-                           <div className="text-sm font-medium text-gray-900">{user.displayName || 'Sin nombre'}</div>
-                           <div className="text-sm text-gray-500">{user.email}</div>
-                           {isSuperAdmin() && (
-                             <div className="text-xs text-gray-400 font-mono">ID: {user.uid}</div>
-                           )}
-                           {isMainSuperAdmin(user.email) && (
-                             <div className="text-xs text-yellow-600 font-medium">⭐ Super Admin Principal</div>
-                           )}
-                           {getDeletedUserInfo(user)}
-                         </div>
-                       </div>
-                     </td>
-                     <td className="px-6 py-4 whitespace-nowrap">
+                       </td>
+                       <td className="px-6 py-4 whitespace-nowrap">
                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                          user.role === 'super_admin' ? 'bg-purple-100 text-purple-800' :
                          user.role === 'admin' ? 'bg-blue-100 text-blue-800' :
@@ -970,17 +1089,17 @@ const AdminDashboard: React.FC = () => {
                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                        {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Nunca'}
                      </td>
-                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                       {canEditUsers() && (
-                         <button
-                           onClick={() => setShowEditUser(user)}
-                           className="text-primary-600 hover:text-primary-900 transition-colors"
-                           title="Editar usuario"
-                         >
-                           <Edit className="w-4 h-4" />
-                         </button>
-                       )}
-                       {canDeleteUser(user.email) && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                      {canEditSpecificUser(user) && (
+                        <button
+                          onClick={() => setShowEditUser(user)}
+                          className="text-primary-600 hover:text-primary-900 transition-colors"
+                          title="Editar usuario"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      )}
+                      {canDeleteOrDeactivateSpecificUser(user) && (
                          <>
                            {user.status === 'active' && canManageUserStatus() && (
                              <button
@@ -1031,7 +1150,8 @@ const AdminDashboard: React.FC = () => {
                        )}
                      </td>
                    </tr>
-                 ))}
+                   );
+                 })}
                </tbody>
              </table>
            </div>
@@ -2269,6 +2389,7 @@ const CreateUserModal: React.FC<{
   onClose: () => void;
   onSubmit: (userData: { email: string; password: string; displayName: string; role: UserRole }) => void;
 }> = ({ onClose, onSubmit }) => {
+  const { userProfile } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -2278,6 +2399,9 @@ const CreateUserModal: React.FC<{
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  
+  // Verificar si el usuario actual es el super-admin principal
+  const isMainSuperAdminUser = userProfile?.email === 'mar90jesus@gmail.com';
 
   // Función para verificar email con debounce
   const checkEmailAvailability = async (email: string) => {
@@ -2454,8 +2578,13 @@ const CreateUserModal: React.FC<{
             >
               <option value="comunidad">Residente</option>
               <option value="admin">Administrador</option>
-              <option value="super_admin">Super Administrador</option>
+              {isMainSuperAdminUser && (
+                <option value="super_admin">Super Administrador</option>
+              )}
             </select>
+            {!isMainSuperAdminUser && (
+              <p className="text-xs text-gray-500 mt-1">ℹ️ Solo el super administrador principal puede asignar el rol de Super Administrador</p>
+            )}
           </div>
           
           <div className="flex justify-end space-x-3 pt-4">
@@ -2485,11 +2614,15 @@ const EditUserModal: React.FC<{
   onClose: () => void;
   onSubmit: (updates: Partial<UserProfile>) => void;
 }> = ({ user, onClose, onSubmit }) => {
+  const { userProfile } = useAuth();
   const [formData, setFormData] = useState({
     displayName: user.displayName,
     role: user.role,
     isActive: user.isActive
   });
+  
+  // Verificar si el usuario actual es el super-admin principal
+  const isMainSuperAdminUser = userProfile?.email === 'mar90jesus@gmail.com';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2541,10 +2674,15 @@ const EditUserModal: React.FC<{
             >
               <option value="comunidad">Residente</option>
               <option value="admin">Administrador</option>
-              <option value="super_admin">Super Administrador</option>
+              {isMainSuperAdminUser && (
+                <option value="super_admin">Super Administrador</option>
+              )}
             </select>
             {isMainSuperAdmin(user.email) && (
               <p className="text-xs text-yellow-600 mt-1">⭐ El rol del super administrador principal no puede ser modificado</p>
+            )}
+            {!isMainSuperAdminUser && !isMainSuperAdmin(user.email) && (
+              <p className="text-xs text-gray-500 mt-1">ℹ️ Solo el super administrador principal puede asignar el rol de Super Administrador</p>
             )}
           </div>
           

@@ -58,6 +58,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 🔐 PROTECCIÓN: Solo el super-admin principal puede asignar el rol de super_admin
+    if (role === 'super_admin' && createdBy !== 'mar90jesus@gmail.com') {
+      return NextResponse.json(
+        { error: 'Solo el super administrador principal puede asignar el rol de Super Administrador' },
+        { status: 403 }
+      );
+    }
+
     let userRecord: any = null;
     let userProfile: any = null;
 
