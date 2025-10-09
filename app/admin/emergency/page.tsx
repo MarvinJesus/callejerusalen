@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/context/AuthContext';
 import { auth } from '@/lib/firebase';
 import { AlertTriangle, MapPin, Save, Image as ImageIcon, List, Info, Loader2 } from 'lucide-react';
@@ -105,22 +106,14 @@ const AdminEmergencyPage: React.FC = () => {
     }
   };
 
-  if (!userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'super_admin')) {
-    return (
+  return (
+    <ProtectedRoute 
+      allowedRoles={['admin', 'super_admin']} 
+      requiredPermissions={['security.view', 'security.alerts']}
+      requireAllPermissions={false}
+    >
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <div className="max-w-4xl mx-auto p-6">
-          <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-xl">
-            <p className="text-yellow-800">No tienes permiso para editar esta sección.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <div className="max-w-5xl mx-auto p-6 space-y-6">
         <div className="flex items-center gap-3">
           <AlertTriangle className="w-7 h-7 text-red-600" />
@@ -238,7 +231,8 @@ const AdminEmergencyPage: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   );
 };
 

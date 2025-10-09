@@ -27,7 +27,7 @@ import { Permission, DEFAULT_PERMISSIONS, validatePermissions } from './permissi
 
 // Tipos de usuario
 export type UserRole = 'visitante' | 'comunidad' | 'admin' | 'super_admin';
-export type UserStatus = 'active' | 'inactive' | 'deleted';
+export type UserStatus = 'active' | 'inactive' | 'deleted' | 'pending' | 'blocked';
 
 export interface UserProfile {
   uid: string;
@@ -62,56 +62,165 @@ export interface RegistrationRequest {
 }
 
 
-// Función para registrar un nuevo usuario
+// Función para registrar un nuevo usuario usando API route del servidor
 export const registerUser = async (
   email: string,
   password: string,
   displayName: string,
   role: UserRole = 'comunidad'
 ): Promise<User> => {
-  if (!auth || !db) {
-    throw new Error('Firebase no está inicializado');
-  }
+  console.log('🚀 Iniciando registro de usuario:', { email, displayName, role });
 
   try {
-    // Crear usuario en Firebase Auth
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    // Usar la API route del servidor para crear el usuario
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password,
+        displayName: displayName,
+        role: role
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al registrar usuario');
+    }
+
+    const result = await response.json();
+    console.log('✅ Usuario registrado exitosamente:', result);
+
+    // Ahora crear la sesión del usuario en el cliente
+    if (!auth) {
+      throw new Error('Firebase Auth no está inicializado');
+    }
+
+    // Iniciar sesión con las credenciales del usuario
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-
-    // Actualizar el perfil del usuario
-    await updateProfile(user, { displayName });
-
-    // Crear perfil en Firestore
-    const userProfile: UserProfile = {
-      uid: user.uid,
-      email: user.email!,
-      displayName,
-      role,
-      status: 'active',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isActive: true,
-      permissions: DEFAULT_PERMISSIONS[role] || []
-    };
-
-    await setDoc(doc(db, 'users', user.uid), userProfile);
-
+    
+    console.log('✅ Sesión iniciada para el usuario:', user.uid);
     return user;
+    
   } catch (error) {
-    console.error('Error al registrar usuario:', error);
+    console.error('❌ Error al registrar usuario:', error);
     throw error;
   }
 };
 
-// Función para iniciar sesión
-export const loginUser = async (email: string, password: string): Promise<User> => {
+// Función para verificar el estado de registro de un usuario
+export const checkRegistrationStatus = async (uid: string): Promise<{
+  status: 'pending' | 'approved' | 'rejected' | 'not_found';
+  userProfile?: UserProfile;
+}> => {
+  if (!db) {
+    throw new Error('Firebase no está inicializado');
+  }
+
+  try {
+    const userProfile = await getUserProfile(uid);
+    
+    if (!userProfile) {
+      return { status: 'not_found' };
+    }
+
+    return {
+      status: userProfile.registrationStatus || 'approved',
+      userProfile
+    };
+  } catch (error) {
+    console.error('Error al verificar estado de registro:', error);
+    return { status: 'not_found' };
+  }
+};
+
+// Función para iniciar sesión con verificación de estado de registro
+export const loginUser = async (email: string, password: string): Promise<{
+  user: User;
+  registrationStatus: 'pending' | 'approved' | 'rejected' | 'not_found';
+  userProfile?: UserProfile;
+}> => {
   if (!auth) {
     throw new Error('Firebase no está inicializado');
   }
 
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    return userCredential.user;
+    const user = userCredential.user;
+
+    // Verificar el estado de registro y el estado del usuario
+    const registrationStatus = await checkRegistrationStatus(user.uid);
+    
+    console.log('🔍 Estado de registro verificado:', registrationStatus.status);
+    console.log('🔍 Perfil de usuario:', registrationStatus.userProfile);
+
+    // ⚠️ VERIFICACIÓN CRÍTICA: Bloquear usuarios inactivos, eliminados o bloqueados
+    if (registrationStatus.userProfile) {
+      const userStatus = registrationStatus.userProfile.status;
+      const isActive = registrationStatus.userProfile.isActive;
+      const userEmail = registrationStatus.userProfile.email;
+
+      // 🔐 PROTECCIÓN SUPER ADMIN: El super admin NUNCA puede ser bloqueado
+      const isSuperAdmin = isMainSuperAdmin(userEmail);
+      
+      if (isSuperAdmin) {
+        console.log('👑 Super Admin detectado - Acceso garantizado:', userEmail);
+        // El super admin siempre tiene acceso, sin importar el estado
+        // Continuar con el login sin verificar estado
+      } else {
+        // Para usuarios normales, verificar el estado
+        // Solo permitir login a usuarios con status='active'
+        // ⚠️ IMPORTANTE: El orden importa - verificar estados específicos primero
+        
+        // 1. Verificar usuarios ELIMINADOS
+        if (userStatus === 'deleted') {
+          await signOut(auth);
+          
+          const error: any = new Error('🚫 Cuenta Eliminada: Esta cuenta ha sido eliminada del sistema. Si crees que esto es un error, contacta al administrador para solicitar la reactivación de tu cuenta.');
+          error.code = 'auth/user-deleted';
+          throw error;
+        }
+
+        // 2. Verificar usuarios PENDIENTES (antes de inactive porque también tienen isActive=false)
+        if (userStatus === 'pending') {
+          await signOut(auth);
+          
+          const error: any = new Error('⏳ Cuenta Pendiente de Aprobación: Tu registro ha sido recibido correctamente. Un administrador debe aprobar tu cuenta antes de que puedas iniciar sesión. Este proceso suele tomar 24-48 horas.');
+          error.code = 'auth/user-pending';
+          throw error;
+        }
+
+        // 3. Verificar usuarios INACTIVOS/DESACTIVADOS
+        if (userStatus === 'inactive' || isActive === false) {
+          await signOut(auth);
+          
+          const error: any = new Error('🚫 Cuenta Desactivada: Tu cuenta ha sido desactivada por un administrador. Esto puede deberse a inactividad o violación de políticas. Contacta al administrador para obtener más información y solicitar la reactivación.');
+          error.code = 'auth/user-disabled';
+          throw error;
+        }
+
+        // 4. Verificar que el status sea 'active' (cualquier otro estado no permitido)
+        if (userStatus !== 'active') {
+          await signOut(auth);
+          
+          const error: any = new Error(`❌ Estado de Cuenta Inválido: Tu cuenta tiene un estado no válido (${userStatus}). Contacta al administrador para resolver este problema.`);
+          error.code = 'auth/user-not-active';
+          throw error;
+        }
+        
+        console.log(`✅ Login permitido para usuario con status: ${userStatus}`);
+      }
+    }
+
+    return {
+      user,
+      registrationStatus: registrationStatus.status,
+      userProfile: registrationStatus.userProfile
+    };
   } catch (error) {
     console.error('Error al iniciar sesión:', error);
     throw error;
@@ -373,11 +482,6 @@ export const changeUserStatus = async (
   }
 
   try {
-    // Verificar si es el super admin principal
-    if (isMainSuperAdmin(changedBy)) {
-      throw new Error('No se puede modificar el estado del super administrador principal');
-    }
-
     // Obtener información del usuario antes del cambio
     const userDoc = await getDoc(doc(db, 'users', uid));
     if (!userDoc.exists()) {
@@ -386,9 +490,10 @@ export const changeUserStatus = async (
 
     const userData = userDoc.data() as UserProfile;
     
-    // Verificar si es el super admin principal por email
-    if (userData.email === 'mar90jesus@gmail.com') {
-      throw new Error('No se puede modificar el estado del super administrador principal');
+    // 🔐 PROTECCIÓN SUPER ADMIN: No se puede modificar el estado del super admin principal
+    if (isMainSuperAdmin(userData.email)) {
+      console.error('❌ Intento de modificar estado del Super Admin:', userData.email);
+      throw new Error('No se puede modificar el estado del super administrador principal. Este usuario tiene protección permanente.');
     }
 
     // Actualizar el estado del usuario
@@ -513,19 +618,50 @@ export const approveRegistration = async (
   }
 
   try {
+    // Obtener la solicitud de registro
     const requestRef = doc(db, 'registrationRequests', requestId);
+    const requestDoc = await getDoc(requestRef);
+    
+    if (!requestDoc.exists()) {
+      throw new Error('Solicitud de registro no encontrada');
+    }
+
+    const requestData = requestDoc.data() as RegistrationRequest;
+    
+    // Actualizar la solicitud de registro
     await updateDoc(requestRef, {
       status: 'approved',
       processedBy: approvedBy,
       processedAt: new Date()
     });
 
+    // Actualizar el perfil del usuario con estado activo y todos los campos necesarios
+    const userRef = doc(db, 'users', requestId);
+    const userUpdateData: Partial<UserProfile> = {
+      status: 'active',
+      isActive: true,
+      registrationStatus: 'approved',
+      approvedBy: approvedBy,
+      approvedAt: new Date(),
+      permissions: DEFAULT_PERMISSIONS[approvedRole] || [],
+      updatedAt: new Date(),
+      statusChangedBy: approvedBy,
+      statusChangedAt: new Date(),
+      statusReason: 'Registro aprobado por administrador'
+    };
+
+    await updateDoc(userRef, userUpdateData);
+
     // Log de la acción en el servidor
     const userProfile = await getUserProfile(approvedBy);
     await logSystemAction('registration_approved', approvedBy, userProfile?.email || 'unknown', {
       requestId,
-      approvedRole
+      approvedRole,
+      approvedUserEmail: requestData.email,
+      approvedUserName: requestData.displayName
     });
+
+    console.log('✅ Registro aprobado para:', requestData.email);
   } catch (error) {
     console.error('Error al aprobar registro:', error);
     throw error;
@@ -543,7 +679,17 @@ export const rejectRegistration = async (
   }
 
   try {
+    // Obtener la solicitud de registro
     const requestRef = doc(db, 'registrationRequests', requestId);
+    const requestDoc = await getDoc(requestRef);
+    
+    if (!requestDoc.exists()) {
+      throw new Error('Solicitud de registro no encontrada');
+    }
+
+    const requestData = requestDoc.data() as RegistrationRequest;
+    
+    // Actualizar la solicitud de registro
     await updateDoc(requestRef, {
       status: 'rejected',
       processedBy: rejectedBy,
@@ -551,12 +697,30 @@ export const rejectRegistration = async (
       reason
     });
 
+    // Actualizar el perfil del usuario con estado rechazado
+    const userRef = doc(db, 'users', requestId);
+    const userUpdateData: Partial<UserProfile> = {
+      status: 'inactive',
+      isActive: false,
+      registrationStatus: 'rejected',
+      updatedAt: new Date(),
+      statusChangedBy: rejectedBy,
+      statusChangedAt: new Date(),
+      statusReason: `Registro rechazado: ${reason}`
+    };
+
+    await updateDoc(userRef, userUpdateData);
+
     // Log de la acción en el servidor
     const userProfile = await getUserProfile(rejectedBy);
     await logSystemAction('registration_rejected', rejectedBy, userProfile?.email || 'unknown', {
       requestId,
-      reason
+      reason,
+      rejectedUserEmail: requestData.email,
+      rejectedUserName: requestData.displayName
     });
+
+    console.log('❌ Registro rechazado para:', requestData.email);
   } catch (error) {
     console.error('Error al rechazar registro:', error);
     throw error;
@@ -780,6 +944,41 @@ export const revokePermissions = async (
     console.log(`✅ Permisos revocados de ${targetUserProfile.email}:`, permissions);
   } catch (error) {
     console.error('Error al revocar permisos:', error);
+    throw error;
+  }
+};
+
+// Función para obtener un usuario por ID
+export const getUserById = async (uid: string): Promise<UserProfile | null> => {
+  try {
+    if (!uid || uid.trim() === '') {
+      throw new Error('ID de usuario requerido');
+    }
+
+    console.log(`🔍 Buscando usuario con ID: ${uid}`);
+
+    const userDoc = await getDoc(doc(db, 'users', uid.trim()));
+    
+    if (!userDoc.exists()) {
+      console.log(`❌ Usuario no encontrado: ${uid}`);
+      return null;
+    }
+
+    const userData = userDoc.data();
+    
+    // Convertir fechas de Firestore a Date
+    const userProfile: UserProfile = {
+      ...userData,
+      createdAt: userData.createdAt?.toDate() || new Date(),
+      updatedAt: userData.updatedAt?.toDate() || new Date(),
+      lastLogin: userData.lastLogin?.toDate() || null,
+      approvedAt: userData.approvedAt?.toDate() || null,
+    } as UserProfile;
+
+    console.log(`✅ Usuario encontrado: ${userProfile.email}`);
+    return userProfile;
+  } catch (error) {
+    console.error('Error al obtener usuario por ID:', error);
     throw error;
   }
 };

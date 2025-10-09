@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Permission } from '@/lib/permissions';
 import { canPerformAction } from '@/lib/permissions';
+import RegistrationStatus from './RegistrationStatus';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -26,68 +27,110 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireAllPermissions = false,
   fallbackPath = '/'
 }) => {
-  const { userProfile, loading } = useAuth();
+  const { userProfile, loading, isRegistrationPending, isRegistrationRejected } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
 
-    console.log('ProtectedRoute: Verificando acceso - userProfile:', userProfile);
-    console.log('ProtectedRoute: requiredRole:', requiredRole);
-    console.log('ProtectedRoute: allowedRoles:', allowedRoles);
+    console.log('🔐 ProtectedRoute: Verificando acceso');
+    console.log('👤 Usuario:', userProfile?.email, '| Rol:', userProfile?.role);
+    console.log('🎯 Permisos de usuario:', userProfile?.permissions);
+    console.log('📋 Requerido - Role:', requiredRole, '| AllowedRoles:', allowedRoles);
+    console.log('🔑 Permisos requeridos:', requiredPermissions);
 
     // Si no hay usuario autenticado
     if (!userProfile) {
-      console.log('ProtectedRoute: No hay usuario autenticado, redirigiendo a login');
+      console.log('❌ No hay usuario autenticado, redirigiendo a login');
       toast.error('Debes iniciar sesión para acceder a esta sección');
       router.push('/login');
       return;
     }
 
-    // Verificar rol específico
+    // Verificar estado de registro - BLOQUEAR ACCESO
+    if (isRegistrationPending) {
+      console.log('⏳ Usuario con registro pendiente - BLOQUEANDO ACCESO');
+      toast.error('Tu solicitud de registro está pendiente de aprobación. No puedes acceder al sistema hasta que sea aprobada.');
+      router.push('/login');
+      return;
+    }
+
+    if (isRegistrationRejected) {
+      console.log('❌ Usuario con registro rechazado - BLOQUEANDO ACCESO');
+      toast.error('Tu solicitud de registro fue rechazada. No puedes acceder al sistema.');
+      router.push('/login');
+      return;
+    }
+
+    // Super admin siempre tiene acceso total
+    if (userProfile.role === 'super_admin') {
+      console.log('✅ Super Admin - Acceso total concedido');
+      return;
+    }
+
+    // Verificar rol específico (solo si NO es super_admin)
     if (requiredRole && userProfile.role !== requiredRole) {
-      // Super admin puede acceder a cualquier rol
-      if (userProfile.role !== 'super_admin') {
-        console.log(`ProtectedRoute: Acceso denegado. Se requiere rol: ${requiredRole}, usuario tiene: ${userProfile.role}`);
-        toast.error(`Acceso denegado. Se requiere rol: ${requiredRole}`);
-        router.push(fallbackPath);
-        return;
-      }
-    }
-
-    // Verificar roles permitidos
-    if (allowedRoles && !allowedRoles.includes(userProfile.role)) {
-      // Super admin puede acceder a cualquier rol
-      if (userProfile.role !== 'super_admin') {
-        console.log(`ProtectedRoute: Acceso denegado. Roles permitidos: ${allowedRoles.join(', ')}, usuario tiene: ${userProfile.role}`);
-        toast.error('No tienes permisos para acceder a esta sección');
-        router.push(fallbackPath);
-        return;
-      }
-    }
-
-    // Verificar permiso específico
-    if (requiredPermission && !canPerformAction(userProfile.role, userProfile.permissions || [], requiredPermission)) {
-      toast.error(`No tienes permisos para acceder a esta sección. Se requiere: ${requiredPermission}`);
+      console.log(`❌ Acceso denegado. Se requiere rol: ${requiredRole}, usuario tiene: ${userProfile.role}`);
+      toast.error(`Acceso denegado. Se requiere rol: ${requiredRole}`);
       router.push(fallbackPath);
       return;
     }
 
-    // Verificar múltiples permisos
-    if (requiredPermissions && requiredPermissions.length > 0) {
-      const hasRequiredPermissions = requireAllPermissions ? 
-        requiredPermissions.every(permission => canPerformAction(userProfile.role, userProfile.permissions || [], permission)) :
-        requiredPermissions.some(permission => canPerformAction(userProfile.role, userProfile.permissions || [], permission));
+    // Verificar roles permitidos (solo si NO es super_admin)
+    if (allowedRoles && !allowedRoles.includes(userProfile.role)) {
+      console.log(`❌ Acceso denegado. Roles permitidos: ${allowedRoles.join(', ')}, usuario tiene: ${userProfile.role}`);
+      toast.error('No tienes el rol necesario para acceder a esta sección');
+      router.push(fallbackPath);
+      return;
+    }
 
-      if (!hasRequiredPermissions) {
-        const message = requireAllPermissions ? 
-          'No tienes todos los permisos requeridos para acceder a esta sección' :
-          'No tienes ninguno de los permisos requeridos para acceder a esta sección';
-        toast.error(message);
+    // IMPORTANTE: Verificar permisos específicos para usuarios admin (NO super_admin)
+    // Si se especificaron permisos, el admin DEBE tenerlos
+    if (requiredPermission) {
+      const hasPermission = canPerformAction(userProfile.role, userProfile.permissions || [], requiredPermission);
+      console.log(`🔍 Verificando permiso "${requiredPermission}": ${hasPermission ? '✅' : '❌'}`);
+      
+      if (!hasPermission) {
+        console.log(`❌ Acceso denegado. Falta permiso: ${requiredPermission}`);
+        toast.error(`No tienes el permiso necesario: ${requiredPermission}`);
         router.push(fallbackPath);
         return;
       }
     }
+
+    // Verificar múltiples permisos
+    if (requiredPermissions && requiredPermissions.length > 0) {
+      const permissionChecks = requiredPermissions.map(permission => ({
+        permission,
+        hasIt: canPerformAction(userProfile.role, userProfile.permissions || [], permission)
+      }));
+
+      console.log('🔍 Verificando múltiples permisos:', permissionChecks);
+
+      const hasRequiredPermissions = requireAllPermissions ? 
+        permissionChecks.every(check => check.hasIt) :
+        permissionChecks.some(check => check.hasIt);
+
+      if (!hasRequiredPermissions) {
+        const missingPermissions = permissionChecks
+          .filter(check => !check.hasIt)
+          .map(check => check.permission);
+        
+        console.log(`❌ Acceso denegado. Permisos faltantes:`, missingPermissions);
+        
+        const message = requireAllPermissions ? 
+          `No tienes todos los permisos requeridos. Faltan: ${missingPermissions.join(', ')}` :
+          'No tienes ninguno de los permisos requeridos para acceder a esta sección';
+        
+        toast.error(message);
+        router.push(fallbackPath);
+        return;
+      }
+
+      console.log('✅ Permisos verificados correctamente');
+    }
+
+    console.log('✅ Acceso concedido');
   }, [userProfile, loading, requiredRole, allowedRoles, requiredPermission, requiredPermissions, requireAllPermissions, fallbackPath, router]);
 
   // Mostrar loading mientras se verifica la autenticación
@@ -99,23 +142,26 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Si no hay usuario o no tiene permisos, no renderizar nada
+  // Si no hay usuario, no renderizar
   if (!userProfile) {
     return null;
   }
 
+  // Los usuarios pendientes o rechazados ya fueron redirigidos en useEffect
+  // No necesitamos mostrar el componente aquí
+
+  // Super admin siempre puede acceder
+  if (userProfile.role === 'super_admin') {
+    return <>{children}</>;
+  }
+
+  // Verificaciones para otros roles
   if (requiredRole && userProfile.role !== requiredRole) {
-    // Super admin puede acceder a cualquier rol
-    if (userProfile.role !== 'super_admin') {
-      return null;
-    }
+    return null;
   }
 
   if (allowedRoles && !allowedRoles.includes(userProfile.role)) {
-    // Super admin puede acceder a cualquier rol
-    if (userProfile.role !== 'super_admin') {
-      return null;
-    }
+    return null;
   }
 
   // Verificar permiso específico

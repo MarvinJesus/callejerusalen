@@ -15,7 +15,10 @@ import {
   ToggleLeft,
   ToggleRight,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Info,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { 
   Permission, 
@@ -23,8 +26,15 @@ import {
   PERMISSION_DESCRIPTIONS,
   ALL_PERMISSIONS,
   getPermissionsByGroups,
-  getPermissionGroup
+  getPermissionGroup,
+  getPermissionDescription
 } from '@/lib/permissions';
+import { 
+  PERMISSION_TEMPLATES,
+  PermissionTemplate,
+  getCategoryColor,
+  getCategoryName
+} from '@/lib/permission-templates';
 import { 
   assignPermissions, 
   revokePermissions, 
@@ -50,6 +60,13 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [permissionStates, setPermissionStates] = useState<Record<Permission, boolean>>({} as Record<Permission, boolean>);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<PermissionTemplate | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState<{
+    toAdd: Permission[];
+    toRemove: Permission[];
+  } | null>(null);
 
   // Cargar permisos del usuario
   useEffect(() => {
@@ -103,47 +120,89 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({
     });
   };
 
-  // Función para guardar cambios
+  // Función para calcular cambios pendientes
+  const calculatePendingChanges = () => {
+    const toAdd: Permission[] = [];
+    const toRemove: Permission[] = [];
+
+    Object.entries(permissionStates).forEach(([permission, isActive]) => {
+      const perm = permission as Permission;
+      const wasActive = userPermissions.includes(perm);
+      
+      if (wasActive && !isActive) {
+        toRemove.push(perm);
+      } else if (!wasActive && isActive) {
+        toAdd.push(perm);
+      }
+    });
+
+    return { toAdd, toRemove };
+  };
+
+  // Función para mostrar modal de confirmación
+  const showConfirmationModal = () => {
+    const changes = calculatePendingChanges();
+    
+    if (changes.toAdd.length === 0 && changes.toRemove.length === 0) {
+      toast('No hay cambios para guardar');
+      return;
+    }
+
+    setPendingChanges(changes);
+    setShowConfirmModal(true);
+  };
+
+  // Función para guardar cambios (ejecutada después de confirmar)
   const saveChanges = async () => {
-    if (!userProfile) return;
+    if (!userProfile || !pendingChanges) return;
 
     setSaving(true);
     try {
-      // Calcular cambios
-      const toAdd: Permission[] = [];
-      const toRemove: Permission[] = [];
-
-      Object.entries(permissionStates).forEach(([permission, isActive]) => {
-        const perm = permission as Permission;
-        const wasActive = userPermissions.includes(perm);
-        
-        if (wasActive && !isActive) {
-          toRemove.push(perm);
-        } else if (!wasActive && isActive) {
-          toAdd.push(perm);
-        }
-      });
-
       // Aplicar cambios solo si hay algo que cambiar
-      if (toAdd.length > 0) {
-        await assignPermissions(targetUser.uid, toAdd, userProfile.uid);
+      if (pendingChanges.toAdd.length > 0) {
+        await assignPermissions(targetUser.uid, pendingChanges.toAdd, userProfile.uid);
       }
 
-      if (toRemove.length > 0) {
-        await revokePermissions(targetUser.uid, toRemove, userProfile.uid);
+      if (pendingChanges.toRemove.length > 0) {
+        await revokePermissions(targetUser.uid, pendingChanges.toRemove, userProfile.uid);
       }
 
       // Recargar permisos
       await loadUserPermissions();
       
-      toast.success('Permisos actualizados correctamente');
+      const totalChanges = pendingChanges.toAdd.length + pendingChanges.toRemove.length;
+      toast.success(`Permisos actualizados correctamente (${totalChanges} cambios aplicados)`);
       onPermissionsUpdated?.();
+      
+      // Cerrar modal y limpiar estado
+      setShowConfirmModal(false);
+      setPendingChanges(null);
     } catch (error) {
       console.error('Error al guardar permisos:', error);
       toast.error('Error al guardar permisos');
     } finally {
       setSaving(false);
     }
+  };
+
+  // Función para aplicar una plantilla
+  const applyTemplate = (template: PermissionTemplate) => {
+    const newStates: Record<Permission, boolean> = {} as Record<Permission, boolean>;
+    
+    // Establecer todos los permisos como false primero
+    ALL_PERMISSIONS.forEach(permission => {
+      newStates[permission] = false;
+    });
+    
+    // Activar solo los permisos de la plantilla
+    template.permissions.forEach(permission => {
+      newStates[permission] = true;
+    });
+    
+    setPermissionStates(newStates);
+    setSelectedTemplate(template);
+    setHasChanges(true);
+    toast.success(`Plantilla "${template.name}" aplicada`);
   };
 
   // Función para alternar grupo
@@ -202,7 +261,14 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({
               </span>
             )}
             <button
-              onClick={saveChanges}
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Settings className="w-4 h-4" />
+              <span>Plantillas</span>
+            </button>
+            <button
+              onClick={showConfirmationModal}
               disabled={saving || !hasChanges}
               className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -212,6 +278,48 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Plantillas de Permisos */}
+      {showTemplates && (
+        <div className="bg-white border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <Settings className="w-5 h-5 text-blue-600" />
+              <h4 className="font-medium text-gray-900">Plantillas de Permisos</h4>
+            </div>
+            <button
+              onClick={() => setShowTemplates(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Selecciona una plantilla predefinida para aplicar un conjunto de permisos comunes
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {PERMISSION_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => applyTemplate(template)}
+                className={`text-left p-4 border rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all ${
+                  selectedTemplate?.id === template.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-2xl">{template.icon}</span>
+                  <span className={`text-xs px-2 py-1 rounded-full ${getCategoryColor(template.category)}`}>
+                    {getCategoryName(template.category)}
+                  </span>
+                </div>
+                <h5 className="font-semibold text-gray-900 mb-1">{template.name}</h5>
+                <p className="text-xs text-gray-600 mb-2">{template.description}</p>
+                <p className="text-xs text-gray-500">{template.permissions.length} permisos</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Grupos de permisos */}
       <div className="space-y-4">
@@ -310,6 +418,183 @@ const PermissionManager: React.FC<PermissionManagerProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Modal de Confirmación */}
+      {showConfirmModal && pendingChanges && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Header del Modal */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Info className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Confirmar Cambios de Permisos
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Revisa los cambios antes de aplicar
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setPendingChanges(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="p-6 space-y-6">
+              {/* Información del Usuario */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <Users className="w-5 h-5 text-gray-600" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">{targetUser.displayName}</h4>
+                    <p className="text-sm text-gray-600">{targetUser.email}</p>
+                    <p className="text-sm text-gray-500">Rol: {targetUser.role}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Resumen de Cambios */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Permisos a Agregar */}
+                {pendingChanges.toAdd.length > 0 && (
+                  <div className="border border-green-200 rounded-lg p-4 bg-green-50">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <Plus className="w-5 h-5 text-green-600" />
+                      <h4 className="font-medium text-green-900">
+                        Permisos a Agregar ({pendingChanges.toAdd.length})
+                      </h4>
+                    </div>
+                    <div className="space-y-3 max-h-40 overflow-y-auto">
+                      {pendingChanges.toAdd.map((permission) => (
+                        <div key={permission} className="flex items-start space-x-3 text-sm">
+                          <Check className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <span className="text-green-800 font-medium block">{permission}</span>
+                            <span className="text-green-600 text-xs">{getPermissionDescription(permission)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Permisos a Remover */}
+                {pendingChanges.toRemove.length > 0 && (
+                  <div className="border border-red-200 rounded-lg p-4 bg-red-50">
+                    <div className="flex items-center space-x-2 mb-3">
+                      <Minus className="w-5 h-5 text-red-600" />
+                      <h4 className="font-medium text-red-900">
+                        Permisos a Remover ({pendingChanges.toRemove.length})
+                      </h4>
+                    </div>
+                    <div className="space-y-3 max-h-40 overflow-y-auto">
+                      {pendingChanges.toRemove.map((permission) => (
+                        <div key={permission} className="flex items-start space-x-3 text-sm">
+                          <X className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <span className="text-red-800 font-medium block">{permission}</span>
+                            <span className="text-red-600 text-xs">{getPermissionDescription(permission)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Estado Actual vs Nuevo */}
+              <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                <h4 className="font-medium text-blue-900 mb-3 flex items-center space-x-2">
+                  <Shield className="w-5 h-5" />
+                  <span>Resumen de Cambios</span>
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                  <div>
+                    <p className="font-medium text-blue-800 mb-2">Estado Actual:</p>
+                    <p className="text-blue-700 mb-3">{userPermissions.length} permisos activos</p>
+                    {userPermissions.length > 0 && (
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {userPermissions.map((permission) => (
+                          <div key={permission} className="text-xs">
+                            <span className="text-blue-700 font-medium">{permission}</span>
+                            <span className="text-blue-500 ml-2">{getPermissionDescription(permission)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium text-blue-800 mb-2">Después del Cambio:</p>
+                    <p className="text-blue-700 mb-3">
+                      {userPermissions.length + pendingChanges.toAdd.length - pendingChanges.toRemove.length} permisos activos
+                    </p>
+                    <div className="text-xs text-blue-600">
+                      <p>• Se agregarán: {pendingChanges.toAdd.length} permisos</p>
+                      <p>• Se removerán: {pendingChanges.toRemove.length} permisos</p>
+                      <p>• Cambio neto: {pendingChanges.toAdd.length - pendingChanges.toRemove.length > 0 ? '+' : ''}{pendingChanges.toAdd.length - pendingChanges.toRemove.length} permisos</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Advertencia */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-yellow-900">Importante</h4>
+                    <p className="text-sm text-yellow-700 mt-1">
+                      Los cambios se aplicarán inmediatamente. El usuario verá los nuevos permisos 
+                      la próxima vez que acceda al sistema.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  setShowConfirmModal(false);
+                  setPendingChanges(null);
+                }}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={saving}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveChanges}
+                disabled={saving}
+                className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {saving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Aplicando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Confirmar y Aplicar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

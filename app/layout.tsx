@@ -4,8 +4,11 @@ import './globals.css';
 import './themes.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { GlobalAlertProvider } from '@/context/GlobalAlertContext';
 import { Toaster } from 'react-hot-toast';
 import FloatingHomeButton from '@/components/FloatingHomeButton';
+import GlobalRegistrationAlert from '@/components/GlobalRegistrationAlert';
+import GlobalAlertBanner from '@/components/GlobalAlertBanner';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -33,34 +36,42 @@ export default function RootLayout({
       </head>
       <body className={inter.className} data-theme="default">
         <ThemeProvider>
-          <AuthProvider>
-            {children}
-            <FloatingHomeButton />
-            <Toaster
-              position="top-right"
-              toastOptions={{
-                duration: 4000,
-                style: {
-                  background: '#363636',
-                  color: '#fff',
-                },
-                success: {
-                  duration: 3000,
-                  iconTheme: {
-                    primary: '#4ade80',
-                    secondary: '#fff',
+          <GlobalAlertProvider>
+            {/* Banner Global - Nivel más alto para que sea visible en TODAS las páginas */}
+            <GlobalAlertBanner />
+            
+            <AuthProvider>
+              <GlobalRegistrationAlert />
+              <div className="relative">
+                {children}
+              </div>
+              <FloatingHomeButton />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    background: '#363636',
+                    color: '#fff',
                   },
-                },
-                error: {
-                  duration: 5000,
-                  iconTheme: {
-                    primary: '#ef4444',
-                    secondary: '#fff',
+                  success: {
+                    duration: 3000,
+                    iconTheme: {
+                      primary: '#4ade80',
+                      secondary: '#fff',
+                    },
                   },
-                },
-              }}
-            />
-          </AuthProvider>
+                  error: {
+                    duration: 5000,
+                    iconTheme: {
+                      primary: '#ef4444',
+                      secondary: '#fff',
+                    },
+                  },
+                }}
+              />
+            </AuthProvider>
+          </GlobalAlertProvider>
         </ThemeProvider>
       </body>
     </html>

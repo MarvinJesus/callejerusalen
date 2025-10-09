@@ -163,7 +163,11 @@ const ServicesManagementPage: React.FC = () => {
   }
 
   return (
-    <ProtectedRoute allowedRoles={['admin', 'super_admin']}>
+    <ProtectedRoute 
+      allowedRoles={['admin', 'super_admin']} 
+      requiredPermissions={['community.services', 'community.edit']}
+      requireAllPermissions={false}
+    >
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
         <div className="bg-white shadow-sm border-b">
