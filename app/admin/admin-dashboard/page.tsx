@@ -568,7 +568,9 @@ const AdminDashboard: React.FC = () => {
       const statusMessages = {
         'active': '✅ Usuario activado exitosamente',
         'inactive': '⚠️ Usuario desactivado exitosamente',
-        'deleted': '🗑️ Usuario eliminado exitosamente'
+        'deleted': '🗑️ Usuario eliminado exitosamente',
+        'pending': '⏳ Usuario marcado como pendiente',
+        'blocked': '🚫 Usuario bloqueado exitosamente'
       };
       
       alert(statusMessages[newStatus]);
