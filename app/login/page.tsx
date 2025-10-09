@@ -39,7 +39,12 @@ const LoginPage: React.FC = () => {
     if (user && profile && !loginAttempted) {
       // Solo redirigir si el usuario está activo
       if (profile.status === 'active' && profile.isActive) {
-        router.push('/');
+        // Redirigir según el rol del usuario
+        if (profile.role === 'admin' || profile.role === 'super_admin') {
+          router.push('/admin');
+        } else {
+          router.push('/');
+        }
       }
     }
   }, [user, profile, router, loginAttempted]);
@@ -73,7 +78,13 @@ const LoginPage: React.FC = () => {
       } else {
         // Login exitoso para usuarios aprobados
         toast.success('¡Bienvenido de vuelta!');
-        router.push('/');
+        
+        // Redirigir según el rol del usuario
+        if (loginResult.userProfile?.role === 'admin' || loginResult.userProfile?.role === 'super_admin') {
+          router.push('/admin');
+        } else {
+          router.push('/');
+        }
       }
     } catch (error: any) {
       console.log('❌ ========================================');
