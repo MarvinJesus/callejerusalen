@@ -40,8 +40,12 @@ export async function POST(request: NextRequest) {
 
     const targetUserData = targetUserDoc.data();
     
+    if (!targetUserData) {
+      return NextResponse.json({ error: 'Datos del usuario objetivo no encontrados' }, { status: 404 });
+    }
+    
     // Verificar que no se esté modificando al super admin principal
-    if (targetUserData?.email === 'mar90jesus@gmail.com') {
+    if (targetUserData.email === 'mar90jesus@gmail.com') {
       return NextResponse.json({ error: 'No se puede modificar los permisos del super administrador principal' }, { status: 403 });
     }
 
@@ -49,12 +53,12 @@ export async function POST(request: NextRequest) {
 
     if (action === 'assign') {
       // Asignar permisos
-      const currentPermissions = targetUserData?.permissions || [];
+      const currentPermissions = targetUserData.permissions || [];
       const combinedPermissions = [...currentPermissions, ...validPermissions];
       updatedPermissions = Array.from(new Set(combinedPermissions));
     } else if (action === 'revoke') {
       // Revocar permisos
-      const currentPermissions = targetUserData?.permissions || [];
+      const currentPermissions = targetUserData.permissions || [];
       updatedPermissions = currentPermissions.filter((p: Permission) => !validPermissions.includes(p));
     } else if (action === 'replace') {
       // Reemplazar todos los permisos
@@ -136,7 +140,12 @@ export async function GET(request: NextRequest) {
     }
 
     const targetUserData = targetUserDoc.data();
-    const permissions = targetUserData?.permissions || [];
+    
+    if (!targetUserData) {
+      return NextResponse.json({ error: 'Datos del usuario no encontrados' }, { status: 404 });
+    }
+    
+    const permissions = targetUserData.permissions || [];
 
     return NextResponse.json({
       success: true,

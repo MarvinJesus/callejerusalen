@@ -47,7 +47,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       return;
     }
 
-    // Verificar estado de registro - BLOQUEAR ACCESO
+    // IMPORTANTE: Super admin siempre tiene acceso total - verificar PRIMERO
+    if (userProfile.role === 'super_admin') {
+      console.log('✅ Super Admin - Acceso total concedido (sin verificar estado de registro)');
+      return;
+    }
+
+    // Verificar estado de registro - SOLO PARA USUARIOS NO SUPER ADMIN
     if (isRegistrationPending) {
       console.log('⏳ Usuario con registro pendiente - BLOQUEANDO ACCESO');
       toast.error('Tu solicitud de registro está pendiente de aprobación. No puedes acceder al sistema hasta que sea aprobada.');
@@ -59,12 +65,6 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       console.log('❌ Usuario con registro rechazado - BLOQUEANDO ACCESO');
       toast.error('Tu solicitud de registro fue rechazada. No puedes acceder al sistema.');
       router.push('/login');
-      return;
-    }
-
-    // Super admin siempre tiene acceso total
-    if (userProfile.role === 'super_admin') {
-      console.log('✅ Super Admin - Acceso total concedido');
       return;
     }
 

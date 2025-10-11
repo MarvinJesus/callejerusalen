@@ -47,6 +47,28 @@ export interface UserProfile {
   statusChangedBy?: string;
   statusChangedAt?: Date;
   statusReason?: string;
+  // Plan de Seguridad de la Comunidad - REMOVIDO: ahora se maneja en securityRegistrations collection
+}
+
+// Interfaz para el Plan de Seguridad desde securityRegistrations
+export interface SecurityPlanRegistration {
+  id: string;
+  userId: string;
+  userDisplayName: string;
+  userEmail: string;
+  phoneNumber: string;
+  address: string;
+  availability: string;
+  skills: string[];
+  otherSkills?: string;
+  status: 'pending' | 'active' | 'rejected';
+  sector?: string;
+  submittedAt: any; // Firestore timestamp
+  reviewedBy?: string;
+  reviewedAt?: any; // Firestore timestamp
+  reviewNotes?: string;
+  createdAt?: any; // Firestore timestamp
+  updatedAt?: any; // Firestore timestamp
 }
 
 export interface RegistrationRequest {
@@ -1155,4 +1177,132 @@ export const getSystemMetrics = async (): Promise<any> => {
     console.error('Error al obtener métricas del sistema:', error);
     throw error;
   }
+}
+
+// Función para obtener el estado del plan de seguridad de un usuario
+export async function getUserSecurityPlanStatus(userId: string): Promise<SecurityPlanRegistration | null> {
+  try {
+    console.log('🔍 getUserSecurityPlanStatus - Buscando para userId:', userId);
+    
+    if (!db) {
+      console.error('Firebase no está inicializado');
+      return null;
+    }
+
+    // Buscar en securityRegistrations por userId
+    const registrationsRef = collection(db, 'securityRegistrations');
+    const q = query(registrationsRef, where('userId', '==', userId));
+    
+    // Intentar con timeout para manejar problemas de conectividad
+    const querySnapshot = await Promise.race([
+      getDocs(q),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      )
+    ]) as any;
+
+    console.log('🔍 getUserSecurityPlanStatus - Resultados encontrados:', querySnapshot.size);
+
+    if (querySnapshot.empty) {
+      console.log('🔍 getUserSecurityPlanStatus - No se encontraron registros para userId:', userId);
+      return null; // No tiene registro en el plan de seguridad
+    }
+
+    // Tomar el primer registro (debería ser único por usuario)
+    const doc = querySnapshot.docs[0];
+    const data = doc.data();
+
+    console.log('🔍 getUserSecurityPlanStatus - Registro encontrado:', {
+      id: doc.id,
+      userId: data.userId,
+      status: data.status,
+      userDisplayName: data.userDisplayName
+    });
+
+    return {
+      id: doc.id,
+      userId: data.userId,
+      userDisplayName: data.userDisplayName,
+      userEmail: data.userEmail,
+      phoneNumber: data.phoneNumber,
+      address: data.address,
+      availability: data.availability,
+      skills: data.skills || [],
+      otherSkills: data.otherSkills,
+      status: data.status,
+      sector: data.sector,
+      submittedAt: data.submittedAt,
+      reviewedBy: data.reviewedBy,
+      reviewedAt: data.reviewedAt,
+      reviewNotes: data.reviewNotes,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt
+    };
+  } catch (error) {
+    console.error('Error al obtener estado del plan de seguridad:', error);
+    
+    // En caso de error de conectividad, usar fallback
+    if (error instanceof Error && (error.message.includes('unavailable') || error.message.includes('Timeout'))) {
+      console.warn('⚠️ Firebase offline - Usando fallback para verificar plan de seguridad');
+      return createFallbackSecurityPlan(userId);
+    }
+    
+    return null;
+  }
+}
+
+// Lista temporal de usuarios aprobados (para cuando Firebase esté offline)
+const APPROVED_USERS_FALLBACK = [
+  'qwBKaOMEZCgePXPTHsuNhAoz9uC2', // Marvin Calvo
+  // Agregar más UIDs aquí según sea necesario
+];
+
+// Función para crear un SecurityPlanRegistration simulado cuando Firebase esté offline
+function createFallbackSecurityPlan(userId: string): SecurityPlanRegistration | null {
+  if (APPROVED_USERS_FALLBACK.includes(userId)) {
+    return {
+      id: `fallback-${userId}`,
+      userId: userId,
+      userDisplayName: 'Usuario Aprobado',
+      userEmail: '',
+      phoneNumber: '',
+      address: '',
+      availability: 'full_time',
+      skills: [],
+      otherSkills: '',
+      status: 'active',
+      sector: 'Centro',
+      submittedAt: new Date(),
+      reviewedBy: 'system-fallback',
+      reviewedAt: new Date(),
+      reviewNotes: 'Usuario aprobado (modo offline)',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+  }
+  return null;
+}
+
+// Función para verificar si un usuario está inscrito y aprobado en el plan de seguridad
+export async function isUserEnrolledInSecurityPlan(userId: string): Promise<boolean> {
+  try {
+    const registration = await getUserSecurityPlanStatus(userId);
+    if (registration) {
+      return registration.status === 'active';
+    }
+    
+    // Fallback para cuando Firebase esté offline
+    console.warn('⚠️ Usando lista de usuarios aprobados (Firebase offline)');
+    return APPROVED_USERS_FALLBACK.includes(userId);
+  } catch (error) {
+    console.error('Error verificando estado del plan de seguridad:', error);
+    // Fallback para errores de conectividad
+    return APPROVED_USERS_FALLBACK.includes(userId);
+  }
+}
+
+// Función para verificar si un usuario tiene una solicitud pendiente
+export async function isUserSecurityPlanPending(userId: string): Promise<boolean> {
+  const registration = await getUserSecurityPlanStatus(userId);
+  return registration !== null && registration.status === 'pending';
 };

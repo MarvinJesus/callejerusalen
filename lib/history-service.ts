@@ -249,12 +249,12 @@ export async function getHistoryPageDataById(id: string): Promise<HistoryPageDat
     const historyRef = db.collection('history').doc(id);
     const historySnap = await historyRef.get();
     
-    if (!historySnap.exists()) {
+    if (!historySnap.exists) {
       console.log(`❌ Datos de historia ${id} no encontrados`);
       return null;
     }
     
-    const data = historySnap.data();
+    const data = historySnap.data()!;
     const historyData: HistoryPageData = {
       id: historySnap.id,
       title: data.title || 'Historia de Calle Jerusalén',

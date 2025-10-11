@@ -35,7 +35,9 @@ import {
   Map,
   Store,
   Navigation,
-  Search
+  Search,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import { 
   getAllUsers, 
@@ -96,6 +98,7 @@ const AdminDashboard: React.FC = () => {
   const [historyData, setHistoryData] = useState<any>(null);
   const [eventStats, setEventStats] = useState<{[key: string]: any}>({});
   const [mapPlaces, setMapPlaces] = useState<any[]>([]);
+  const [securityRegistrations, setSecurityRegistrations] = useState<any[]>([]);
 
   // Función para verificar si el usuario es super admin
   const isSuperAdmin = () => {
@@ -384,6 +387,20 @@ const AdminDashboard: React.FC = () => {
         setConnectionStatus('error');
       }
       
+      // Obtener registros de seguridad
+      let securityRegsData: any[] = [];
+      try {
+        const securityResponse = await fetch('/api/security-registrations');
+        if (securityResponse.ok) {
+          const securityData = await securityResponse.json();
+          securityRegsData = securityData.registrations || [];
+          console.log('🛡️ Registros de seguridad obtenidos:', securityRegsData.length);
+        }
+      } catch (error) {
+        console.warn('⚠️ Error al obtener registros de seguridad, continuando sin ellos:', error);
+        securityRegsData = [];
+      }
+      
       // Usar métricas del servidor si están disponibles, sino calcular localmente
       const finalMetrics = serverMetrics || {
         users: {
@@ -416,10 +433,12 @@ const AdminDashboard: React.FC = () => {
       setPendingRegistrations(registrationsData);
       setSystemLogs(logsData);
       setMetrics(finalMetrics);
+      setSecurityRegistrations(securityRegsData);
       
       console.log('✅ Métricas finales establecidas:', finalMetrics);
       console.log('✅ Usuarios establecidos en estado:', usersData.length);
       console.log('✅ Métricas establecidas en estado:', finalMetrics.users.total);
+      console.log('✅ Registros de seguridad establecidos:', securityRegsData.length);
     } catch (error) {
       console.error('Error al cargar datos del dashboard:', error);
       // En caso de error, establecer métricas por defecto
@@ -1525,49 +1544,138 @@ const AdminDashboard: React.FC = () => {
      </div>
    );
 
-   const renderSecurity = () => (
-     <div className="space-y-6">
-       <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
-         <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitoreo de Seguridad</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center space-x-3 mb-3">
-              <Camera className="w-6 h-6 text-green-600" />
-              <h4 className="font-medium text-gray-900">Cámaras de Seguridad</h4>
+  const renderSecurity = () => {
+    // Calcular estadísticas del Plan de Seguridad desde securityRegistrations
+    const totalRegistrations = securityRegistrations.length;
+    const pendingRequests = securityRegistrations.filter(r => r.status === 'pending').length;
+    const approvedRequests = securityRegistrations.filter(r => r.status === 'active').length;
+    const rejectedRequests = securityRegistrations.filter(r => r.status === 'rejected').length;
+
+    return (
+      <div className="space-y-6">
+        {/* Plan de Seguridad de la Comunidad */}
+        <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <Shield className="w-5 h-5 mr-2 text-green-600" />
+                Plan de Seguridad de la Comunidad
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">Gestiona solicitudes de inscripción al plan</p>
             </div>
-            <p className="text-sm text-gray-600 mb-2">12 cámaras activas</p>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>Estado del sistema</span>
-                <span className="text-green-600">Operativo</span>
+            <Link 
+              href="/admin/plan-seguridad"
+              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Shield className="w-4 h-4" />
+              <span>Gestionar Solicitudes</span>
+            </Link>
+          </div>
+
+          {/* Estadísticas del Plan */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between mb-2">
+                <Users className="w-5 h-5 text-blue-600" />
+                <span className="text-xs text-blue-600 font-medium">Total</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span>Última verificación</span>
-                <span>Hace 2 minutos</span>
+              <p className="text-2xl font-bold text-blue-900">{totalRegistrations}</p>
+              <p className="text-xs text-blue-700">Solicitudes totales</p>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
+              <div className="flex items-center justify-between mb-2">
+                <Clock className="w-5 h-5 text-yellow-600" />
+                <span className="text-xs text-yellow-600 font-medium">Pendientes</span>
               </div>
+              <p className="text-2xl font-bold text-yellow-900">{pendingRequests}</p>
+              <p className="text-xs text-yellow-700">Por revisar</p>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+              <div className="flex items-center justify-between mb-2">
+                <Check className="w-5 h-5 text-green-600" />
+                <span className="text-xs text-green-600 font-medium">Aprobados</span>
+              </div>
+              <p className="text-2xl font-bold text-green-900">{approvedRequests}</p>
+              <p className="text-xs text-green-700">Con acceso activo</p>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-lg border border-red-200">
+              <div className="flex items-center justify-between mb-2">
+                <X className="w-5 h-5 text-red-600" />
+                <span className="text-xs text-red-600 font-medium">Rechazados</span>
+              </div>
+              <p className="text-2xl font-bold text-red-900">{rejectedRequests}</p>
+              <p className="text-xs text-red-700">Sin acceso</p>
             </div>
           </div>
-          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="flex items-center space-x-3 mb-3">
-              <Bell className="w-6 h-6 text-red-600" />
-              <h4 className="font-medium text-gray-900">Alertas de Pánico</h4>
-            </div>
-            <p className="text-sm text-gray-600 mb-2">3 alertas en las últimas 24h</p>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>Tiempo promedio respuesta</span>
-                <span>2.3 minutos</span>
+
+          {/* Acciones rápidas */}
+          {pendingRequests > 0 && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start space-x-3">
+              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-yellow-900">
+                  Tienes {pendingRequests} solicitud{pendingRequests !== 1 ? 'es' : ''} pendiente{pendingRequests !== 1 ? 's' : ''} de revisión
+                </p>
+                <p className="text-xs text-yellow-700 mt-1">
+                  Los usuarios están esperando aprobación para acceder a las funciones de seguridad
+                </p>
               </div>
-              <div className="flex justify-between text-xs">
-                <span>Última alerta</span>
-                <span>Hace 15 minutos</span>
+              <Link 
+                href="/admin/plan-seguridad"
+                className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium whitespace-nowrap"
+              >
+                Revisar Ahora
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Monitoreo de Seguridad */}
+        <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitoreo de Seguridad</h3>
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center space-x-3 mb-3">
+                <Camera className="w-6 h-6 text-green-600" />
+                <h4 className="font-medium text-gray-900">Cámaras de Seguridad</h4>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">12 cámaras activas</p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>Estado del sistema</span>
+                  <span className="text-green-600">Operativo</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Última verificación</span>
+                  <span>Hace 2 minutos</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center space-x-3 mb-3">
+                <Bell className="w-6 h-6 text-red-600" />
+                <h4 className="font-medium text-gray-900">Alertas de Pánico</h4>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">3 alertas en las últimas 24h</p>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>Tiempo promedio respuesta</span>
+                  <span>2.3 minutos</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Última alerta</span>
+                  <span>Hace 15 minutos</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderHistory = () => (
     <div className="space-y-6">
