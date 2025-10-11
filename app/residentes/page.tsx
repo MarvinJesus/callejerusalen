@@ -1,17 +1,20 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
-import { Shield, Camera, AlertTriangle, Users, MapPin, Bell, Settings, ArrowLeft, Sparkles, Lock } from 'lucide-react';
+import { Shield, Camera, AlertTriangle, Users, MapPin, Bell, Settings, ArrowLeft, Sparkles, Lock, Clock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import SecurityPlanModal from '@/components/SecurityPlanModal';
 
 const ResidentesPage: React.FC = () => {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, securityPlan } = useAuth();
   const router = useRouter();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const isEnrolledInSecurityPlan = userProfile?.securityPlan?.enrolled || false;
+  const isEnrolledInSecurityPlan = securityPlan !== null && securityPlan.status === 'active';
+  const isAlreadyEnrolled = securityPlan !== null;
 
   const features = [
     {
@@ -179,29 +182,76 @@ const ResidentesPage: React.FC = () => {
                 <h2 className="text-3xl md:text-4xl font-bold text-white leading-tight">
                   {user ? `¡Bienvenido, ${userProfile?.displayName?.split(' ')[0] || user?.displayName?.split(' ')[0] || 'Residente'}!` : 'Bienvenido a Calle Jerusalén'}
                 </h2>
-                <p className="text-green-50 text-lg max-w-2xl leading-relaxed">
-                  {user 
-                    ? 'Tu seguridad es nuestra prioridad. Accede a todas las herramientas de monitoreo y comunicación de la comunidad.'
-                    : 'Descubre nuestro ecosistema de seguridad comunitaria. Regístrate para acceder a todas las funcionalidades.'
-                  }
-                </p>
-                {!user && (
-                  <div className="flex flex-wrap gap-3 pt-2">
-                    <Link
-                      href="/login"
-                      className="group inline-flex items-center px-6 py-3 bg-white text-green-600 font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
-                    >
-                      <span>Iniciar Sesión</span>
-                      <ArrowLeft className="w-4 h-4 ml-2 rotate-180 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-                    <Link
-                      href="/register"
-                      className="group inline-flex items-center px-6 py-3 border-2 border-white text-white font-semibold rounded-xl hover:bg-white hover:text-green-600 transition-all duration-300"
-                    >
-                      <Shield className="w-4 h-4 mr-2" />
-                      <span>Registrarse</span>
-                    </Link>
+                
+                {/* Mostrar mensaje según estado de inscripción */}
+                {user && securityPlan && securityPlan.status === 'pending' ? (
+                  <div className="space-y-3">
+                    <p className="text-green-50 text-lg max-w-2xl leading-relaxed">
+                      Tu solicitud al <span className="font-bold text-yellow-300">Plan de Seguridad de la Comunidad</span> está 
+                      <span className="font-bold text-yellow-300"> pendiente de aprobación</span> por un administrador.
+                      Te notificaremos cuando sea revisada.
+                    </p>
+                    <div className="inline-flex items-center space-x-2 bg-yellow-500/20 backdrop-blur-sm px-4 py-2 rounded-full border border-yellow-300">
+                      <Clock className="w-5 h-5 text-yellow-300" />
+                      <span className="text-sm font-medium text-yellow-100">Solicitud en Revisión</span>
+                    </div>
                   </div>
+                ) : user && securityPlan && securityPlan.status === 'rejected' ? (
+                  <div className="space-y-3">
+                    <p className="text-green-50 text-lg max-w-2xl leading-relaxed">
+                      Tu solicitud al Plan de Seguridad fue <span className="font-bold text-red-300">rechazada</span>.
+                      {securityPlan.reviewNotes && (
+                        <span className="block mt-2 text-base">
+                          Razón: {securityPlan.reviewNotes}
+                        </span>
+                      )}
+                      Contacta al administrador para más información o para volver a solicitar.
+                    </p>
+                  </div>
+                ) : user && !isEnrolledInSecurityPlan && !isAlreadyEnrolled ? (
+                  <div className="space-y-3">
+                    <p className="text-green-50 text-lg max-w-2xl leading-relaxed">
+                      Para acceder a las funciones de seguridad (cámaras, botón de pánico, alertas), únete al 
+                      <span className="font-bold text-yellow-300"> Plan de Seguridad de la Comunidad</span>. 
+                      Mantengámonos conectados e informados a través de la tecnología.
+                    </p>
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="group inline-flex items-center px-6 py-3 bg-white text-green-600 font-bold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
+                      >
+                        <Shield className="w-5 h-5 mr-2" />
+                        <span>Inscribirme en el Plan de Seguridad</span>
+                        <ArrowLeft className="w-4 h-4 ml-2 rotate-180 group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  </div>
+                ) : user ? (
+                  <p className="text-green-50 text-lg max-w-2xl leading-relaxed">
+                    Tu seguridad es nuestra prioridad. Accede a todas las herramientas de monitoreo y comunicación de la comunidad.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-green-50 text-lg max-w-2xl leading-relaxed">
+                      Descubre nuestro ecosistema de seguridad comunitaria. Regístrate para acceder a todas las funcionalidades.
+                    </p>
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      <Link
+                        href="/login"
+                        className="group inline-flex items-center px-6 py-3 bg-white text-green-600 font-semibold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
+                      >
+                        <span>Iniciar Sesión</span>
+                        <ArrowLeft className="w-4 h-4 ml-2 rotate-180 group-hover:translate-x-1 transition-transform" />
+                      </Link>
+                      <Link
+                        href="/register"
+                        className="group inline-flex items-center px-6 py-3 border-2 border-white text-white font-semibold rounded-xl hover:bg-white hover:text-green-600 transition-all duration-300"
+                      >
+                        <Shield className="w-4 h-4 mr-2" />
+                        <span>Registrarse</span>
+                      </Link>
+                    </div>
+                  </>
                 )}
               </div>
               <div className="hidden lg:block">
@@ -215,34 +265,6 @@ const ResidentesPage: React.FC = () => {
             </div>
           </div>
         </div>
-
-        {/* Security Plan Banner - Show if user is logged in but not enrolled */}
-        {user && !isEnrolledInSecurityPlan && (
-          <div className="relative overflow-hidden bg-gradient-to-br from-amber-500 via-orange-500 to-red-500 rounded-2xl p-8 shadow-2xl mb-8">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-400/30 rounded-full blur-3xl"></div>
-            <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between space-y-4 md:space-y-0">
-              <div className="flex items-start space-x-4 flex-1">
-                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center flex-shrink-0">
-                  <Shield className="w-8 h-8 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-2xl font-bold text-white mb-2">Plan de Seguridad de la Comunidad</h3>
-                  <p className="text-orange-50 leading-relaxed max-w-2xl">
-                    Para acceder a las funciones de seguridad (cámaras, botón de pánico, alertas), debes inscribirte en nuestro 
-                    Plan de Seguridad Comunitaria. Únete y mantengámonos conectados e informados a través de la tecnología.
-                  </p>
-                </div>
-              </div>
-              <Link
-                href="/residentes/seguridad/inscribirse"
-                className="group inline-flex items-center px-6 py-3 bg-white text-orange-600 font-bold rounded-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 whitespace-nowrap"
-              >
-                <Sparkles className="w-5 h-5 mr-2 group-hover:animate-pulse" />
-                <span>Inscribirme Ahora</span>
-              </Link>
-            </div>
-          </div>
-        )}
 
         {/* Features Grid with Enhanced Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -295,16 +317,16 @@ const ResidentesPage: React.FC = () => {
                     <p className="text-gray-600 text-sm leading-relaxed mb-4">
                       {feature.description}
                     </p>
-                    <div className="inline-flex items-center space-x-1.5 bg-orange-50 text-orange-700 text-xs font-medium px-3 py-1.5 rounded-full border border-orange-200 mb-3">
+                    <div className="inline-flex items-center space-x-1.5 bg-orange-50 text-orange-700 text-xs font-medium px-3 py-1.5 rounded-full border border-orange-200">
                       <Shield className="w-3 h-3" />
                       <span>Requiere Plan de Seguridad</span>
                     </div>
-                    <Link
-                      href="/residentes/seguridad/inscribirse"
-                      className="block text-sm font-semibold text-orange-600 hover:text-orange-700 transition-colors"
-                    >
-                      Inscribirme en el plan →
-                    </Link>
+                    {securityPlan?.status === 'pending' && (
+                      <p className="text-sm text-orange-600 mt-3">Solicitud en revisión...</p>
+                    )}
+                    {securityPlan?.status === 'rejected' && (
+                      <p className="text-sm text-red-600 mt-3">Solicitud rechazada</p>
+                    )}
                   </div>
                 ) : feature.available && feature.requiresAuth && !user ? (
                   <div className="relative h-full bg-white rounded-2xl p-6 border-2 border-gray-200 shadow-sm">
@@ -467,6 +489,15 @@ const ResidentesPage: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Modal de Inscripción al Plan de Seguridad */}
+        <SecurityPlanModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={() => {
+            // El modal recargará la página automáticamente
+          }}
+        />
       </div>
     </div>
   );

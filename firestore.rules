@@ -19,14 +19,16 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
     }
     
-    // Función para verificar si está inscrito en el Plan de Seguridad
+    // Función para verificar si está inscrito Y APROBADO en el Plan de Seguridad
+    // Ahora busca en la colección securityRegistrations
     function isEnrolledInSecurityPlan() {
       return request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.securityPlan.enrolled == true;
+        exists(/databases/$(database)/documents/securityRegistrations/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/securityRegistrations/$(request.auth.uid)).data.status == 'active';
     }
     
     // Función para verificar si tiene acceso a funciones de seguridad
-    // Requiere ser residente/admin y estar inscrito en el plan (o ser admin/super_admin)
+    // Requiere ser residente/admin y estar inscrito Y APROBADO en el plan (o ser admin/super_admin)
     function hasSecurityAccess() {
       return request.auth != null && 
         (isAdminOrSuperAdmin() || 
@@ -85,6 +87,14 @@ service cloud.firestore {
     match /registrationRequests/{requestId} {
       allow create: if request.auth != null && request.auth.uid == requestId;
       allow read, update, delete: if isSuperAdmin();
+    }
+    
+    // Registros del Plan de Seguridad - usuarios pueden crear sus propias solicitudes, admins pueden gestionar todas
+    match /securityRegistrations/{registrationId} {
+      allow create: if request.auth != null && request.auth.uid == registrationId;
+      allow read: if request.auth != null && 
+        (request.auth.uid == registrationId || isAdminOrSuperAdmin());
+      allow update, delete: if isAdminOrSuperAdmin();
     }
   }
 }

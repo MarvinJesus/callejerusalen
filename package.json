@@ -22,7 +22,10 @@
     "deploy:windows": "powershell -ExecutionPolicy Bypass -File scripts/deploy-to-vercel.ps1",
     "deploy:linux": "bash scripts/deploy-to-vercel.sh",
     "security-plan:enroll": "node scripts/enroll-user-security-plan.js",
-    "security-plan:enroll-all": "node scripts/enroll-user-security-plan.js --all"
+    "security-plan:enroll-all": "node scripts/enroll-user-security-plan.js --all",
+    "security-plan:sync": "node scripts/sync-security-plan-status.js",
+    "security-plan:clean": "node scripts/clean-security-plan-field.js",
+    "check-user-status": "node scripts/check-user-security-status.js"
   },
   "dependencies": {
     "dotenv": "^17.2.2",

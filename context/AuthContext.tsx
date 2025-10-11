@@ -3,11 +3,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { getUserProfile, UserProfile, UserRole } from '@/lib/auth';
+import { getUserProfile, UserProfile, UserRole, getUserSecurityPlanStatus, SecurityPlanRegistration } from '@/lib/auth';
 
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
+  securityPlan: SecurityPlanRegistration | null;
   loading: boolean;
   updateUserRole: (newRole: UserRole) => Promise<void>;
   loginAsGuest: () => void;
@@ -20,6 +21,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   userProfile: null,
+  securityPlan: null,
   loading: true,
   updateUserRole: async () => {},
   loginAsGuest: () => {},
@@ -44,6 +46,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [securityPlan, setSecurityPlan] = useState<SecurityPlanRegistration | null>(null);
   const [loading, setLoading] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
   const [isRegistrationPending, setIsRegistrationPending] = useState(false);
@@ -93,6 +96,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 await auth.signOut();
                 setUser(null);
                 setUserProfile(null);
+                setSecurityPlan(null);
                 setIsRegistrationPending(false);
                 setIsRegistrationRejected(false);
                 setLoading(false);
@@ -109,6 +113,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             setIsRegistrationPending(isPending);
             setIsRegistrationRejected(isRejected);
             
+            // Cargar estado del plan de seguridad desde securityRegistrations
+            try {
+              const securityPlanData = await getUserSecurityPlanStatus(user.uid);
+              setSecurityPlan(securityPlanData);
+            } catch (securityError) {
+              console.error('Error al cargar plan de seguridad:', securityError);
+              setSecurityPlan(null);
+            }
+            
             // Log del estado para debugging
             console.log('🔍 Estado de registro detectado:', {
               email: profile.email,
@@ -119,17 +132,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               isRejected
             });
           } else {
+            setSecurityPlan(null);
             setIsRegistrationPending(false);
             setIsRegistrationRejected(false);
           }
         } catch (error) {
           console.error('Error al cargar perfil del usuario:', error);
           setUserProfile(null);
+          setSecurityPlan(null);
           setIsRegistrationPending(false);
           setIsRegistrationRejected(false);
         }
       } else {
         setUserProfile(null);
+        setSecurityPlan(null);
         setIsRegistrationPending(false);
         setIsRegistrationRejected(false);
       }
@@ -164,12 +180,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logoutGuest = () => {
     setUserProfile(null);
+    setSecurityPlan(null);
     setIsGuest(false);
   };
 
   const value: AuthContextType = {
     user,
     userProfile,
+    securityPlan,
     loading,
     updateUserRole,
     loginAsGuest,

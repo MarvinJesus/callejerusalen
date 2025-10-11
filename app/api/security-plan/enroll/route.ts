@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { adminDb, admin } from '@/lib/firebase-admin';
 
 export async function POST(request: NextRequest) {
   try {
-    const { uid, agreedToTerms } = await request.json();
+    const { 
+      uid, 
+      agreedToTerms,
+      phoneNumber,
+      address,
+      availability,
+      skills,
+      otherSkills 
+    } = await request.json();
 
     if (!uid) {
       return NextResponse.json(
@@ -20,11 +27,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar que el usuario existe
-    const userRef = doc(db, 'users', uid);
-    const userDoc = await getDoc(userRef);
+    if (!phoneNumber || !address || !availability) {
+      return NextResponse.json(
+        { error: 'Todos los campos son requeridos' },
+        { status: 400 }
+      );
+    }
 
-    if (!userDoc.exists()) {
+    if (!skills || skills.length === 0) {
+      return NextResponse.json(
+        { error: 'Debes seleccionar al menos una habilidad' },
+        { status: 400 }
+      );
+    }
+
+    // Verificar que el usuario existe
+    const userRef = adminDb.collection('users').doc(uid);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists) {
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 404 }
@@ -34,7 +55,7 @@ export async function POST(request: NextRequest) {
     const userData = userDoc.data();
 
     // Verificar que el usuario sea de tipo comunidad
-    if (userData.role !== 'comunidad' && userData.role !== 'admin' && userData.role !== 'super_admin') {
+    if (!userData || (userData.role !== 'comunidad' && userData.role !== 'admin' && userData.role !== 'super_admin')) {
       return NextResponse.json(
         { error: 'Solo los residentes pueden inscribirse en el Plan de Seguridad' },
         { status: 403 }
@@ -49,23 +70,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // IMPORTANTE: Verificar que NO esté ya inscrito
+    if (userData.securityPlan && userData.securityPlan.enrolled) {
+      const status = userData.securityPlan.status;
+      if (status === 'pending') {
+        return NextResponse.json(
+          { error: 'Ya tienes una solicitud pendiente de aprobación' },
+          { status: 400 }
+        );
+      } else if (status === 'approved') {
+        return NextResponse.json(
+          { error: 'Ya estás inscrito en el Plan de Seguridad' },
+          { status: 400 }
+        );
+      } else if (status === 'rejected') {
+        return NextResponse.json(
+          { error: 'Tu solicitud fue rechazada. Contacta al administrador para volver a aplicar' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Actualizar el perfil del usuario con la inscripción al plan
-    await updateDoc(userRef, {
-      securityPlan: {
-        enrolled: true,
-        enrolledAt: new Date(),
-        agreedToTerms: true,
-      },
-      updatedAt: new Date(),
+    // IMPORTANTE: La inscripción queda como 'pending' hasta que un admin la apruebe
+    await userRef.update({
+      'securityPlan.enrolled': true,
+      'securityPlan.enrolledAt': admin.firestore.FieldValue.serverTimestamp(),
+      'securityPlan.agreedToTerms': true,
+      'securityPlan.phoneNumber': phoneNumber,
+      'securityPlan.address': address,
+      'securityPlan.availability': availability,
+      'securityPlan.skills': skills,
+      'securityPlan.otherSkills': otherSkills || '',
+      'securityPlan.status': 'pending',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     return NextResponse.json({
       success: true,
-      message: '¡Te has inscrito exitosamente en el Plan de Seguridad de la Comunidad!',
+      message: '¡Tu solicitud ha sido enviada! Un administrador la revisará pronto.',
       securityPlan: {
         enrolled: true,
-        enrolledAt: new Date(),
-        agreedToTerms: true,
+        status: 'pending',
+        phoneNumber,
+        address,
+        availability,
+        skills,
+        otherSkills: otherSkills || '',
       },
     });
   } catch (error) {

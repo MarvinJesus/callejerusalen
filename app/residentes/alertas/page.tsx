@@ -22,10 +22,10 @@ interface Alert {
 }
 
 const AlertsPage: React.FC = () => {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, securityPlan, loading } = useAuth();
   const router = useRouter();
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [alertsLoading, setAlertsLoading] = useState(true);
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportForm, setReportForm] = useState({
     title: '',
@@ -37,22 +37,65 @@ const AlertsPage: React.FC = () => {
 
   // Verificar inscripción en el Plan de Seguridad
   useEffect(() => {
+    console.log('🔍 AlertasPage - Verificando acceso:', {
+      user: user?.email,
+      userProfile: userProfile?.email,
+      securityPlan: securityPlan,
+      securityPlanStatus: securityPlan?.status,
+      loading: loading
+    });
+
+    // No hacer verificaciones hasta que se carguen todos los datos
+    if (loading) {
+      console.log('⏳ AlertasPage - Aún cargando datos...');
+      return;
+    }
+
     if (!user) {
       router.push('/login');
       return;
     }
 
-    // Verificar si el usuario está inscrito en el plan de seguridad
-    const isEnrolled = userProfile?.securityPlan?.enrolled;
+    // Verificar si el usuario está inscrito Y aprobado en el plan de seguridad
+    const isEnrolled = securityPlan !== null;
+    const isApproved = securityPlan?.status === 'active';
     const isAdminOrSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
 
-    if (!isEnrolled && !isAdminOrSuperAdmin) {
-      toast.error('Debes inscribirte en el Plan de Seguridad para acceder a esta función');
-      setTimeout(() => {
-        router.push('/residentes/seguridad/inscribirse');
-      }, 2000);
+    console.log('🔍 AlertasPage - Verificaciones:', {
+      isAdminOrSuperAdmin,
+      isEnrolled,
+      isApproved,
+      userRole: userProfile?.role
+    });
+
+    if (!isAdminOrSuperAdmin) {
+      if (!isEnrolled) {
+        console.log('❌ Usuario no inscrito en plan de seguridad');
+        toast.error('Debes inscribirte en el Plan de Seguridad para acceder a esta función');
+        setTimeout(() => {
+          router.push('/residentes');
+        }, 2000);
+        return;
+      }
+
+      if (!isApproved) {
+        console.log('❌ Usuario inscrito pero no aprobado, status:', securityPlan?.status);
+        if (securityPlan?.status === 'pending') {
+          toast.error('Tu inscripción está pendiente de aprobación por un administrador');
+        } else if (securityPlan?.status === 'rejected') {
+          toast.error('Tu inscripción fue rechazada. Contacta al administrador');
+        } else {
+          toast.error('Debes ser aprobado en el Plan de Seguridad para acceder a esta función');
+        }
+        setTimeout(() => {
+          router.push('/residentes');
+        }, 2000);
+        return;
+      }
     }
-  }, [user, userProfile, router]);
+
+    console.log('✅ AlertasPage - Acceso concedido');
+  }, [user, userProfile, securityPlan, loading, router]);
 
   // Datos de ejemplo para alertas
   const sampleAlerts: Alert[] = [
@@ -105,9 +148,21 @@ const AlertsPage: React.FC = () => {
     // Simular carga de datos
     setTimeout(() => {
       setAlerts(sampleAlerts);
-      setLoading(false);
+      setAlertsLoading(false);
     }, 1000);
   }, []);
+
+  // Mostrar pantalla de carga mientras se verifican los datos
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Verificando acceso al sistema de alertas...</p>
+        </div>
+      </div>
+    );
+  }
 
   const getAlertIcon = (type: Alert['type']) => {
     switch (type) {

@@ -22,7 +22,7 @@ interface PanicReport {
 }
 
 const PanicPage: React.FC = () => {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, securityPlan, loading } = useAuth();
   const router = useRouter();
   const [isPanicActive, setIsPanicActive] = useState(false);
   const [panicCountdown, setPanicCountdown] = useState(0);
@@ -32,22 +32,65 @@ const PanicPage: React.FC = () => {
 
   // Verificar inscripción en el Plan de Seguridad
   useEffect(() => {
+    console.log('🔍 PanicoPage - Verificando acceso:', {
+      user: user?.email,
+      userProfile: userProfile?.email,
+      securityPlan: securityPlan,
+      securityPlanStatus: securityPlan?.status,
+      loading: loading
+    });
+
+    // No hacer verificaciones hasta que se carguen todos los datos
+    if (loading) {
+      console.log('⏳ PanicoPage - Aún cargando datos...');
+      return;
+    }
+
     if (!user) {
       router.push('/login');
       return;
     }
 
-    // Verificar si el usuario está inscrito en el plan de seguridad
-    const isEnrolled = userProfile?.securityPlan?.enrolled;
+    // Verificar si el usuario está inscrito Y aprobado en el plan de seguridad
+    const isEnrolled = securityPlan !== null;
+    const isApproved = securityPlan?.status === 'active';
     const isAdminOrSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
 
-    if (!isEnrolled && !isAdminOrSuperAdmin) {
-      toast.error('Debes inscribirte en el Plan de Seguridad para acceder a esta función');
-      setTimeout(() => {
-        router.push('/residentes/seguridad/inscribirse');
-      }, 2000);
+    console.log('🔍 PanicoPage - Verificaciones:', {
+      isAdminOrSuperAdmin,
+      isEnrolled,
+      isApproved,
+      userRole: userProfile?.role
+    });
+
+    if (!isAdminOrSuperAdmin) {
+      if (!isEnrolled) {
+        console.log('❌ Usuario no inscrito en plan de seguridad');
+        toast.error('Debes inscribirte en el Plan de Seguridad para acceder a esta función');
+        setTimeout(() => {
+          router.push('/residentes');
+        }, 2000);
+        return;
+      }
+
+      if (!isApproved) {
+        console.log('❌ Usuario inscrito pero no aprobado, status:', securityPlan?.status);
+        if (securityPlan?.status === 'pending') {
+          toast.error('Tu inscripción está pendiente de aprobación por un administrador');
+        } else if (securityPlan?.status === 'rejected') {
+          toast.error('Tu inscripción fue rechazada. Contacta al administrador');
+        } else {
+          toast.error('Debes ser aprobado en el Plan de Seguridad para acceder a esta función');
+        }
+        setTimeout(() => {
+          router.push('/residentes');
+        }, 2000);
+        return;
+      }
     }
-  }, [user, userProfile, router]);
+
+    console.log('✅ PanicoPage - Acceso concedido');
+  }, [user, userProfile, securityPlan, loading, router]);
 
   // Números de emergencia
   const emergencyContacts = [
@@ -87,6 +130,43 @@ const PanicPage: React.FC = () => {
     setRecentReports(sampleReports);
   }, []);
 
+  // Función para manejar la activación del pánico
+  const handlePanicActivation = async () => {
+    if (!user || !userProfile) {
+      toast.error('Debes estar autenticado para usar el botón de pánico');
+      return;
+    }
+
+    try {
+      // Crear reporte de pánico en Firestore
+      const panicReport: Omit<PanicReport, 'id'> = {
+        userId: user.uid,
+        userName: userProfile.displayName || user.displayName || 'Usuario',
+        userEmail: userProfile.email || user.email || '',
+        location: location || 'Ubicación no especificada',
+        description: description || 'Emergencia reportada',
+        timestamp: serverTimestamp(),
+        status: 'active',
+        emergencyContacts: ['911', '+1 (555) 911-0000']
+      };
+
+      const docRef = await addDoc(collection(db, 'panicReports'), panicReport);
+      
+      setIsPanicActive(true);
+      toast.success('¡Alerta de emergencia enviada! Las autoridades han sido notificadas.');
+      
+      // Actualizar la lista de reportes recientes
+      setRecentReports(prev => [{
+        ...panicReport,
+        id: docRef.id
+      } as PanicReport, ...prev.slice(0, 4)]); // Mantener solo los 5 más recientes
+      
+    } catch (error) {
+      console.error('Error al enviar reporte de pánico:', error);
+      toast.error('Error al enviar la alerta. Inténtalo de nuevo.');
+    }
+  };
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
@@ -107,51 +187,17 @@ const PanicPage: React.FC = () => {
     };
   }, [isPanicActive, panicCountdown]);
 
-  const handlePanicActivation = async () => {
-    if (!user || !userProfile) {
-      toast.error('Debes estar autenticado para usar el botón de pánico');
-      return;
-    }
-
-    try {
-      // Crear reporte de pánico en Firestore
-      const panicReport: Omit<PanicReport, 'id'> = {
-        userId: user.uid,
-        userName: userProfile.displayName,
-        userEmail: user.email || '',
-        location: location || 'Ubicación no especificada',
-        description: description || 'Emergencia reportada mediante botón de pánico',
-        timestamp: serverTimestamp(),
-        status: 'active',
-        emergencyContacts: ['911', '+1 (555) 911-0000']
-      };
-
-      // En una implementación real, aquí se guardaría en Firestore
-      // await addDoc(collection(db, 'panicReports'), panicReport);
-
-      // Simular envío de notificaciones
-      toast.success('¡Alerta de pánico activada! Las autoridades han sido notificadas.');
-      
-      // Agregar a reportes recientes
-      const newReport: PanicReport = {
-        ...panicReport,
-        id: Date.now().toString(),
-        timestamp: new Date()
-      };
-      setRecentReports(prev => [newReport, ...prev]);
-
-      // Resetear formulario
-      setLocation('');
-      setDescription('');
-      setIsPanicActive(false);
-      setPanicCountdown(0);
-
-    } catch (error) {
-      toast.error('Error al activar la alerta de pánico');
-      setIsPanicActive(false);
-      setPanicCountdown(0);
-    }
-  };
+  // Mostrar pantalla de carga mientras se verifican los datos
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-red-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Verificando acceso al sistema de emergencia...</p>
+        </div>
+      </div>
+    );
+  }
 
   const startPanicSequence = () => {
     if (!user) {
