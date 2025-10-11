@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { AlertTriangle, Phone, MapPin, Clock, Shield, CheckCircle } from 'lucide-react';
@@ -22,11 +23,31 @@ interface PanicReport {
 
 const PanicPage: React.FC = () => {
   const { user, userProfile } = useAuth();
+  const router = useRouter();
   const [isPanicActive, setIsPanicActive] = useState(false);
   const [panicCountdown, setPanicCountdown] = useState(0);
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
   const [recentReports, setRecentReports] = useState<PanicReport[]>([]);
+
+  // Verificar inscripción en el Plan de Seguridad
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    // Verificar si el usuario está inscrito en el plan de seguridad
+    const isEnrolled = userProfile?.securityPlan?.enrolled;
+    const isAdminOrSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+
+    if (!isEnrolled && !isAdminOrSuperAdmin) {
+      toast.error('Debes inscribirte en el Plan de Seguridad para acceder a esta función');
+      setTimeout(() => {
+        router.push('/residentes/seguridad/inscribirse');
+      }, 2000);
+    }
+  }, [user, userProfile, router]);
 
   // Números de emergencia
   const emergencyContacts = [

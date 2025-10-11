@@ -47,6 +47,12 @@ export interface UserProfile {
   statusChangedBy?: string;
   statusChangedAt?: Date;
   statusReason?: string;
+  // Plan de Seguridad de la Comunidad
+  securityPlan?: {
+    enrolled: boolean;
+    enrolledAt?: Date;
+    agreedToTerms?: boolean;
+  };
 }
 
 export interface RegistrationRequest {

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { collection, addDoc, getDocs, orderBy, query, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { AlertTriangle, Bell, Plus, Clock, User, MapPin, Phone } from 'lucide-react';
@@ -22,6 +23,7 @@ interface Alert {
 
 const AlertsPage: React.FC = () => {
   const { user, userProfile } = useAuth();
+  const router = useRouter();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [showReportForm, setShowReportForm] = useState(false);
@@ -32,6 +34,25 @@ const AlertsPage: React.FC = () => {
     location: '',
     contactPhone: '',
   });
+
+  // Verificar inscripción en el Plan de Seguridad
+  useEffect(() => {
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    // Verificar si el usuario está inscrito en el plan de seguridad
+    const isEnrolled = userProfile?.securityPlan?.enrolled;
+    const isAdminOrSuperAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
+
+    if (!isEnrolled && !isAdminOrSuperAdmin) {
+      toast.error('Debes inscribirte en el Plan de Seguridad para acceder a esta función');
+      setTimeout(() => {
+        router.push('/residentes/seguridad/inscribirse');
+      }, 2000);
+    }
+  }, [user, userProfile, router]);
 
   // Datos de ejemplo para alertas
   const sampleAlerts: Alert[] = [
