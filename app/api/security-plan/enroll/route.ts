@@ -141,10 +141,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userRef = doc(db, 'users', uid);
-    const userDoc = await getDoc(userRef);
+    const userRef = adminDb.collection('users').doc(uid);
+    const userDoc = await userRef.get();
 
-    if (!userDoc.exists()) {
+    if (!userDoc.exists) {
       return NextResponse.json(
         { error: 'Usuario no encontrado' },
         { status: 404 }
@@ -154,9 +154,9 @@ export async function GET(request: NextRequest) {
     const userData = userDoc.data();
 
     return NextResponse.json({
-      enrolled: userData.securityPlan?.enrolled || false,
-      enrolledAt: userData.securityPlan?.enrolledAt || null,
-      agreedToTerms: userData.securityPlan?.agreedToTerms || false,
+      enrolled: userData?.securityPlan?.enrolled || false,
+      enrolledAt: userData?.securityPlan?.enrolledAt || null,
+      agreedToTerms: userData?.securityPlan?.agreedToTerms || false,
     });
   } catch (error) {
     console.error('Error al verificar inscripción:', error);

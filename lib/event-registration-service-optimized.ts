@@ -92,6 +92,10 @@ export async function unregisterUserFromEvent(
       throw new Error('El usuario no está inscrito a este evento');
     }
 
+    if (!registration.id) {
+      throw new Error('ID de registro no encontrado');
+    }
+
     await db.collection('eventRegistrations').doc(registration.id).update({
       status: 'cancelled',
       updatedAt: new Date(),

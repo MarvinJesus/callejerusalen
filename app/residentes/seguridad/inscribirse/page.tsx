@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getUserSecurityPlanStatus } from '@/lib/auth';
 import { 
   Shield, 
   Camera, 
@@ -33,13 +34,23 @@ const SecurityPlanEnrollmentPage: React.FC = () => {
       return;
     }
 
-    // Verificar si el usuario ya está inscrito
-    if (userProfile?.securityPlan?.enrolled) {
-      setEnrollmentStatus('enrolled');
-    } else {
-      setEnrollmentStatus('not_enrolled');
-    }
-  }, [user, userProfile, router]);
+    // Verificar si el usuario ya está inscrito usando la nueva API
+    const checkEnrollmentStatus = async () => {
+      try {
+        const securityPlanStatus = await getUserSecurityPlanStatus(user.uid);
+        if (securityPlanStatus && securityPlanStatus.status === 'active') {
+          setEnrollmentStatus('enrolled');
+        } else {
+          setEnrollmentStatus('not_enrolled');
+        }
+      } catch (error) {
+        console.error('Error al verificar estado de inscripción:', error);
+        setEnrollmentStatus('not_enrolled');
+      }
+    };
+
+    checkEnrollmentStatus();
+  }, [user, router]);
 
   const handleEnroll = async () => {
     if (!agreedToTerms) {
