@@ -70,15 +70,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // IMPORTANTE: Verificar que NO esté ya inscrito
-    if (userData.securityPlan && userData.securityPlan.enrolled) {
-      const status = userData.securityPlan.status;
+    // IMPORTANTE: Verificar que NO esté ya inscrito en securityRegistrations
+    const existingRegistrationsQuery = await adminDb
+      .collection('securityRegistrations')
+      .where('userId', '==', uid)
+      .get();
+
+    if (!existingRegistrationsQuery.empty) {
+      const existingReg = existingRegistrationsQuery.docs[0].data();
+      const status = existingReg.status;
+      
       if (status === 'pending') {
         return NextResponse.json(
           { error: 'Ya tienes una solicitud pendiente de aprobación' },
           { status: 400 }
         );
-      } else if (status === 'approved') {
+      } else if (status === 'active') {
         return NextResponse.json(
           { error: 'Ya estás inscrito en el Plan de Seguridad' },
           { status: 400 }
@@ -91,26 +98,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Actualizar el perfil del usuario con la inscripción al plan
-    // IMPORTANTE: La inscripción queda como 'pending' hasta que un admin la apruebe
-    await userRef.update({
-      'securityPlan.enrolled': true,
-      'securityPlan.enrolledAt': admin.firestore.FieldValue.serverTimestamp(),
-      'securityPlan.agreedToTerms': true,
-      'securityPlan.phoneNumber': phoneNumber,
-      'securityPlan.address': address,
-      'securityPlan.availability': availability,
-      'securityPlan.skills': skills,
-      'securityPlan.otherSkills': otherSkills || '',
-      'securityPlan.status': 'pending',
+    // Crear documento en la colección securityRegistrations
+    const registrationData = {
+      userId: uid,
+      userDisplayName: userData.displayName || '',
+      userEmail: userData.email || '',
+      phoneNumber,
+      address,
+      availability,
+      skills,
+      otherSkills: otherSkills || '',
+      status: 'pending',
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+
+    const registrationRef = await adminDb.collection('securityRegistrations').add(registrationData);
+
+    console.log('✅ Registro creado en securityRegistrations:', registrationRef.id);
 
     return NextResponse.json({
       success: true,
       message: '¡Tu solicitud ha sido enviada! Un administrador la revisará pronto.',
+      registrationId: registrationRef.id,
       securityPlan: {
-        enrolled: true,
+        id: registrationRef.id,
         status: 'pending',
         phoneNumber,
         address,
@@ -141,22 +154,27 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const userRef = adminDb.collection('users').doc(uid);
-    const userDoc = await userRef.get();
+    // Buscar en securityRegistrations
+    const registrationsQuery = await adminDb
+      .collection('securityRegistrations')
+      .where('userId', '==', uid)
+      .get();
 
-    if (!userDoc.exists) {
-      return NextResponse.json(
-        { error: 'Usuario no encontrado' },
-        { status: 404 }
-      );
+    if (registrationsQuery.empty) {
+      return NextResponse.json({
+        enrolled: false,
+        enrolledAt: null,
+        status: null,
+      });
     }
 
-    const userData = userDoc.data();
+    const registration = registrationsQuery.docs[0].data();
 
     return NextResponse.json({
-      enrolled: userData?.securityPlan?.enrolled || false,
-      enrolledAt: userData?.securityPlan?.enrolledAt || null,
-      agreedToTerms: userData?.securityPlan?.agreedToTerms || false,
+      enrolled: true,
+      enrolledAt: registration.submittedAt || registration.createdAt || null,
+      status: registration.status,
+      registrationId: registrationsQuery.docs[0].id,
     });
   } catch (error) {
     console.error('Error al verificar inscripción:', error);

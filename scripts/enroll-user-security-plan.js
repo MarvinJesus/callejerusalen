@@ -45,6 +45,7 @@ async function enrollUserInSecurityPlan(email) {
 
     const userDoc = usersSnapshot.docs[0];
     const userData = userDoc.data();
+    const userId = userDoc.id;
     
     console.log(`✅ Usuario encontrado: ${userData.displayName}`);
     console.log(`   Rol: ${userData.role}`);
@@ -56,22 +57,39 @@ async function enrollUserInSecurityPlan(email) {
       return;
     }
 
-    // Verificar si ya está inscrito
-    if (userData.securityPlan && userData.securityPlan.enrolled) {
+    // Verificar si ya está inscrito en securityRegistrations
+    const existingRegistrations = await db.collection('securityRegistrations')
+      .where('userId', '==', userId)
+      .get();
+
+    if (!existingRegistrations.empty) {
+      const registration = existingRegistrations.docs[0].data();
       console.log('⚠️  El usuario ya está inscrito en el Plan de Seguridad');
-      console.log(`   Fecha de inscripción: ${userData.securityPlan.enrolledAt?.toDate?.() || 'N/A'}`);
+      console.log(`   Estado: ${registration.status}`);
+      console.log(`   Fecha de inscripción: ${registration.submittedAt?.toDate?.() || 'N/A'}`);
       return;
     }
 
-    // Inscribir usuario en el plan
-    await db.collection('users').doc(userDoc.id).update({
-      securityPlan: {
-        enrolled: true,
-        enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
-        agreedToTerms: true,
-      },
+    // Crear registro en la colección securityRegistrations
+    const registrationData = {
+      userId: userId,
+      userDisplayName: userData.displayName || '',
+      userEmail: userData.email || '',
+      phoneNumber: '000-000-0000', // Placeholder - debería ser proporcionado
+      address: 'Dirección no especificada', // Placeholder - debería ser proporcionado
+      availability: 'full_time',
+      skills: ['other'],
+      otherSkills: 'Inscripción manual por script',
+      status: 'active', // Directamente aprobado
+      submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+      reviewedBy: 'system',
+      reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+      reviewNotes: 'Inscripción aprobada automáticamente por script',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    };
+
+    await db.collection('securityRegistrations').add(registrationData);
 
     console.log('\n✅ Usuario inscrito exitosamente en el Plan de Seguridad');
     console.log('   Ahora tiene acceso a:');
@@ -100,22 +118,38 @@ async function enrollAllCommunityUsers() {
 
     for (const userDoc of usersSnapshot.docs) {
       const userData = userDoc.data();
+      const userId = userDoc.id;
       
-      // Si ya está inscrito, saltar
-      if (userData.securityPlan && userData.securityPlan.enrolled) {
+      // Verificar si ya está inscrito en securityRegistrations
+      const existingRegistrations = await db.collection('securityRegistrations')
+        .where('userId', '==', userId)
+        .get();
+
+      if (!existingRegistrations.empty) {
         alreadyEnrolled++;
         continue;
       }
 
-      // Inscribir usuario
-      await db.collection('users').doc(userDoc.id).update({
-        securityPlan: {
-          enrolled: true,
-          enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
-          agreedToTerms: true,
-        },
+      // Crear registro en securityRegistrations
+      const registrationData = {
+        userId: userId,
+        userDisplayName: userData.displayName || '',
+        userEmail: userData.email || '',
+        phoneNumber: '000-000-0000', // Placeholder
+        address: 'Dirección no especificada', // Placeholder
+        availability: 'full_time',
+        skills: ['other'],
+        otherSkills: 'Inscripción masiva por script',
+        status: 'active', // Directamente aprobado
+        submittedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reviewedBy: 'system',
+        reviewedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reviewNotes: 'Inscripción aprobada automáticamente por script masivo',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      };
+
+      await db.collection('securityRegistrations').add(registrationData);
 
       enrolled++;
       console.log(`✅ Inscrito: ${userData.email}`);

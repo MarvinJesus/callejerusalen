@@ -1305,4 +1305,161 @@ export async function isUserEnrolledInSecurityPlan(userId: string): Promise<bool
 export async function isUserSecurityPlanPending(userId: string): Promise<boolean> {
   const registration = await getUserSecurityPlanStatus(userId);
   return registration !== null && registration.status === 'pending';
-};
+}
+
+// === FUNCIONES PARA EL SISTEMA DE BOTÓN DE PÁNICO ===
+
+// Interfaz para configuración del botón de pánico
+export interface PanicButtonSettings {
+  userId: string;
+  emergencyContacts: string[]; // Array de userIds del plan de seguridad
+  notifyAll: boolean; // Si es true, notifica a todos los usuarios activos del plan
+  customMessage?: string;
+  location?: string;
+  // Configuración del botón flotante
+  floatingButtonEnabled: boolean; // Si está habilitado el botón flotante
+  holdTime: number; // Tiempo en segundos para mantener presionado (default: 5)
+  extremeModeEnabled: boolean; // Si está habilitado el modo extremo con cámara
+  autoRecordVideo: boolean; // Si graba automáticamente al activar pánico
+  // Configuración de geolocalización GPS
+  shareGPSLocation: boolean; // Si comparte ubicación GPS en tiempo real
+  // Configuración de duración de alerta
+  alertDurationMinutes: number; // Duración de la señal de alerta en minutos (default: 5)
+  createdAt: any;
+  updatedAt: any;
+}
+
+// Función para obtener todos los usuarios activos del plan de seguridad
+export async function getActiveSecurityPlanUsers(): Promise<SecurityPlanRegistration[]> {
+  try {
+    console.log('🔍 Obteniendo usuarios activos del plan de seguridad...');
+    
+    if (!db) {
+      console.error('Firebase no está inicializado');
+      return [];
+    }
+
+    const registrationsRef = collection(db, 'securityRegistrations');
+    const q = query(registrationsRef, where('status', '==', 'active'));
+    
+    const querySnapshot = await getDocs(q);
+    
+    console.log('🔍 Usuarios activos encontrados:', querySnapshot.size);
+    
+    const users: SecurityPlanRegistration[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      users.push({
+        id: doc.id,
+        userId: data.userId,
+        userDisplayName: data.userDisplayName,
+        userEmail: data.userEmail,
+        phoneNumber: data.phoneNumber,
+        address: data.address,
+        availability: data.availability,
+        skills: data.skills || [],
+        otherSkills: data.otherSkills,
+        status: data.status,
+        sector: data.sector,
+        submittedAt: data.submittedAt,
+        reviewedBy: data.reviewedBy,
+        reviewedAt: data.reviewedAt,
+        reviewNotes: data.reviewNotes,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt
+      });
+    });
+    
+    // Ordenar por sector y disponibilidad
+    users.sort((a, b) => {
+      // Primero por sector
+      if (a.sector && b.sector && a.sector !== b.sector) {
+        return a.sector.localeCompare(b.sector);
+      }
+      // Luego por nombre
+      return a.userDisplayName.localeCompare(b.userDisplayName);
+    });
+    
+    console.log('✅ Usuarios del plan de seguridad obtenidos:', users.length);
+    return users;
+  } catch (error) {
+    console.error('Error al obtener usuarios del plan de seguridad:', error);
+    return [];
+  }
+}
+
+// Función para guardar configuración del botón de pánico
+export async function savePanicButtonSettings(
+  userId: string,
+  settings: Partial<PanicButtonSettings>
+): Promise<void> {
+  try {
+    if (!db) {
+      throw new Error('Firebase no está inicializado');
+    }
+
+    const settingsRef = doc(db, 'panicButtonSettings', userId);
+    
+    const settingsData: PanicButtonSettings = {
+      userId,
+      emergencyContacts: settings.emergencyContacts || [],
+      notifyAll: settings.notifyAll || false,
+      customMessage: settings.customMessage || '',
+      location: settings.location || '',
+      floatingButtonEnabled: settings.floatingButtonEnabled !== undefined ? settings.floatingButtonEnabled : true,
+      holdTime: settings.holdTime || 5,
+      extremeModeEnabled: settings.extremeModeEnabled || false,
+      autoRecordVideo: settings.autoRecordVideo !== undefined ? settings.autoRecordVideo : true,
+      shareGPSLocation: settings.shareGPSLocation || false,
+      alertDurationMinutes: settings.alertDurationMinutes || 5,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    await setDoc(settingsRef, settingsData, { merge: true });
+    
+    console.log('✅ Configuración del botón de pánico guardada para:', userId);
+  } catch (error) {
+    console.error('Error al guardar configuración del botón de pánico:', error);
+    throw error;
+  }
+}
+
+// Función para obtener configuración del botón de pánico
+export async function getPanicButtonSettings(userId: string): Promise<PanicButtonSettings | null> {
+  try {
+    if (!db) {
+      console.error('Firebase no está inicializado');
+      return null;
+    }
+
+    const settingsRef = doc(db, 'panicButtonSettings', userId);
+    const settingsDoc = await getDoc(settingsRef);
+    
+    if (!settingsDoc.exists()) {
+      console.log('No hay configuración del botón de pánico para:', userId);
+      return null;
+    }
+
+    const data = settingsDoc.data();
+    return {
+      userId: data.userId,
+      emergencyContacts: data.emergencyContacts || [],
+      notifyAll: data.notifyAll || false,
+      customMessage: data.customMessage || '',
+      location: data.location || '',
+      floatingButtonEnabled: data.floatingButtonEnabled !== undefined ? data.floatingButtonEnabled : true,
+      holdTime: data.holdTime || 5,
+      extremeModeEnabled: data.extremeModeEnabled || false,
+      autoRecordVideo: data.autoRecordVideo !== undefined ? data.autoRecordVideo : true,
+      shareGPSLocation: data.shareGPSLocation || false,
+      alertDurationMinutes: data.alertDurationMinutes || 5,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt
+    };
+  } catch (error) {
+    console.error('Error al obtener configuración del botón de pánico:', error);
+    return null;
+  }
+}

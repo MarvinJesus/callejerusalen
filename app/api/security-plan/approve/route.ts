@@ -45,44 +45,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar que el usuario a aprobar/rechazar existe
-    const userRef = adminDb.collection('users').doc(uid);
-    const userDoc = await userRef.get();
+    // Buscar el registro en securityRegistrations
+    const registrationsQuery = await adminDb
+      .collection('securityRegistrations')
+      .where('userId', '==', uid)
+      .get();
 
-    if (!userDoc.exists) {
-      return NextResponse.json(
-        { error: 'Usuario no encontrado' },
-        { status: 404 }
-      );
-    }
-
-    const userData = userDoc.data();
-
-    // Verificar que el usuario tiene una solicitud pendiente
-    if (!userData || !userData.securityPlan || !userData.securityPlan.enrolled) {
+    if (registrationsQuery.empty) {
       return NextResponse.json(
         { error: 'El usuario no tiene una solicitud de inscripción' },
         { status: 400 }
       );
     }
 
-    // Actualizar el estado de la inscripción
+    const registrationDoc = registrationsQuery.docs[0];
+    const registrationData = registrationDoc.data();
+
+    // Actualizar el estado de la inscripción en securityRegistrations
     const updateData: any = {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     if (action === 'approve') {
-      updateData['securityPlan.status'] = 'approved';
-      updateData['securityPlan.approvedBy'] = adminUid;
-      updateData['securityPlan.approvedAt'] = admin.firestore.FieldValue.serverTimestamp();
+      updateData.status = 'active';
+      updateData.reviewedBy = adminUid;
+      updateData.reviewedAt = admin.firestore.FieldValue.serverTimestamp();
     } else {
-      updateData['securityPlan.status'] = 'rejected';
-      updateData['securityPlan.rejectedBy'] = adminUid;
-      updateData['securityPlan.rejectedAt'] = admin.firestore.FieldValue.serverTimestamp();
-      updateData['securityPlan.rejectionReason'] = rejectionReason || 'No se proporcionó razón';
+      updateData.status = 'rejected';
+      updateData.reviewedBy = adminUid;
+      updateData.reviewedAt = admin.firestore.FieldValue.serverTimestamp();
+      updateData.reviewNotes = rejectionReason || 'No se proporcionó razón';
     }
 
-    await userRef.update(updateData);
+    await registrationDoc.ref.update(updateData);
+
+    console.log(`✅ Registro ${action === 'approve' ? 'aprobado' : 'rechazado'} en securityRegistrations:`, registrationDoc.id);
 
     return NextResponse.json({
       success: true,
@@ -90,8 +87,9 @@ export async function POST(request: NextRequest) {
         ? 'Inscripción aprobada exitosamente' 
         : 'Inscripción rechazada',
       action,
-      userEmail: userData.email,
-      userName: userData.displayName,
+      userEmail: registrationData.userEmail,
+      userName: registrationData.userDisplayName,
+      registrationId: registrationDoc.id,
     });
   } catch (error) {
     console.error('Error al procesar aprobación/rechazo:', error);

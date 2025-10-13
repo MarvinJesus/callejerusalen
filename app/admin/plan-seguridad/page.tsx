@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Shield, Check, X, Clock, Phone, MapPin, Briefcase, User, Mail, Calendar, AlertCircle, Trash2, ArrowLeft } from 'lucide-react';
+import { Shield, Check, X, Clock, Phone, MapPin, Briefcase, User, Mail, Calendar, AlertCircle, Trash2, ArrowLeft, Edit3, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import Link from 'next/link';
@@ -16,6 +16,8 @@ const SecurityPlanAdminContent: React.FC = () => {
   const [selectedRegistration, setSelectedRegistration] = useState<any | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+  const [editingComment, setEditingComment] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState('');
 
   useEffect(() => {
     loadRegistrations();
@@ -41,7 +43,14 @@ const SecurityPlanAdminContent: React.FC = () => {
   };
 
   const handleApprove = async (registrationId: string) => {
-    if (!confirm('¿Estás seguro de aprobar esta inscripción?')) return;
+    const registration = registrations.find(r => r.id === registrationId);
+    const isReapproving = registration?.status === 'rejected';
+    
+    const confirmMessage = isReapproving 
+      ? '¿Estás seguro de reaprobar esta inscripción que fue rechazada?'
+      : '¿Estás seguro de aprobar esta inscripción?';
+    
+    if (!confirm(confirmMessage)) return;
 
     setActionLoading(true);
     try {
@@ -63,7 +72,7 @@ const SecurityPlanAdminContent: React.FC = () => {
         throw new Error(data.error || 'Error al aprobar');
       }
 
-      toast.success('Inscripción aprobada exitosamente');
+      toast.success(isReapproving ? 'Inscripción reaprobada exitosamente' : 'Inscripción aprobada exitosamente');
       setSelectedRegistration(null);
       await loadRegistrations();
     } catch (error) {
@@ -75,6 +84,15 @@ const SecurityPlanAdminContent: React.FC = () => {
   };
 
   const handleReject = async (registrationId: string) => {
+    const registration = registrations.find(r => r.id === registrationId);
+    const isRejectingActive = registration?.status === 'active';
+    
+    const confirmMessage = isRejectingActive 
+      ? '¿Estás seguro de rechazar esta solicitud que ya está aprobada? El usuario perderá acceso a las funciones de seguridad.'
+      : '¿Estás seguro de rechazar esta solicitud?';
+    
+    if (!confirm(confirmMessage)) return;
+
     const reason = prompt('¿Razón del rechazo? (opcional)');
     if (reason === null) return; // User cancelled
 
@@ -99,7 +117,7 @@ const SecurityPlanAdminContent: React.FC = () => {
         throw new Error(data.error || 'Error al rechazar');
       }
 
-      toast.success('Inscripción rechazada exitosamente');
+      toast.success(isRejectingActive ? 'Solicitud rechazada exitosamente' : 'Inscripción rechazada exitosamente');
       setSelectedRegistration(null);
       await loadRegistrations();
     } catch (error) {
@@ -111,7 +129,10 @@ const SecurityPlanAdminContent: React.FC = () => {
   };
 
   const handleDelete = async (registrationId: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta solicitud? Esta acción no se puede deshacer.')) return;
+    const registration = registrations.find(r => r.id === registrationId);
+    const userName = registration?.userDisplayName || 'esta solicitud';
+    
+    if (!confirm(`¿Estás seguro de eliminar la solicitud de ${userName}? Esta acción no se puede deshacer.`)) return;
 
     setActionLoading(true);
     try {
@@ -138,6 +159,54 @@ const SecurityPlanAdminContent: React.FC = () => {
     } catch (error) {
       console.error('Error:', error);
       toast.error(error instanceof Error ? error.message : 'Error al eliminar');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStartEditComment = (registrationId: string, currentComment: string) => {
+    setEditingComment(registrationId);
+    setCommentText(currentComment || '');
+  };
+
+  const handleCancelEditComment = () => {
+    setEditingComment(null);
+    setCommentText('');
+  };
+
+  const handleSaveComment = async (registrationId: string) => {
+    if (!commentText.trim()) {
+      toast.error('El comentario no puede estar vacío');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const response = await fetch('/api/security-registrations/update-comment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          registrationId: registrationId,
+          adminUid: user?.uid,
+          reviewNotes: commentText.trim(),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al actualizar comentario');
+      }
+
+      toast.success('Comentario actualizado exitosamente');
+      setEditingComment(null);
+      setCommentText('');
+      await loadRegistrations();
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al actualizar comentario');
     } finally {
       setActionLoading(false);
     }
@@ -362,45 +431,108 @@ const SecurityPlanAdminContent: React.FC = () => {
                     <div className="flex items-center space-x-4 text-xs text-gray-500">
                       <div className="flex items-center space-x-1">
                         <Calendar className="w-3 h-3" />
-                        <span>Solicitado: {new Date(registration.submittedAt).toLocaleDateString()}</span>
+                        <span>Solicitado: {registration.submittedAt ? new Date(registration.submittedAt).toLocaleDateString('es-ES') : 'Fecha no disponible'}</span>
                       </div>
                       {registration.reviewedAt && (
                         <div className="flex items-center space-x-1">
                           <Calendar className="w-3 h-3" />
-                          <span>Revisado: {new Date(registration.reviewedAt).toLocaleDateString()}</span>
+                          <span>Revisado: {new Date(registration.reviewedAt).toLocaleDateString('es-ES')}</span>
                         </div>
                       )}
                     </div>
 
                     {registration.reviewNotes && (
                       <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                        <h4 className="text-sm font-medium text-gray-700 mb-1">Notas de revisión:</h4>
-                        <p className="text-sm text-gray-600">{registration.reviewNotes}</p>
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="text-sm font-medium text-gray-700">Notas de revisión:</h4>
+                          {registration.status === 'rejected' && !editingComment && (
+                            <button
+                              onClick={() => handleStartEditComment(registration.id, registration.reviewNotes)}
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              disabled={actionLoading}
+                            >
+                              <Edit3 className="w-3 h-3 mr-1" />
+                              Editar
+                            </button>
+                          )}
+                        </div>
+                        
+                        {editingComment === registration.id ? (
+                          <div className="space-y-2">
+                            <textarea
+                              value={commentText}
+                              onChange={(e) => setCommentText(e.target.value)}
+                              placeholder="Escribe las notas de revisión..."
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none placeholder-gray-500"
+                              rows={3}
+                              disabled={actionLoading}
+                            />
+                            <div className="flex justify-end space-x-2">
+                              <button
+                                onClick={handleCancelEditComment}
+                                className="px-3 py-1 text-xs font-medium text-gray-600 hover:text-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={actionLoading}
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => handleSaveComment(registration.id)}
+                                className="inline-flex items-center px-3 py-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={actionLoading}
+                              >
+                                <Save className="w-3 h-3 mr-1" />
+                                Guardar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-600">{registration.reviewNotes}</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Mostrar información de re-aprobación si es relevante */}
+                    {registration.status === 'active' && registration.reviewNotes?.includes('Aprobado') && (
+                      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center">
+                          <Check className="w-4 h-4 text-green-600 mr-2" />
+                          <p className="text-sm text-green-800 font-medium">
+                            {registration.reviewNotes.includes('reaprobado') || registration.reviewNotes.includes('Reaprobado') 
+                              ? 'Esta solicitud fue reaprobada por un administrador'
+                              : 'Esta solicitud fue aprobada por un administrador'
+                            }
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
 
                   <div className="flex flex-col space-y-2 ml-4">
-                    {registration.status === 'pending' && (
-                      <>
-                        <button
-                          onClick={() => handleApprove(registration.id)}
-                          disabled={actionLoading}
-                          className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          <Check className="w-4 h-4 mr-2" />
-                          Aprobar
-                        </button>
-                        <button
-                          onClick={() => handleReject(registration.id)}
-                          disabled={actionLoading}
-                          className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                        >
-                          <X className="w-4 h-4 mr-2" />
-                          Rechazar
-                        </button>
-                      </>
+                    {/* Botón de Aprobar: solo para pending y rejected */}
+                    {(registration.status === 'pending' || registration.status === 'rejected') && (
+                      <button
+                        onClick={() => handleApprove(registration.id)}
+                        disabled={actionLoading}
+                        className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <Check className="w-4 h-4 mr-2" />
+                        {registration.status === 'rejected' ? 'Reaprobar' : 'Aprobar'}
+                      </button>
                     )}
+
+                    {/* Botón de Rechazar: para pending y active */}
+                    {(registration.status === 'pending' || registration.status === 'active') && (
+                      <button
+                        onClick={() => handleReject(registration.id)}
+                        disabled={actionLoading}
+                        className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        {registration.status === 'active' ? 'Rechazar' : 'Rechazar'}
+                      </button>
+                    )}
+                    
+                    {/* Botón de Eliminar siempre visible para todos los estados */}
                     <button
                       onClick={() => handleDelete(registration.id)}
                       disabled={actionLoading}
