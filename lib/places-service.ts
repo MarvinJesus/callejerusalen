@@ -1,6 +1,6 @@
 // Servicio de lugares que usa Firebase Admin cuando está disponible, o datos en memoria como fallback
 
-import { db } from '@/lib/firebase-admin';
+import { db, admin } from '@/lib/firebase-admin';
 
 export interface Place {
   id?: string;
@@ -33,7 +33,11 @@ export interface Place {
 // Verificar si Firebase Admin está disponible
 const isFirebaseAvailable = () => {
   try {
-    return db && typeof db.collection === 'function';
+    // Verificar si Firebase Admin se inicializó correctamente
+    return db && 
+           typeof db.collection === 'function' && 
+           admin && 
+           admin.apps.length > 0;
   } catch (error) {
     console.error('❌ Firebase Admin no está disponible:', error);
     return false;

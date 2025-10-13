@@ -31,6 +31,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ places });
   } catch (error) {
     console.error('❌ Error al obtener lugares públicos:', error);
+    
+    // En caso de error de Firebase, devolver array vacío en lugar de 500
+    if (error instanceof Error && error.message.includes('Firebase Admin no está disponible')) {
+      console.log('⚠️ Firebase no disponible, devolviendo array vacío');
+      return NextResponse.json({ places: [] });
+    }
+    
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
 }
