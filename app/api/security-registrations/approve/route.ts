@@ -51,7 +51,11 @@ export async function POST(request: NextRequest) {
 
     if (action === 'approve') {
       updateData.status = 'active';
-      updateData.reviewNotes = 'Aprobado por administrador';
+      // Determinar si es una re-aprobación
+      const isReapproval = registrationData.status === 'rejected';
+      updateData.reviewNotes = isReapproval 
+        ? 'Reaprobado por administrador' 
+        : 'Aprobado por administrador';
     } else if (action === 'reject') {
       updateData.status = 'rejected';
       updateData.reviewNotes = rejectionReason || 'Rechazado por administrador';

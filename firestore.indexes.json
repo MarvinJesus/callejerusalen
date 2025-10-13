@@ -1,6 +1,20 @@
 {
   "indexes": [
     {
+      "collectionGroup": "panicChats",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "alertId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "registrationRequests",
       "queryScope": "COLLECTION",
       "fields": [
@@ -57,6 +71,48 @@
         {
           "fieldPath": "registrationDate",
           "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "panicReports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "panicReports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "notifiedUsers",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "panicReports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
         }
       ]
     }

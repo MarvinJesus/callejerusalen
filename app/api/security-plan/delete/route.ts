@@ -36,38 +36,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar que el usuario existe
-    const userRef = adminDb.collection('users').doc(uid);
-    const userDoc = await userRef.get();
+    // Buscar el registro en securityRegistrations
+    const registrationsQuery = await adminDb
+      .collection('securityRegistrations')
+      .where('userId', '==', uid)
+      .get();
 
-    if (!userDoc.exists) {
-      return NextResponse.json(
-        { error: 'Usuario no encontrado' },
-        { status: 404 }
-      );
-    }
-
-    const userData = userDoc.data();
-
-    // Verificar que el usuario tiene una solicitud
-    if (!userData || !userData.securityPlan || !userData.securityPlan.enrolled) {
+    if (registrationsQuery.empty) {
       return NextResponse.json(
         { error: 'El usuario no tiene una solicitud de inscripción' },
         { status: 400 }
       );
     }
 
-    // Eliminar completamente la solicitud del Plan de Seguridad
-    await userRef.update({
-      securityPlan: admin.firestore.FieldValue.delete(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    const registrationDoc = registrationsQuery.docs[0];
+    const registrationData = registrationDoc.data();
+
+    // Eliminar el documento de securityRegistrations
+    await registrationDoc.ref.delete();
+
+    console.log('✅ Registro eliminado de securityRegistrations:', registrationDoc.id);
 
     return NextResponse.json({
       success: true,
       message: 'Solicitud eliminada exitosamente',
-      userEmail: userData.email,
-      userName: userData.displayName,
+      userEmail: registrationData.userEmail,
+      userName: registrationData.userDisplayName,
+      registrationId: registrationDoc.id,
     });
   } catch (error) {
     console.error('Error al eliminar solicitud:', error);

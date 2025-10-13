@@ -5,10 +5,14 @@ import './themes.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { GlobalAlertProvider } from '@/context/GlobalAlertContext';
+import { WebSocketProvider } from '@/context/WebSocketContext';
 import { Toaster } from 'react-hot-toast';
 import FloatingHomeButton from '@/components/FloatingHomeButton';
+import FloatingPanicButton from '@/components/FloatingPanicButton';
 import GlobalRegistrationAlert from '@/components/GlobalRegistrationAlert';
 import GlobalAlertBanner from '@/components/GlobalAlertBanner';
+import PanicNotificationSystem from '@/components/PanicNotificationSystem';
+import PanicAlertModal from '@/components/PanicAlertModal';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -41,35 +45,46 @@ export default function RootLayout({
             <GlobalAlertBanner />
             
             <AuthProvider>
-              <GlobalRegistrationAlert />
-              <div className="relative">
-                {children}
-              </div>
-              <FloatingHomeButton />
-              <Toaster
-                position="top-right"
-                toastOptions={{
-                  duration: 4000,
-                  style: {
-                    background: '#363636',
-                    color: '#fff',
-                  },
-                  success: {
-                    duration: 3000,
-                    iconTheme: {
-                      primary: '#4ade80',
-                      secondary: '#fff',
+              {/* WebSocket Provider - Conecta al servidor de tiempo real */}
+              <WebSocketProvider>
+                <GlobalRegistrationAlert />
+                
+                {/* Sistema de notificaciones de pánico dual:
+                    - PanicAlertModal: WebSocket en tiempo real (prioridad)
+                    - PanicNotificationSystem: Firestore fallback */}
+                <PanicAlertModal />
+                <PanicNotificationSystem />
+                
+                <div className="relative">
+                  {children}
+                </div>
+                <FloatingHomeButton />
+                <FloatingPanicButton />
+                <Toaster
+                  position="top-right"
+                  toastOptions={{
+                    duration: 4000,
+                    style: {
+                      background: '#363636',
+                      color: '#fff',
                     },
-                  },
-                  error: {
-                    duration: 5000,
-                    iconTheme: {
-                      primary: '#ef4444',
-                      secondary: '#fff',
+                    success: {
+                      duration: 3000,
+                      iconTheme: {
+                        primary: '#4ade80',
+                        secondary: '#fff',
+                      },
                     },
-                  },
-                }}
-              />
+                    error: {
+                      duration: 5000,
+                      iconTheme: {
+                        primary: '#ef4444',
+                        secondary: '#fff',
+                      },
+                    },
+                  }}
+                />
+              </WebSocketProvider>
             </AuthProvider>
           </GlobalAlertProvider>
         </ThemeProvider>
