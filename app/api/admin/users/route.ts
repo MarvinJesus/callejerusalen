@@ -35,6 +35,20 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error al obtener usuarios:', error);
+    
+    // En caso de error de Firebase, devolver array vacío en lugar de 500
+    if (error instanceof Error && (
+      error.message.includes('Firebase Admin no está disponible') ||
+      error.message.includes('Failed to initialize Firebase Admin') ||
+      error.message.includes('Cannot read properties')
+    )) {
+      console.log('⚠️ Firebase no disponible, devolviendo array vacío');
+      return NextResponse.json({
+        success: true,
+        users: []
+      });
+    }
+    
     return NextResponse.json(
       { error: 'Error interno del servidor' },
       { status: 500 }
