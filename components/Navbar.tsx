@@ -19,9 +19,17 @@ import {
   Settings,
   Crown,
   BookOpen,
-  Briefcase
+  Briefcase,
+  Camera,
+  LayoutDashboard,
+  Building2,
+  Bell,
+  Lock,
+  Database
 } from 'lucide-react';
 import SettingsDropdown from './SettingsDropdown';
+import NavDropdown from './NavDropdown';
+import NavDropdownMobile from './NavDropdownMobile';
 import toast from 'react-hot-toast';
 
 const Navbar: React.FC = () => {
@@ -100,17 +108,32 @@ const Navbar: React.FC = () => {
                 {userProfile?.role === 'comunidad' && (
                   <>
                     <Link 
-                      href="/comunidads/camaras" 
-                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                      href="/residentes" 
+                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1 font-medium"
                     >
-                      Cámaras
+                      <LayoutDashboard className="w-4 h-4" />
+                      <span>Panel</span>
                     </Link>
                     <Link 
-                      href="/comunidads/alertas" 
+                      href="/residentes/panico" 
                       className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
                     >
                       <AlertTriangle className="w-4 h-4" />
+                      <span>Pánico</span>
+                    </Link>
+                    <Link 
+                      href="/residentes/alertas" 
+                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+                    >
+                      <Shield className="w-4 h-4" />
                       <span>Alertas</span>
+                    </Link>
+                    <Link 
+                      href="/mapa" 
+                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+                    >
+                      <MapPin className="w-4 h-4" />
+                      <span>Mapa</span>
                     </Link>
                   </>
                 )}
@@ -119,39 +142,72 @@ const Navbar: React.FC = () => {
                   <>
                     <Link 
                       href="/admin/admin-dashboard" 
-                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
+                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1 font-medium"
                     >
-                      <Settings className="w-4 h-4" />
-                      <span>Admin</span>
+                      <LayoutDashboard className="w-4 h-4" />
+                      <span>Dashboard</span>
                     </Link>
-                    <Link 
-                      href="/admin/places" 
-                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
-                    >
-                      <MapPin className="w-4 h-4" />
-                      <span>Lugares</span>
-                    </Link>
-                    <Link 
-                      href="/admin/history" 
-                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
-                    >
-                      <BookOpen className="w-4 h-4" />
-                      <span>Historia</span>
-                    </Link>
-                    <Link 
-                      href="/admin/services" 
-                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
-                    >
-                      <Briefcase className="w-4 h-4" />
-                      <span>Servicios</span>
-                    </Link>
-                    <Link 
-                      href="/visitantes" 
-                      className="text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-1"
-                    >
-                      <Eye className="w-4 h-4" />
-                      <span>Vista Visitante</span>
-                    </Link>
+
+                    <NavDropdown
+                      label="Comunidad"
+                      icon={<Building2 className="w-4 h-4" />}
+                      items={[
+                        {
+                          label: 'Lugares',
+                          href: '/admin/places',
+                          icon: <MapPin className="w-4 h-4" />
+                        },
+                        {
+                          label: 'Servicios',
+                          href: '/admin/services',
+                          icon: <Briefcase className="w-4 h-4" />
+                        },
+                        {
+                          label: 'Historia',
+                          href: '/admin/history',
+                          icon: <BookOpen className="w-4 h-4" />
+                        }
+                      ]}
+                    />
+
+                    <NavDropdown
+                      label="Seguridad"
+                      icon={<Shield className="w-4 h-4" />}
+                      items={[
+                        {
+                          label: 'Alertas de Pánico',
+                          href: '/admin/panic-alerts',
+                          icon: <AlertTriangle className="w-4 h-4" />
+                        },
+                        {
+                          label: 'Plan de Seguridad',
+                          href: '/admin/plan-seguridad',
+                          icon: <Shield className="w-4 h-4" />
+                        },
+                        {
+                          label: 'Emergencias',
+                          href: '/admin/emergency',
+                          icon: <Bell className="w-4 h-4" />
+                        }
+                      ]}
+                    />
+
+                    <NavDropdown
+                      label="Sistema"
+                      icon={<Settings className="w-4 h-4" />}
+                      items={[
+                        {
+                          label: 'Permisos',
+                          href: '/admin/permissions',
+                          icon: <Lock className="w-4 h-4" />
+                        },
+                        {
+                          label: 'Vista Visitante',
+                          href: '/visitantes',
+                          icon: <Eye className="w-4 h-4" />
+                        }
+                      ]}
+                    />
                   </>
                 )}
 
@@ -346,18 +402,36 @@ const Navbar: React.FC = () => {
                   {userProfile?.role === 'comunidad' && (
                     <>
                       <Link 
-                        href="/comunidads/camaras" 
-                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                        href="/residentes" 
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200 font-medium flex items-center space-x-2"
                         onClick={() => setIsMenuOpen(false)}
                       >
-                        Cámaras
+                        <LayoutDashboard className="w-4 h-4" />
+                        <span>Panel de Residentes</span>
                       </Link>
                       <Link 
-                        href="/comunidads/alertas" 
-                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                        href="/residentes/panico" 
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-2"
                         onClick={() => setIsMenuOpen(false)}
                       >
-                        Alertas
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>Botón de Pánico</span>
+                      </Link>
+                      <Link 
+                        href="/residentes/alertas" 
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-2"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <Shield className="w-4 h-4" />
+                        <span>Alertas Comunitarias</span>
+                      </Link>
+                      <Link 
+                        href="/mapa" 
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200 flex items-center space-x-2"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        <MapPin className="w-4 h-4" />
+                        <span>Mapa de Seguridad</span>
                       </Link>
                     </>
                   )}
@@ -366,39 +440,76 @@ const Navbar: React.FC = () => {
                     <>
                       <Link 
                         href="/admin/admin-dashboard" 
-                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
+                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200 font-medium flex items-center space-x-2"
                         onClick={() => setIsMenuOpen(false)}
                       >
-                        Panel de Administración
+                        <LayoutDashboard className="w-4 h-4" />
+                        <span>Dashboard Admin</span>
                       </Link>
-                      <Link 
-                        href="/admin/places" 
-                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Gestión de Lugares
-                      </Link>
-                      <Link 
-                        href="/admin/history" 
-                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Gestión de Historia
-                      </Link>
-                      <Link 
-                        href="/admin/services" 
-                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Gestión de Servicios
-                      </Link>
-                      <Link 
-                        href="/visitantes" 
-                        className="block px-3 py-2 text-gray-700 hover:text-primary-600 transition-colors duration-200"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        Vista Visitante
-                      </Link>
+
+                      <NavDropdownMobile
+                        label="Comunidad"
+                        icon={<Building2 className="w-4 h-4" />}
+                        items={[
+                          {
+                            label: 'Lugares',
+                            href: '/admin/places',
+                            icon: <MapPin className="w-4 h-4" />
+                          },
+                          {
+                            label: 'Servicios',
+                            href: '/admin/services',
+                            icon: <Briefcase className="w-4 h-4" />
+                          },
+                          {
+                            label: 'Historia',
+                            href: '/admin/history',
+                            icon: <BookOpen className="w-4 h-4" />
+                          }
+                        ]}
+                        onItemClick={() => setIsMenuOpen(false)}
+                      />
+
+                      <NavDropdownMobile
+                        label="Seguridad"
+                        icon={<Shield className="w-4 h-4" />}
+                        items={[
+                          {
+                            label: 'Alertas de Pánico',
+                            href: '/admin/panic-alerts',
+                            icon: <AlertTriangle className="w-4 h-4" />
+                          },
+                          {
+                            label: 'Plan de Seguridad',
+                            href: '/admin/plan-seguridad',
+                            icon: <Shield className="w-4 h-4" />
+                          },
+                          {
+                            label: 'Emergencias',
+                            href: '/admin/emergency',
+                            icon: <Bell className="w-4 h-4" />
+                          }
+                        ]}
+                        onItemClick={() => setIsMenuOpen(false)}
+                      />
+
+                      <NavDropdownMobile
+                        label="Sistema"
+                        icon={<Settings className="w-4 h-4" />}
+                        items={[
+                          {
+                            label: 'Permisos',
+                            href: '/admin/permissions',
+                            icon: <Lock className="w-4 h-4" />
+                          },
+                          {
+                            label: 'Vista Visitante',
+                            href: '/visitantes',
+                            icon: <Eye className="w-4 h-4" />
+                          }
+                        ]}
+                        onItemClick={() => setIsMenuOpen(false)}
+                      />
                     </>
                   )}
 
