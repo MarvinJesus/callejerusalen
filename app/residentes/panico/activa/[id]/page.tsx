@@ -964,7 +964,7 @@ const ActivePanicPage: React.FC = () => {
   const confirmationRate = totalNotified > 0 ? Math.round((acknowledgedCount / totalNotified) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-6">
+    <div className="min-h-screen bg-gray-50 pb-48 md:pb-6">
       <Navbar />
       
       <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 sm:py-4 lg:py-6">
@@ -1321,15 +1321,20 @@ const ActivePanicPage: React.FC = () => {
             </div>
 
             {/* Chat - Mejorado */}
-            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden mb-4 md:mb-6">
               <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
-                <h2 className="text-xl font-bold flex items-center">
-                  <MessageCircle className="w-6 h-6 mr-3" />
-                  Chat de Emergencia
+                <h2 className="text-xl font-bold flex items-center justify-between">
+                  <div className="flex items-center">
+                    <MessageCircle className="w-6 h-6 mr-3" />
+                    Chat de Emergencia
+                  </div>
+                  <div className="md:hidden text-sm bg-blue-500 px-2 py-1 rounded">
+                    💬 Activo
+                  </div>
                 </h2>
               </div>
               
-              <div className="p-4">
+              <div className="p-4 pb-24 md:pb-4">
               
                 {/* Leyenda de tipos de mensajes - Mejorado */}
                 <div className="mb-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
@@ -1351,7 +1356,11 @@ const ActivePanicPage: React.FC = () => {
                 </div>
 
                 {/* Mensajes - Mejorado */}
-                <div className="bg-gray-50 rounded-lg p-4 h-72 overflow-y-auto mb-4 border border-gray-200 shadow-inner">
+                <div className="bg-gray-50 rounded-lg p-4 h-64 md:h-72 overflow-y-auto mb-4 border border-gray-200 shadow-inner relative">
+                  {/* Indicador de scroll para móvil */}
+                  <div className="md:hidden absolute top-2 right-2 text-xs text-gray-400 bg-white px-2 py-1 rounded shadow-sm">
+                    📜 Scroll
+                  </div>
                   {chatMessages.length === 0 ? (
                     <div className="text-center text-gray-500 py-12">
                       <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
@@ -1435,8 +1444,8 @@ const ActivePanicPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Input - Mejorado */}
-                <form onSubmit={handleSendMessage} className="flex gap-3">
+                {/* Input - Mejorado con espacio para móvil */}
+                <form onSubmit={handleSendMessage} className="flex gap-3 mb-2 md:mb-0">
                   <input
                     type="text"
                     value={newMessage}
@@ -1456,6 +1465,12 @@ const ActivePanicPage: React.FC = () => {
                     <Send className="w-5 h-5" />
                   </button>
                 </form>
+                
+                {/* Indicador para móvil - Mostrar que hay más contenido abajo */}
+                <div className="md:hidden text-center py-4">
+                  <p className="text-sm text-gray-500 font-medium">💬 Chat disponible - Scroll hacia abajo para escribir</p>
+                  <p className="text-xs text-gray-400 mt-1">Espacio adicional para mejor visibilidad</p>
+                </div>
               </div>
             </div>
           </div>
