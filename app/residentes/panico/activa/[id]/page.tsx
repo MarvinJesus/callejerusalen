@@ -160,6 +160,7 @@ const ActivePanicPage: React.FC = () => {
   // Estado de sonido de alarma
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [alarmPlayed, setAlarmPlayed] = useState(false);
+  const [showSoundPrompt, setShowSoundPrompt] = useState(false);
   
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -266,38 +267,57 @@ const ActivePanicPage: React.FC = () => {
     if (!alertData || loading || alarmPlayed) return;
 
     // Solo reproducir para receptores, no para el emisor
-    if (isEmitter) return;
+    if (isEmitter) {
+      console.log('ℹ️ Emisor de alerta - sonido no necesario');
+      return;
+    }
 
     // Solo reproducir si la alerta está activa
-    if (alertData.status !== 'active') return;
+    if (alertData.status !== 'active') {
+      console.log('ℹ️ Alerta no activa - sonido no necesario');
+      return;
+    }
 
     // Verificar si el sonido está habilitado
     if (!soundEnabled) {
-      console.log('🔇 Sonido de alarma deshabilitado por el usuario');
+      console.log('🔇 Sonido deshabilitado por configuración del usuario');
       return;
     }
 
     // Verificar si ya se está reproduciendo
     if (isPlaying()) {
-      console.log('🔊 Sonido de alarma ya se está reproduciendo');
+      console.log('🔊 Sonido ya se está reproduciendo');
+      setAlarmPlayed(true);
       return;
     }
 
-    console.log('🚨 Reproduciendo sonido de alarma para alerta activa');
+    console.log('🚨 Intentando reproducir sonido de alarma de emergencia...');
     
-    // Reproducir sonido de emergencia
-    try {
-      startAlarm('emergency');
-      setAlarmPlayed(true);
-      
-      toast('🔊 Sonido de emergencia activado', {
-        duration: 3000,
-        icon: '🔊'
-      });
-    } catch (error) {
-      console.error('Error al reproducir sonido:', error);
-      toast.error('No se pudo reproducir el sonido de alerta');
-    }
+    // Pequeño delay para asegurar que la página se haya cargado
+    const playSound = setTimeout(() => {
+      try {
+        startAlarm('emergency');
+        setAlarmPlayed(true);
+        setShowSoundPrompt(false); // Ocultar prompt si el sonido se reproduce
+        console.log('✅ Sonido de alarma iniciado correctamente');
+        
+        toast.success('🔊 Sonido de emergencia activado', {
+          duration: 3000
+        });
+      } catch (error) {
+        console.error('❌ Error al reproducir sonido (autoplay bloqueado):', error);
+        // Mostrar banner para que el usuario active el sonido manualmente
+        setShowSoundPrompt(true);
+        setAlarmPlayed(false); // Permitir que se reproduzca cuando el usuario haga click
+        
+        toast('⚠️ Click en el botón 🔊 para activar el sonido', {
+          duration: 5000,
+          icon: '⚠️'
+        });
+      }
+    }, 500); // Delay de 500ms para permitir interacción previa
+
+    return () => clearTimeout(playSound);
   }, [alertData, loading, isEmitter, soundEnabled, startAlarm, isPlaying, alarmPlayed]);
 
   // Guardar configuración de sonido en localStorage
@@ -885,31 +905,33 @@ const ActivePanicPage: React.FC = () => {
   const confirmationRate = totalNotified > 0 ? Math.round((acknowledgedCount / totalNotified) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-6">
       <Navbar />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Header */}
-        <div className="bg-red-600 text-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <AlertTriangle className="w-10 h-10" />
+      <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 sm:py-4 lg:py-6">
+        {/* Header - Responsive */}
+        <div className="bg-red-600 text-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6 mb-3 sm:mb-4 md:mb-6">
+          {/* Header principal - Stack en móviles */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10" />
               </div>
-              <div>
-                <h1 className="text-3xl font-bold">
-                  🚨 {isEmitter ? 'EMERGENCIA ACTIVA' : 'ALERTA DE EMERGENCIA'}
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-2xl md:text-3xl font-bold leading-tight">
+                  🚨 {isEmitter ? 'EMERGENCIA' : 'ALERTA'}
                 </h1>
-                <p className="text-red-100 text-lg">
+                <p className="text-red-100 text-xs sm:text-sm md:text-base line-clamp-2">
                   {isEmitter 
                     ? 'Tu alerta de pánico está en curso' 
-                    : `${alertData.userName} necesita ayuda urgente`
+                    : `${alertData.userName} necesita ayuda`
                   }
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
+            {/* Controles - Horizontal en móviles */}
+            <div className="flex items-center gap-2 sm:gap-3 self-start sm:self-auto">
               {/* Control de sonido */}
               <button
                 onClick={() => {
@@ -917,95 +939,130 @@ const ActivePanicPage: React.FC = () => {
                   setSoundEnabled(newState);
                   if (!newState && isPlaying()) {
                     stopAlarm();
+                  } else if (newState && !isPlaying() && alertData.status === 'active' && !isEmitter) {
+                    // Reproducir sonido cuando se activa manualmente
+                    startAlarm('emergency');
+                    toast.success('🔊 Sonido activado');
+                  } else {
+                    toast.success(newState ? '🔊 Sonido activado' : '🔇 Sonido desactivado');
                   }
-                  toast.success(newState ? '🔊 Sonido activado' : '🔇 Sonido desactivado');
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-2 rounded-lg font-semibold transition-colors text-sm sm:text-base ${
                   soundEnabled
                     ? 'bg-white bg-opacity-20 hover:bg-opacity-30'
                     : 'bg-gray-600 bg-opacity-50 hover:bg-opacity-60'
                 }`}
                 title={soundEnabled ? 'Desactivar sonido' : 'Activar sonido'}
               >
-                <span className="text-xl">{soundEnabled ? '🔊' : '🔇'}</span>
-                <span className="hidden sm:inline">
+                <span className="text-lg sm:text-xl">{soundEnabled ? '🔊' : '🔇'}</span>
+                <span className="hidden sm:inline text-xs md:text-sm">
                   {soundEnabled ? 'Sonido' : 'Silencio'}
                 </span>
               </button>
 
               {/* Indicador de conexión */}
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+              <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-2 rounded-lg text-sm sm:text-base ${
                 isConnected ? 'bg-green-500 bg-opacity-30' : 'bg-yellow-500 bg-opacity-30'
               }`}>
-                {isConnected ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
-                <span className="font-semibold">{isConnected ? 'En línea' : 'Offline'}</span>
+                {isConnected ? <Wifi className="w-4 h-4 sm:w-5 sm:h-5" /> : <WifiOff className="w-4 h-4 sm:w-5 sm:h-5" />}
+                <span className="font-semibold text-xs sm:text-sm hidden xs:inline">{isConnected ? 'Online' : 'Offline'}</span>
               </div>
             </div>
           </div>
 
-          {/* Info */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white bg-opacity-10 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-5 h-5" />
-                <span className="text-sm font-medium">Tiempo Restante:</span>
+          {/* Info - Responsive Grid */}
+          <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+            <div className="bg-white bg-opacity-10 rounded-lg p-2 sm:p-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 mb-1 sm:mb-0" />
+                <span className="text-[10px] sm:text-xs md:text-sm font-medium">Tiempo:</span>
               </div>
-              <p className="text-2xl font-bold mt-1">{timeRemaining}</p>
+              <p className="text-base sm:text-xl md:text-2xl font-bold mt-0.5 sm:mt-1 leading-tight">{timeRemaining}</p>
             </div>
 
-            <div className="bg-white bg-opacity-10 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <Users className="w-5 h-5" />
-                <span className="text-sm font-medium">Confirmaciones:</span>
+            <div className="bg-white bg-opacity-10 rounded-lg p-2 sm:p-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5 mb-1 sm:mb-0" />
+                <span className="text-[10px] sm:text-xs md:text-sm font-medium">Confirm:</span>
               </div>
-              <p className="text-2xl font-bold mt-1">
-                {acknowledgedCount} / {totalNotified}
-                <span className="text-lg ml-2">({confirmationRate}%)</span>
+              <p className="text-base sm:text-xl md:text-2xl font-bold mt-0.5 sm:mt-1 leading-tight">
+                {acknowledgedCount}/{totalNotified}
+                <span className="text-xs sm:text-sm md:text-lg ml-1 sm:ml-2">({confirmationRate}%)</span>
               </p>
             </div>
 
-            <div className="bg-white bg-opacity-10 rounded-lg p-3">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="w-5 h-5" />
-                <span className="text-sm font-medium">Estado:</span>
+            <div className="bg-white bg-opacity-10 rounded-lg p-2 sm:p-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 mb-1 sm:mb-0" />
+                <span className="text-[10px] sm:text-xs md:text-sm font-medium">Estado:</span>
               </div>
-              <p className="text-2xl font-bold mt-1 capitalize">{alertData.status}</p>
+              <p className="text-base sm:text-xl md:text-2xl font-bold mt-0.5 sm:mt-1 capitalize leading-tight">{alertData.status}</p>
             </div>
           </div>
         </div>
 
-        {/* Grid principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Banner para activar sonido manualmente - Solo si es receptor y el sonido está habilitado pero no se reproduce */}
+        {showSoundPrompt && !isEmitter && soundEnabled && !isPlaying() && alertData.status === 'active' && (
+          <div className="bg-orange-500 text-white rounded-lg shadow-lg p-3 sm:p-4 mb-3 sm:mb-4 md:mb-6 animate-pulse">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1">
+                <div className="text-2xl sm:text-3xl">🔊</div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base md:text-lg">Activa el Sonido de Emergencia</h3>
+                  <p className="text-orange-100 text-xs sm:text-sm">Click en el botón 🔊 arriba o aquí para activar el sonido</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  try {
+                    startAlarm('emergency');
+                    setAlarmPlayed(true);
+                    setShowSoundPrompt(false);
+                    toast.success('🔊 Sonido activado correctamente');
+                  } catch (error) {
+                    toast.error('No se pudo activar el sonido');
+                  }
+                }}
+                className="bg-white text-orange-600 px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 rounded-lg font-bold text-sm sm:text-base hover:bg-orange-50 active:bg-orange-100 transition-colors flex-shrink-0"
+              >
+                ACTIVAR
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Grid principal - Responsive */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
           {/* Columna Izquierda */}
-          <div className="space-y-6">
-            {/* Banner confirmación (receptores) */}
+          <div className="space-y-3 sm:space-y-4 md:space-y-6">
+            {/* Banner confirmación (receptores) - Responsive */}
             {!isEmitter && !hasAcknowledged && (
-              <div className="bg-green-600 text-white rounded-lg shadow-lg p-6">
-                <div className="flex items-center space-x-3 mb-3">
-                  <CheckCircle className="w-8 h-8" />
-                  <div>
-                    <h3 className="text-xl font-bold">¿Recibiste la alerta?</h3>
-                    <p className="text-green-100">Confirma para que {alertData.userName.split(' ')[0]} sepa</p>
+              <div className="bg-green-600 text-white rounded-lg shadow-lg p-4 sm:p-5 md:p-6">
+                <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+                  <CheckCircle className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <h3 className="text-base sm:text-lg md:text-xl font-bold">¿Recibiste la alerta?</h3>
+                    <p className="text-green-100 text-xs sm:text-sm md:text-base">Confirma para que {alertData.userName.split(' ')[0]} sepa</p>
                   </div>
                 </div>
                 <button
                   onClick={handleAcknowledgeAlert}
-                  className="w-full bg-white text-green-600 py-3 px-6 rounded-lg font-bold text-lg hover:bg-green-50"
+                  className="w-full bg-white text-green-600 py-3 sm:py-3.5 md:py-4 px-4 sm:px-5 md:px-6 rounded-lg font-bold text-base sm:text-lg md:text-xl hover:bg-green-50 active:bg-green-100 transition-colors"
                 >
                   ✅ SÍ, HE SIDO NOTIFICADO
                 </button>
               </div>
             )}
 
-            {/* Video (solo emisor) */}
+            {/* Video (solo emisor) - Responsive */}
             {isEmitter && alertData.extremeMode && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold mb-4 flex items-center">
-                  <Video className="w-6 h-6 mr-2 text-purple-600" />
-                  Grabación de Video
+              <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
+                <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 flex items-center flex-wrap gap-2">
+                  <Video className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
+                  <span>Grabación de Video</span>
                   {isRecording && (
-                    <span className="ml-auto px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm flex items-center space-x-2">
-                      <Camera className="w-4 h-4" />
+                    <span className="ml-auto px-2 sm:px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
+                      <Camera className="w-3 h-3 sm:w-4 sm:h-4" />
                       <span>GRABANDO</span>
                     </span>
                   )}
@@ -1016,42 +1073,44 @@ const ActivePanicPage: React.FC = () => {
                   autoPlay
                   muted
                   playsInline
-                  className="w-full h-64 bg-black rounded-lg object-cover"
+                  className="w-full h-48 sm:h-56 md:h-64 bg-black rounded-lg object-cover"
                 />
 
                 {isRecording && (
                   <button
                     onClick={stopRecording}
-                    className="w-full mt-4 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 flex items-center justify-center space-x-2"
+                    className="w-full mt-3 sm:mt-4 bg-gray-600 text-white py-2.5 sm:py-3 px-4 rounded-lg hover:bg-gray-700 active:bg-gray-800 flex items-center justify-center gap-2 text-sm sm:text-base font-medium"
                   >
-                    <StopCircle className="w-5 h-5" />
+                    <StopCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span>Detener Grabación</span>
                   </button>
                 )}
               </div>
             )}
 
-            {/* Mapa */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4 flex items-center">
-                <MapPin className="w-6 h-6 mr-2 text-blue-600" />
-                {isEmitter ? 'Tu Ubicación' : `Ubicación de ${alertData.userName.split(' ')[0]}`}
+            {/* Mapa - Responsive */}
+            <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
+              <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 flex items-center">
+                <MapPin className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-blue-600" />
+                <span className="line-clamp-1">{isEmitter ? 'Tu Ubicación' : `Ubicación de ${alertData.userName.split(' ')[0]}`}</span>
               </h2>
               
-              <EmergencyLocationMap
-                latitude={alertData.gpsLatitude}
-                longitude={alertData.gpsLongitude}
-                location={alertData.location}
-                userName={alertData.userName}
-              />
+              <div className="w-full h-56 sm:h-64 md:h-72">
+                <EmergencyLocationMap
+                  latitude={alertData.gpsLatitude}
+                  longitude={alertData.gpsLongitude}
+                  location={alertData.location}
+                  userName={alertData.userName}
+                />
+              </div>
 
-              <div className="mt-4 bg-blue-50 rounded-lg p-3">
-                <p className="text-sm text-blue-900">
-                  <MapPin className="w-4 h-4 inline mr-1" />
+              <div className="mt-3 sm:mt-4 bg-blue-50 rounded-lg p-2 sm:p-3">
+                <p className="text-xs sm:text-sm text-blue-900 break-words">
+                  <MapPin className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1" />
                   {alertData.location}
                 </p>
                 {alertData.gpsLatitude && alertData.gpsLongitude && (
-                  <p className="text-xs text-blue-700 mt-1 font-mono">
+                  <p className="text-[10px] sm:text-xs text-blue-700 mt-1 font-mono break-all">
                     GPS: {alertData.gpsLatitude.toFixed(6)}, {alertData.gpsLongitude.toFixed(6)}
                   </p>
                 )}
@@ -1060,75 +1119,76 @@ const ActivePanicPage: React.FC = () => {
           </div>
 
           {/* Columna Derecha */}
-          <div className="space-y-6">
-            {/* Confirmaciones */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4 flex items-center">
-                <Users className="w-6 h-6 mr-2 text-green-600" />
-                Estado de Notificaciones
+          <div className="space-y-3 sm:space-y-4 md:space-y-6">
+            {/* Confirmaciones - Responsive */}
+            <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
+              <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 flex items-center">
+                <Users className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-green-600" />
+                <span className="text-sm sm:text-base md:text-xl">Notificaciones</span>
               </h2>
 
-              {/* Usuarios viendo la alerta en TIEMPO REAL */}
+              {/* Usuarios viendo la alerta en TIEMPO REAL - Responsive */}
               {Object.keys(onlineUsers).length > 0 && (
-                <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                  <h3 className="text-sm font-semibold text-green-800 mb-2 flex items-center">
-                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
+                  <h3 className="text-xs sm:text-sm font-semibold text-green-800 mb-2 flex items-center">
+                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full mr-1.5 sm:mr-2 animate-pulse"></span>
                     Viendo ahora ({Object.keys(onlineUsers).length})
                   </h3>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {Object.entries(onlineUsers).map(([uid, userData]) => (
                       <div 
                         key={uid}
-                        className="inline-flex items-center px-2 py-1 bg-white rounded-full text-xs font-medium text-green-700 border border-green-300"
+                        className="inline-flex items-center px-2 py-0.5 sm:py-1 bg-white rounded-full text-[10px] sm:text-xs font-medium text-green-700 border border-green-300"
                       >
-                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></span>
-                        {userData.userName}
+                        <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-green-500 rounded-full mr-1 sm:mr-1.5"></span>
+                        <span className="truncate max-w-[100px] sm:max-w-none">{userData.userName}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              <div className="mb-4">
+              <div className="mb-3 sm:mb-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">Confirmaciones</span>
-                  <span className="text-sm font-bold text-green-600">
-                    {acknowledgedCount} de {totalNotified} ({confirmationRate}%)
+                  <span className="text-xs sm:text-sm font-medium">Confirmaciones</span>
+                  <span className="text-xs sm:text-sm font-bold text-green-600">
+                    {acknowledgedCount}/{totalNotified} ({confirmationRate}%)
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
+                <div className="w-full bg-gray-200 rounded-full h-2 sm:h-2.5 md:h-3">
                   <div
-                    className="bg-green-600 h-3 rounded-full transition-all"
+                    className="bg-green-600 h-2 sm:h-2.5 md:h-3 rounded-full transition-all"
                     style={{ width: `${confirmationRate}%` }}
                   ></div>
                 </div>
               </div>
 
-              <div className="space-y-2 max-h-40 overflow-y-auto">
+              <div className="space-y-1.5 sm:space-y-2 max-h-32 sm:max-h-40 overflow-y-auto">
                 {alertData.notifiedUsers?.map((userId) => {
                   const hasAck = alertData.acknowledgedBy?.includes(userId);
                   const isOnline = onlineUsers[userId] !== undefined;
                   return (
                     <div
                       key={userId}
-                      className={`flex items-center justify-between p-2 rounded-lg ${
+                      className={`flex items-center justify-between p-1.5 sm:p-2 rounded-lg ${
                         hasAck ? 'bg-green-50' : 'bg-gray-50'
                       }`}
                     >
-                      <span className="text-sm flex items-center">
+                      <span className="text-xs sm:text-sm flex items-center min-w-0">
                         {isOnline && (
-                          <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full mr-1.5 sm:mr-2 flex-shrink-0"></span>
                         )}
-                        {onlineUsers[userId]?.userName || 'Contacto'}
+                        <span className="truncate">{onlineUsers[userId]?.userName || 'Contacto'}</span>
                       </span>
                       {hasAck ? (
-                        <span className="flex items-center text-green-600 text-sm font-medium">
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Confirmó
+                        <span className="flex items-center text-green-600 text-[10px] sm:text-xs md:text-sm font-medium flex-shrink-0 ml-2">
+                          <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-0.5 sm:mr-1" />
+                          <span className="hidden sm:inline">Confirmó</span>
+                          <span className="sm:hidden">✓</span>
                         </span>
                       ) : (
-                        <span className={`text-sm font-medium ${isOnline ? 'text-blue-600' : 'text-orange-600'}`}>
-                          {isOnline ? 'Viendo...' : 'Pendiente...'}
+                        <span className={`text-[10px] sm:text-xs md:text-sm font-medium flex-shrink-0 ml-2 ${isOnline ? 'text-blue-600' : 'text-orange-600'}`}>
+                          {isOnline ? 'Viendo' : 'Pend'}
                         </span>
                       )}
                     </div>
@@ -1137,45 +1197,45 @@ const ActivePanicPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Chat */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4 flex items-center text-gray-900">
-                <MessageCircle className="w-6 h-6 mr-2 text-blue-600" />
-                Chat de Emergencia
+            {/* Chat - Responsive */}
+            <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
+              <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 flex items-center text-gray-900">
+                <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-blue-600" />
+                <span>Chat de Emergencia</span>
               </h2>
               
-              {/* Leyenda de tipos de mensajes */}
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Tipos de mensajes:</h3>
-                <div className="flex flex-wrap gap-4 text-xs">
+              {/* Leyenda de tipos de mensajes - Responsive */}
+              <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-gray-50 rounded-lg border">
+                <h3 className="text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">Tipos de mensajes:</h3>
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 md:gap-4 text-[10px] sm:text-xs">
                   <div className="flex items-center">
-                    <div className="w-4 h-4 bg-red-100 border-2 border-red-400 rounded mr-2 neon-pulse"></div>
-                    <span className="text-red-700 font-medium">⚠️ Quien solicita ayuda (con efecto neón)</span>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-100 border-2 border-red-400 rounded mr-1.5 sm:mr-2 neon-pulse flex-shrink-0"></div>
+                    <span className="text-red-700 font-medium">⚠️ Solicita ayuda</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-4 h-4 bg-blue-600 rounded mr-2"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-600 rounded mr-1.5 sm:mr-2 flex-shrink-0"></div>
                     <span className="text-blue-700 font-medium">Tus mensajes</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-4 h-4 bg-gray-200 rounded mr-2"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-200 rounded mr-1.5 sm:mr-2 flex-shrink-0"></div>
                     <span className="text-gray-700">Otros usuarios</span>
                   </div>
                 </div>
               </div>
 
-              {/* Mensajes */}
-              <div className="bg-gray-50 rounded-lg p-4 h-64 overflow-y-auto mb-4">
+              {/* Mensajes - Altura optimizada para móvil */}
+              <div className="bg-gray-50 rounded-lg p-2 sm:p-3 md:p-4 h-56 sm:h-64 md:h-72 overflow-y-auto mb-3 sm:mb-4">
                 {chatMessages.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Aún no hay mensajes</p>
+                  <div className="text-center text-gray-500 py-6 sm:py-8">
+                    <MessageCircle className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs sm:text-sm">Aún no hay mensajes</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {chatMessages.map((msg) => {
                       const isOwn = msg.userId === user?.uid;
-                      const isEmitter = msg.userId === alertData.userId; // El emisor de la alerta
-                      const isResponder = !isOwn && !isEmitter; // Usuario que responde
+                      const isEmitter = msg.userId === alertData.userId;
+                      const isResponder = !isOwn && !isEmitter;
                       
                       return (
                         <div
@@ -1183,41 +1243,40 @@ const ActivePanicPage: React.FC = () => {
                           className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[75%] rounded-lg px-4 py-2 relative ${
+                            className={`max-w-[85%] sm:max-w-[75%] rounded-lg px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 relative ${
                               isEmitter 
-                                ? 'bg-red-100 border-2 border-red-400 text-red-900 shadow-lg neon-pulse' // Emisor: con animación de neón
+                                ? 'bg-red-100 border-2 border-red-400 text-red-900 shadow-lg neon-pulse'
                                 : isOwn 
-                                  ? 'bg-blue-600 text-white shadow-md' // Propio: azul
-                                  : 'bg-gray-200 text-gray-900' // Otros: gris
+                                  ? 'bg-blue-600 text-white shadow-md'
+                                  : 'bg-gray-200 text-gray-900'
                             }`}
                           >
-                            
                             {/* Header del mensaje con icono */}
-                            <div className="flex items-center mb-1">
+                            <div className="flex items-center mb-0.5 sm:mb-1">
                               {isEmitter && (
-                                <AlertTriangle className="w-4 h-4 mr-1 text-red-600" />
+                                <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-red-600 flex-shrink-0" />
                               )}
                               {isResponder && (
-                                <Users className="w-4 h-4 mr-1 text-blue-600" />
+                                <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-blue-600 flex-shrink-0" />
                               )}
-                              <p className="text-xs font-semibold opacity-75">
+                              <p className="text-[10px] sm:text-xs font-semibold opacity-75 truncate">
                                 {isOwn 
                                   ? 'Tú' 
                                   : isEmitter 
-                                    ? `${msg.userName} (Solicita Ayuda)` 
-                                    : `${msg.userName} (Responde)`
+                                    ? `${msg.userName.split(' ')[0]} (Ayuda)` 
+                                    : msg.userName.split(' ')[0]
                                 }
                               </p>
                             </div>
                             
                             {/* Contenido del mensaje */}
-                            <p className="text-sm">{msg.message}</p>
+                            <p className="text-xs sm:text-sm break-words">{msg.message}</p>
                             
                             {/* Timestamp */}
-                            <p className={`text-xs mt-1 opacity-75 ${
+                            <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 opacity-75 ${
                               isEmitter ? 'text-red-600' : isOwn ? 'text-blue-100' : 'text-gray-600'
                             }`}>
-                              {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString() : ''}
+                              {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </p>
                           </div>
                         </div>
@@ -1228,112 +1287,115 @@ const ActivePanicPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Indicador de usuarios escribiendo */}
+              {/* Indicador de usuarios escribiendo - Responsive */}
               {Object.entries(usersTyping).some(([_, isTyping]) => isTyping) && (
-                <div className="mb-2 px-3 py-1 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-blue-600 flex items-center">
-                    <span className="flex space-x-1 mr-2">
-                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                <div className="mb-2 px-2 sm:px-3 py-1 bg-blue-50 rounded-lg">
+                  <p className="text-[10px] sm:text-xs text-blue-600 flex items-center">
+                    <span className="flex space-x-0.5 sm:space-x-1 mr-1.5 sm:mr-2">
+                      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                     </span>
-                    {Object.entries(usersTyping)
-                      .filter(([_, isTyping]) => isTyping)
-                      .map(([uid, _]) => onlineUsers[uid]?.userName)
-                      .filter(Boolean)
-                      .join(', ')} {Object.entries(usersTyping).filter(([_, isTyping]) => isTyping).length === 1 ? 'está' : 'están'} escribiendo...
+                    <span className="truncate">
+                      {Object.entries(usersTyping)
+                        .filter(([_, isTyping]) => isTyping)
+                        .map(([uid, _]) => onlineUsers[uid]?.userName?.split(' ')[0])
+                        .filter(Boolean)
+                        .join(', ')} {Object.entries(usersTyping).filter(([_, isTyping]) => isTyping).length === 1 ? 'está' : 'están'} escribiendo...
+                    </span>
                   </p>
                 </div>
               )}
 
-              {/* Input */}
-              <form onSubmit={handleSendMessage} className="flex space-x-2">
+              {/* Input - Responsive */}
+              <form onSubmit={handleSendMessage} className="flex gap-2">
                 <input
                   type="text"
                   value={newMessage}
                   onChange={(e) => {
                     setNewMessage(e.target.value);
-                    handleTypingIndicator(); // Indicar que está escribiendo
+                    handleTypingIndicator();
                   }}
                   placeholder="Escribe un mensaje..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
                   disabled={sendingMessage || alertData.status !== 'active'}
                 />
                 <button
                   type="submit"
                   disabled={sendingMessage || !newMessage.trim() || alertData.status !== 'active'}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="bg-blue-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                 >
-                  <Send className="w-5 h-5" />
+                  <Send className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </form>
             </div>
           </div>
         </div>
 
-        {/* Acciones */}
-        <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-bold mb-4">
+        {/* Acciones - Responsive y fijas en móvil */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl p-3 sm:p-4 md:relative md:mt-6 md:rounded-lg md:shadow-lg md:border-t-0 z-50">
+          <h2 className="text-sm sm:text-base md:text-xl font-bold mb-2 sm:mb-3 md:mb-4 hidden md:block">
             {isEmitter ? 'Acciones de Emergencia' : 'Responder a Emergencia'}
           </h2>
           
           {isEmitter ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
               <a
                 href="tel:911"
-                className="flex items-center justify-center space-x-2 bg-red-600 text-white py-4 px-6 rounded-lg font-bold text-lg hover:bg-red-700"
+                className="flex items-center justify-center gap-1.5 sm:gap-2 bg-red-600 text-white py-3 sm:py-3.5 md:py-4 px-3 sm:px-4 md:px-6 rounded-lg font-bold text-sm sm:text-base md:text-lg hover:bg-red-700 active:bg-red-800 transition-colors"
               >
-                <Phone className="w-6 h-6" />
-                <span>LLAMAR AL 911</span>
+                <Phone className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                <span>LLAMAR 911</span>
               </a>
 
               <button
                 onClick={handleResolveAlert}
                 disabled={alertData.status !== 'active'}
-                className="flex items-center justify-center space-x-2 bg-green-600 text-white py-4 px-6 rounded-lg font-bold text-lg hover:bg-green-700 disabled:bg-gray-400"
+                className="flex items-center justify-center gap-1.5 sm:gap-2 bg-green-600 text-white py-3 sm:py-3.5 md:py-4 px-3 sm:px-4 md:px-6 rounded-lg font-bold text-sm sm:text-base md:text-lg hover:bg-green-700 active:bg-green-800 disabled:bg-gray-400 transition-colors"
               >
-                <CheckCircle className="w-6 h-6" />
-                <span>MARCAR COMO RESUELTA</span>
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                <span className="hidden sm:inline">MARCAR RESUELTA</span>
+                <span className="sm:hidden">RESUELTA</span>
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2 sm:space-y-3 md:space-y-4">
               {!hasAcknowledged && (
                 <button
                   onClick={handleAcknowledgeAlert}
-                  className="w-full flex items-center justify-center space-x-2 bg-green-600 text-white py-4 px-6 rounded-lg font-bold text-xl hover:bg-green-700 shadow-lg"
+                  className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 rounded-lg font-bold text-base sm:text-lg md:text-xl hover:bg-green-700 active:bg-green-800 shadow-lg transition-colors"
                 >
-                  <CheckCircle className="w-7 h-7" />
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
                   <span>HE SIDO NOTIFICADO</span>
                 </button>
               )}
 
               {hasAcknowledged && (
-                <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4">
-                  <div className="flex items-center justify-center space-x-2 text-green-700">
-                    <CheckCircle className="w-6 h-6" />
-                    <span className="font-bold text-lg">Ya confirmaste esta alerta</span>
+                <div className="bg-green-50 border-2 border-green-500 rounded-lg p-3 sm:p-4">
+                  <div className="flex items-center justify-center gap-2 text-green-700">
+                    <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                    <span className="font-bold text-sm sm:text-base md:text-lg">Ya confirmaste</span>
                   </div>
-                  <p className="text-center text-green-600 text-sm mt-2">
-                    Continúa usando el chat para coordinar
+                  <p className="text-center text-green-600 text-xs sm:text-sm mt-1 sm:mt-2">
+                    Continúa usando el chat
                   </p>
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
                 <a
                   href="tel:911"
-                  className="flex items-center justify-center space-x-2 bg-red-600 text-white py-3 px-6 rounded-lg font-bold hover:bg-red-700"
+                  className="flex items-center justify-center gap-1.5 sm:gap-2 bg-red-600 text-white py-2.5 sm:py-3 md:py-3.5 px-3 sm:px-4 md:px-6 rounded-lg font-bold text-sm sm:text-base hover:bg-red-700 active:bg-red-800 transition-colors"
                 >
-                  <Phone className="w-5 h-5" />
-                  <span>LLAMAR AL 911</span>
+                  <Phone className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span>LLAMAR 911</span>
                 </a>
 
                 <button
                   onClick={() => routerRef.current.push('/residentes/panico')}
-                  className="flex items-center justify-center space-x-2 bg-gray-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-gray-700"
+                  className="flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-600 text-white py-2.5 sm:py-3 md:py-3.5 px-3 sm:px-4 md:px-6 rounded-lg font-semibold text-sm sm:text-base hover:bg-gray-700 active:bg-gray-800 transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span>VOLVER</span>
                 </button>
               </div>
