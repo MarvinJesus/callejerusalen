@@ -140,6 +140,62 @@ const ActivePanicPage: React.FC = () => {
       console.log('🔄 ActivePanicPage desmontado:', new Date().toISOString());
     };
   }, []);
+
+  // Monitorear conexión de Firebase
+  useEffect(() => {
+    console.log('🔗 Iniciando monitoreo de conexión Firebase...');
+    
+    let unsubscribe: (() => void) | null = null;
+    
+    // Verificar conexión inicial
+    const checkConnection = () => {
+      // Usar una operación simple de Firebase para verificar conexión
+      const testDoc = doc(db, 'panicReports', 'connection-test');
+      getDoc(testDoc).then(() => {
+        setFirebaseConnected(true);
+        console.log('✅ Firebase conectado');
+      }).catch((error) => {
+        setFirebaseConnected(false);
+        console.log('❌ Firebase desconectado:', error.message);
+      });
+    };
+
+    // Verificar inicialmente
+    checkConnection();
+
+    // Usar onSnapshot para monitorear el estado de conexión
+    // Esto es más preciso que polling manual
+    const connectionTestRef = doc(db, 'panicReports', 'connection-test');
+    
+    // Intentar leer un documento que sabemos que existe (la alerta actual)
+    if (alertId) {
+      const alertRef = doc(db, 'panicReports', alertId);
+      unsubscribe = onSnapshot(
+        alertRef,
+        (doc) => {
+          if (doc.exists()) {
+            setFirebaseConnected(true);
+            console.log('✅ Firebase conectado (onSnapshot activo)');
+          }
+        },
+        (error) => {
+          setFirebaseConnected(false);
+          console.log('❌ Firebase desconectado (onSnapshot error):', error.message);
+        }
+      );
+    }
+
+    // Verificar periódicamente cada 15 segundos como backup
+    const interval = setInterval(checkConnection, 15000);
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+      clearInterval(interval);
+      console.log('🔗 Monitoreo de conexión Firebase detenido');
+    };
+  }, [alertId]);
   
   // Estados
   const [alertData, setAlertData] = useState<AlertData | null>(null);
@@ -156,6 +212,9 @@ const ActivePanicPage: React.FC = () => {
   // Estados de presencia
   const [onlineUsers, setOnlineUsers] = useState<Record<string, { userName: string; lastSeen: number }>>({});
   const [usersTyping, setUsersTyping] = useState<Record<string, boolean>>({});
+  
+  // Estado de conexión Firebase
+  const [firebaseConnected, setFirebaseConnected] = useState(true);
   
   // Estado de sonido de alarma
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -960,46 +1019,85 @@ const ActivePanicPage: React.FC = () => {
                 </span>
               </button>
 
-              {/* Indicador de conexión */}
-              <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-2 rounded-lg text-sm sm:text-base ${
-                isConnected ? 'bg-green-500 bg-opacity-30' : 'bg-yellow-500 bg-opacity-30'
-              }`}>
-                {isConnected ? <Wifi className="w-4 h-4 sm:w-5 sm:h-5" /> : <WifiOff className="w-4 h-4 sm:w-5 sm:h-5" />}
-                <span className="font-semibold text-xs sm:text-sm hidden xs:inline">{isConnected ? 'Online' : 'Offline'}</span>
+              {/* Indicador de conexión Firebase */}
+              <div 
+                className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-2 rounded-lg text-sm sm:text-base transition-all duration-300 ${
+                  firebaseConnected 
+                    ? 'bg-green-500 bg-opacity-30 hover:bg-opacity-40' 
+                    : 'bg-red-500 bg-opacity-30 hover:bg-opacity-40'
+                }`}
+                title={firebaseConnected ? 'Conectado a Firebase - Datos en tiempo real' : 'Desconectado de Firebase - Sin datos en tiempo real'}
+              >
+                <div className="relative">
+                  {firebaseConnected ? (
+                    <Wifi className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
+                  ) : (
+                    <WifiOff className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+                  )}
+                  {firebaseConnected && (
+                    <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  )}
+                </div>
+                <span className="font-semibold text-xs sm:text-sm hidden xs:inline">
+                  {firebaseConnected ? 'Online' : 'Offline'}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Info - Responsive Grid */}
-          <div className="mt-3 sm:mt-4 grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
-            <div className="bg-white bg-opacity-10 rounded-lg p-2 sm:p-3">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                <Clock className="w-4 h-4 sm:w-5 sm:h-5 mb-1 sm:mb-0" />
-                <span className="text-[10px] sm:text-xs md:text-sm font-medium">Tiempo:</span>
+          {/* Info - Responsive Grid con mejor contraste */}
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+            <div className="bg-red-700 bg-opacity-80 rounded-lg p-4 border border-red-400">
+              <div className="flex items-center space-x-2 mb-2">
+                <Clock className="w-5 h-5 text-white" />
+                <span className="text-sm font-medium text-red-100">Tiempo Restante</span>
               </div>
-              <p className="text-base sm:text-xl md:text-2xl font-bold mt-0.5 sm:mt-1 leading-tight">{timeRemaining}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-white leading-tight">{timeRemaining}</p>
             </div>
 
-            <div className="bg-white bg-opacity-10 rounded-lg p-2 sm:p-3">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 mb-1 sm:mb-0" />
-                <span className="text-[10px] sm:text-xs md:text-sm font-medium">Confirm:</span>
+            <div className="bg-red-700 bg-opacity-80 rounded-lg p-4 border border-red-400">
+              <div className="flex items-center space-x-2 mb-2">
+                <Users className="w-5 h-5 text-white" />
+                <span className="text-sm font-medium text-red-100">Confirmaciones</span>
               </div>
-              <p className="text-base sm:text-xl md:text-2xl font-bold mt-0.5 sm:mt-1 leading-tight">
+              <p className="text-2xl sm:text-3xl font-bold text-white leading-tight">
                 {acknowledgedCount}/{totalNotified}
-                <span className="text-xs sm:text-sm md:text-lg ml-1 sm:ml-2">({confirmationRate}%)</span>
               </p>
+              <p className="text-sm text-red-200 mt-1">({confirmationRate}%)</p>
             </div>
 
-            <div className="bg-white bg-opacity-10 rounded-lg p-2 sm:p-3">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
-                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 mb-1 sm:mb-0" />
-                <span className="text-[10px] sm:text-xs md:text-sm font-medium">Estado:</span>
+            <div className="bg-red-700 bg-opacity-80 rounded-lg p-4 border border-red-400">
+              <div className="flex items-center space-x-2 mb-2">
+                <CheckCircle className="w-5 h-5 text-white" />
+                <span className="text-sm font-medium text-red-100">Estado</span>
               </div>
-              <p className="text-base sm:text-xl md:text-2xl font-bold mt-0.5 sm:mt-1 capitalize leading-tight">{alertData.status}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-white capitalize leading-tight">{alertData.status}</p>
             </div>
           </div>
         </div>
+
+        {/* Banner de conexión Firebase desconectado */}
+        {!firebaseConnected && (
+          <div className="bg-red-600 text-white rounded-lg shadow-lg p-4 mb-4 border-2 border-red-400 animate-pulse">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <WifiOff className="w-6 h-6 text-red-200" />
+                <div>
+                  <h3 className="font-bold text-lg">⚠️ Sin Conexión a Firebase</h3>
+                  <p className="text-red-100 text-sm">
+                    Los datos no se están actualizando en tiempo real. Verifica tu conexión a internet.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => window.location.reload()}
+                className="bg-white text-red-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-red-50 active:bg-red-100 transition-colors flex-shrink-0"
+              >
+                RECARGAR
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Banner para activar sonido manualmente - Solo si es receptor y el sonido está habilitado pero no se reproduce */}
         {showSoundPrompt && !isEmitter && soundEnabled && !isPlaying() && alertData.status === 'active' && (
@@ -1035,22 +1133,24 @@ const ActivePanicPage: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
           {/* Columna Izquierda */}
           <div className="space-y-3 sm:space-y-4 md:space-y-6">
-            {/* Banner confirmación (receptores) - Responsive */}
+            {/* Banner confirmación (receptores) - Mejorado */}
             {!isEmitter && !hasAcknowledged && (
-              <div className="bg-green-600 text-white rounded-lg shadow-lg p-4 sm:p-5 md:p-6">
-                <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
-                  <CheckCircle className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <h3 className="text-base sm:text-lg md:text-xl font-bold">¿Recibiste la alerta?</h3>
-                    <p className="text-green-100 text-xs sm:text-sm md:text-base">Confirma para que {alertData.userName.split(' ')[0]} sepa</p>
+              <div className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl shadow-2xl p-6 border-2 border-green-400">
+                <div className="text-center">
+                  <div className="mb-4">
+                    <CheckCircle className="w-16 h-16 mx-auto text-green-100 animate-pulse" />
                   </div>
+                  <h3 className="text-2xl font-bold mb-2">¿Recibiste la alerta de emergencia?</h3>
+                  <p className="text-green-100 text-lg mb-6">
+                    {alertData.userName.split(' ')[0]} necesita tu confirmación de que has sido notificado
+                  </p>
+                  <button
+                    onClick={handleAcknowledgeAlert}
+                    className="w-full bg-white text-green-700 py-4 px-6 rounded-xl font-bold text-xl hover:bg-green-50 active:bg-green-100 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    ✅ SÍ, HE SIDO NOTIFICADO
+                  </button>
                 </div>
-                <button
-                  onClick={handleAcknowledgeAlert}
-                  className="w-full bg-white text-green-600 py-3 sm:py-3.5 md:py-4 px-4 sm:px-5 md:px-6 rounded-lg font-bold text-base sm:text-lg md:text-xl hover:bg-green-50 active:bg-green-100 transition-colors"
-                >
-                  ✅ SÍ, HE SIDO NOTIFICADO
-                </button>
               </div>
             )}
 
@@ -1088,314 +1188,343 @@ const ActivePanicPage: React.FC = () => {
               </div>
             )}
 
-            {/* Mapa - Responsive */}
-            <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 flex items-center">
-                <MapPin className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-blue-600" />
-                <span className="line-clamp-1">{isEmitter ? 'Tu Ubicación' : `Ubicación de ${alertData.userName.split(' ')[0]}`}</span>
-              </h2>
-              
-              <div className="w-full h-56 sm:h-64 md:h-72">
-                <EmergencyLocationMap
-                  latitude={alertData.gpsLatitude}
-                  longitude={alertData.gpsLongitude}
-                  location={alertData.location}
-                  userName={alertData.userName}
-                />
+            {/* Mapa - Mejorado */}
+            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+                <h2 className="text-xl font-bold flex items-center">
+                  <MapPin className="w-6 h-6 mr-3" />
+                  {isEmitter ? 'Tu Ubicación de Emergencia' : `Ubicación de ${alertData.userName.split(' ')[0]}`}
+                </h2>
               </div>
+              
+              <div className="p-4">
+                <div className="w-full h-64 sm:h-72 md:h-80 rounded-lg overflow-hidden border-2 border-gray-300 shadow-inner">
+                  <EmergencyLocationMap
+                    latitude={alertData.gpsLatitude}
+                    longitude={alertData.gpsLongitude}
+                    location={alertData.location}
+                    userName={alertData.userName}
+                  />
+                </div>
 
-              <div className="mt-3 sm:mt-4 bg-blue-50 rounded-lg p-2 sm:p-3">
-                <p className="text-xs sm:text-sm text-blue-900 break-words">
-                  <MapPin className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1" />
-                  {alertData.location}
-                </p>
-                {alertData.gpsLatitude && alertData.gpsLongitude && (
-                  <p className="text-[10px] sm:text-xs text-blue-700 mt-1 font-mono break-all">
-                    GPS: {alertData.gpsLatitude.toFixed(6)}, {alertData.gpsLongitude.toFixed(6)}
-                  </p>
-                )}
+                <div className="mt-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                  <div className="flex items-start space-x-3">
+                    <MapPin className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900 mb-2">
+                        {alertData.location}
+                      </p>
+                      {alertData.gpsLatitude && alertData.gpsLongitude && (
+                        <div className="bg-white rounded p-2 border">
+                          <p className="text-xs text-gray-600 mb-1">Coordenadas GPS:</p>
+                          <p className="text-sm font-mono text-gray-800">
+                            Lat: {alertData.gpsLatitude.toFixed(6)}, Lng: {alertData.gpsLongitude.toFixed(6)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Columna Derecha */}
           <div className="space-y-3 sm:space-y-4 md:space-y-6">
-            {/* Confirmaciones - Responsive */}
-            <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 flex items-center">
-                <Users className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-green-600" />
-                <span className="text-sm sm:text-base md:text-xl">Notificaciones</span>
-              </h2>
+            {/* Confirmaciones - Mejorado */}
+            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-4">
+                <h2 className="text-xl font-bold flex items-center">
+                  <Users className="w-6 h-6 mr-3" />
+                  Estado de Notificaciones
+                </h2>
+              </div>
+              
+              <div className="p-4">
 
-              {/* Usuarios viendo la alerta en TIEMPO REAL - Responsive */}
-              {Object.keys(onlineUsers).length > 0 && (
-                <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-green-50 rounded-lg border border-green-200">
-                  <h3 className="text-xs sm:text-sm font-semibold text-green-800 mb-2 flex items-center">
-                    <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full mr-1.5 sm:mr-2 animate-pulse"></span>
-                    Viendo ahora ({Object.keys(onlineUsers).length})
-                  </h3>
-                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                    {Object.entries(onlineUsers).map(([uid, userData]) => (
-                      <div 
-                        key={uid}
-                        className="inline-flex items-center px-2 py-0.5 sm:py-1 bg-white rounded-full text-[10px] sm:text-xs font-medium text-green-700 border border-green-300"
-                      >
-                        <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 bg-green-500 rounded-full mr-1 sm:mr-1.5"></span>
-                        <span className="truncate max-w-[100px] sm:max-w-none">{userData.userName}</span>
-                      </div>
-                    ))}
+                {/* Usuarios viendo la alerta en TIEMPO REAL - Mejorado */}
+                {Object.keys(onlineUsers).length > 0 && (
+                  <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-300">
+                    <h3 className="text-sm font-semibold text-green-800 mb-3 flex items-center">
+                      <span className="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                      Viendo ahora ({Object.keys(onlineUsers).length})
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(onlineUsers).map(([uid, userData]) => (
+                        <div 
+                          key={uid}
+                          className="inline-flex items-center px-3 py-1.5 bg-white rounded-full text-sm font-medium text-green-700 border border-green-300 shadow-sm"
+                        >
+                          <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                          {userData.userName}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-gray-700">Progreso de Confirmaciones</span>
+                    <span className="text-sm font-bold text-green-600 bg-green-100 px-2 py-1 rounded">
+                      {acknowledgedCount}/{totalNotified} ({confirmationRate}%)
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-4 shadow-inner">
+                    <div
+                      className="bg-gradient-to-r from-green-500 to-green-600 h-4 rounded-full transition-all duration-300 shadow-sm"
+                      style={{ width: `${confirmationRate}%` }}
+                    ></div>
                   </div>
                 </div>
-              )}
 
-              <div className="mb-3 sm:mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs sm:text-sm font-medium">Confirmaciones</span>
-                  <span className="text-xs sm:text-sm font-bold text-green-600">
-                    {acknowledgedCount}/{totalNotified} ({confirmationRate}%)
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2 sm:h-2.5 md:h-3">
-                  <div
-                    className="bg-green-600 h-2 sm:h-2.5 md:h-3 rounded-full transition-all"
-                    style={{ width: `${confirmationRate}%` }}
-                  ></div>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 sm:space-y-2 max-h-32 sm:max-h-40 overflow-y-auto">
-                {alertData.notifiedUsers?.map((userId) => {
-                  const hasAck = alertData.acknowledgedBy?.includes(userId);
-                  const isOnline = onlineUsers[userId] !== undefined;
-                  return (
-                    <div
-                      key={userId}
-                      className={`flex items-center justify-between p-1.5 sm:p-2 rounded-lg ${
-                        hasAck ? 'bg-green-50' : 'bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-xs sm:text-sm flex items-center min-w-0">
-                        {isOnline && (
-                          <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full mr-1.5 sm:mr-2 flex-shrink-0"></span>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {alertData.notifiedUsers?.map((userId) => {
+                    const hasAck = alertData.acknowledgedBy?.includes(userId);
+                    const isOnline = onlineUsers[userId] !== undefined;
+                    return (
+                      <div
+                        key={userId}
+                        className={`flex items-center justify-between p-3 rounded-lg border ${
+                          hasAck 
+                            ? 'bg-green-50 border-green-200' 
+                            : isOnline 
+                              ? 'bg-blue-50 border-blue-200' 
+                              : 'bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        <span className="text-sm flex items-center min-w-0">
+                          {isOnline && (
+                            <span className="w-2 h-2 bg-green-500 rounded-full mr-2 flex-shrink-0 animate-pulse"></span>
+                          )}
+                          <span className="font-medium">{onlineUsers[userId]?.userName || 'Contacto'}</span>
+                        </span>
+                        {hasAck ? (
+                          <span className="flex items-center text-green-700 text-sm font-medium flex-shrink-0 ml-2 bg-green-100 px-2 py-1 rounded">
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Confirmó
+                          </span>
+                        ) : (
+                          <span className={`text-sm font-medium flex-shrink-0 ml-2 px-2 py-1 rounded ${
+                            isOnline 
+                              ? 'text-blue-700 bg-blue-100' 
+                              : 'text-orange-700 bg-orange-100'
+                          }`}>
+                            {isOnline ? 'Viendo...' : 'Pendiente'}
+                          </span>
                         )}
-                        <span className="truncate">{onlineUsers[userId]?.userName || 'Contacto'}</span>
-                      </span>
-                      {hasAck ? (
-                        <span className="flex items-center text-green-600 text-[10px] sm:text-xs md:text-sm font-medium flex-shrink-0 ml-2">
-                          <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-0.5 sm:mr-1" />
-                          <span className="hidden sm:inline">Confirmó</span>
-                          <span className="sm:hidden">✓</span>
-                        </span>
-                      ) : (
-                        <span className={`text-[10px] sm:text-xs md:text-sm font-medium flex-shrink-0 ml-2 ${isOnline ? 'text-blue-600' : 'text-orange-600'}`}>
-                          {isOnline ? 'Viendo' : 'Pend'}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
-            {/* Chat - Responsive */}
-            <div className="bg-white rounded-lg shadow-lg p-3 sm:p-4 md:p-6">
-              <h2 className="text-base sm:text-lg md:text-xl font-bold mb-3 sm:mb-4 flex items-center text-gray-900">
-                <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-blue-600" />
-                <span>Chat de Emergencia</span>
-              </h2>
+            {/* Chat - Mejorado */}
+            <div className="bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+                <h2 className="text-xl font-bold flex items-center">
+                  <MessageCircle className="w-6 h-6 mr-3" />
+                  Chat de Emergencia
+                </h2>
+              </div>
               
-              {/* Leyenda de tipos de mensajes - Responsive */}
-              <div className="mb-3 sm:mb-4 p-2 sm:p-3 bg-gray-50 rounded-lg border">
-                <h3 className="text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">Tipos de mensajes:</h3>
-                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 md:gap-4 text-[10px] sm:text-xs">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-100 border-2 border-red-400 rounded mr-1.5 sm:mr-2 neon-pulse flex-shrink-0"></div>
-                    <span className="text-red-700 font-medium">⚠️ Solicita ayuda</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-600 rounded mr-1.5 sm:mr-2 flex-shrink-0"></div>
-                    <span className="text-blue-700 font-medium">Tus mensajes</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 bg-gray-200 rounded mr-1.5 sm:mr-2 flex-shrink-0"></div>
-                    <span className="text-gray-700">Otros usuarios</span>
+              <div className="p-4">
+              
+                {/* Leyenda de tipos de mensajes - Mejorado */}
+                <div className="mb-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Tipos de mensajes:</h3>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 bg-red-100 border-2 border-red-400 rounded mr-2 neon-pulse flex-shrink-0"></div>
+                      <span className="text-red-700 font-medium">⚠️ Solicita ayuda</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 bg-blue-600 rounded mr-2 flex-shrink-0"></div>
+                      <span className="text-blue-700 font-medium">Tus mensajes</span>
+                    </div>
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 bg-gray-300 rounded mr-2 flex-shrink-0"></div>
+                      <span className="text-gray-700">Otros usuarios</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Mensajes - Altura optimizada para móvil */}
-              <div className="bg-gray-50 rounded-lg p-2 sm:p-3 md:p-4 h-56 sm:h-64 md:h-72 overflow-y-auto mb-3 sm:mb-4">
-                {chatMessages.length === 0 ? (
-                  <div className="text-center text-gray-500 py-6 sm:py-8">
-                    <MessageCircle className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 opacity-50" />
-                    <p className="text-xs sm:text-sm">Aún no hay mensajes</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 sm:space-y-3">
-                    {chatMessages.map((msg) => {
-                      const isOwn = msg.userId === user?.uid;
-                      const isEmitter = msg.userId === alertData.userId;
-                      const isResponder = !isOwn && !isEmitter;
-                      
-                      return (
-                        <div
-                          key={msg.id}
-                          className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                        >
+                {/* Mensajes - Mejorado */}
+                <div className="bg-gray-50 rounded-lg p-4 h-72 overflow-y-auto mb-4 border border-gray-200 shadow-inner">
+                  {chatMessages.length === 0 ? (
+                    <div className="text-center text-gray-500 py-12">
+                      <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg font-medium">Aún no hay mensajes</p>
+                      <p className="text-sm text-gray-400 mt-2">Sé el primero en escribir</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {chatMessages.map((msg) => {
+                        const isOwn = msg.userId === user?.uid;
+                        const isEmitter = msg.userId === alertData.userId;
+                        const isResponder = !isOwn && !isEmitter;
+                        
+                        return (
                           <div
-                            className={`max-w-[85%] sm:max-w-[75%] rounded-lg px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 relative ${
-                              isEmitter 
-                                ? 'bg-red-100 border-2 border-red-400 text-red-900 shadow-lg neon-pulse'
-                                : isOwn 
-                                  ? 'bg-blue-600 text-white shadow-md'
-                                  : 'bg-gray-200 text-gray-900'
-                            }`}
+                            key={msg.id}
+                            className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                           >
-                            {/* Header del mensaje con icono */}
-                            <div className="flex items-center mb-0.5 sm:mb-1">
-                              {isEmitter && (
-                                <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-red-600 flex-shrink-0" />
-                              )}
-                              {isResponder && (
-                                <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 text-blue-600 flex-shrink-0" />
-                              )}
-                              <p className="text-[10px] sm:text-xs font-semibold opacity-75 truncate">
-                                {isOwn 
-                                  ? 'Tú' 
-                                  : isEmitter 
-                                    ? `${msg.userName.split(' ')[0]} (Ayuda)` 
-                                    : msg.userName.split(' ')[0]
-                                }
+                            <div
+                              className={`max-w-[80%] rounded-xl px-4 py-3 relative shadow-sm ${
+                                isEmitter 
+                                  ? 'bg-red-100 border-2 border-red-400 text-red-900 shadow-lg neon-pulse'
+                                  : isOwn 
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : 'bg-white border border-gray-200 text-gray-900'
+                              }`}
+                            >
+                              {/* Header del mensaje con icono */}
+                              <div className="flex items-center mb-2">
+                                {isEmitter && (
+                                  <AlertTriangle className="w-4 h-4 mr-2 text-red-600 flex-shrink-0" />
+                                )}
+                                {isResponder && (
+                                  <Users className="w-4 h-4 mr-2 text-blue-600 flex-shrink-0" />
+                                )}
+                                <p className="text-xs font-semibold opacity-75">
+                                  {isOwn 
+                                    ? 'Tú' 
+                                    : isEmitter 
+                                      ? `${msg.userName.split(' ')[0]} (Solicita ayuda)` 
+                                      : msg.userName.split(' ')[0]
+                                  }
+                                </p>
+                              </div>
+                              
+                              {/* Contenido del mensaje */}
+                              <p className="text-sm break-words mb-2">{msg.message}</p>
+                              
+                              {/* Timestamp */}
+                              <p className={`text-xs opacity-75 ${
+                                isEmitter ? 'text-red-600' : isOwn ? 'text-blue-100' : 'text-gray-500'
+                              }`}>
+                                {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                               </p>
                             </div>
-                            
-                            {/* Contenido del mensaje */}
-                            <p className="text-xs sm:text-sm break-words">{msg.message}</p>
-                            
-                            {/* Timestamp */}
-                            <p className={`text-[10px] sm:text-xs mt-0.5 sm:mt-1 opacity-75 ${
-                              isEmitter ? 'text-red-600' : isOwn ? 'text-blue-100' : 'text-gray-600'
-                            }`}>
-                              {msg.timestamp?.toDate ? msg.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                            </p>
                           </div>
-                        </div>
-                      );
-                    })}
-                    <div ref={chatEndRef} />
+                        );
+                      })}
+                      <div ref={chatEndRef} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Indicador de usuarios escribiendo - Mejorado */}
+                {Object.entries(usersTyping).some(([_, isTyping]) => isTyping) && (
+                  <div className="mb-3 px-3 py-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-600 flex items-center">
+                      <span className="flex space-x-1 mr-2">
+                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                        <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                      </span>
+                      <span className="truncate">
+                        {Object.entries(usersTyping)
+                          .filter(([_, isTyping]) => isTyping)
+                          .map(([uid, _]) => onlineUsers[uid]?.userName?.split(' ')[0])
+                          .filter(Boolean)
+                          .join(', ')} {Object.entries(usersTyping).filter(([_, isTyping]) => isTyping).length === 1 ? 'está' : 'están'} escribiendo...
+                      </span>
+                    </p>
                   </div>
                 )}
+
+                {/* Input - Mejorado */}
+                <form onSubmit={handleSendMessage} className="flex gap-3">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={(e) => {
+                      setNewMessage(e.target.value);
+                      handleTypingIndicator();
+                    }}
+                    placeholder="Escribe un mensaje de emergencia..."
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-xl bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base shadow-sm"
+                    disabled={sendingMessage || alertData.status !== 'active'}
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendingMessage || !newMessage.trim() || alertData.status !== 'active'}
+                    className="bg-blue-600 text-white px-4 py-3 rounded-xl hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </form>
               </div>
-
-              {/* Indicador de usuarios escribiendo - Responsive */}
-              {Object.entries(usersTyping).some(([_, isTyping]) => isTyping) && (
-                <div className="mb-2 px-2 sm:px-3 py-1 bg-blue-50 rounded-lg">
-                  <p className="text-[10px] sm:text-xs text-blue-600 flex items-center">
-                    <span className="flex space-x-0.5 sm:space-x-1 mr-1.5 sm:mr-2">
-                      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                      <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                    </span>
-                    <span className="truncate">
-                      {Object.entries(usersTyping)
-                        .filter(([_, isTyping]) => isTyping)
-                        .map(([uid, _]) => onlineUsers[uid]?.userName?.split(' ')[0])
-                        .filter(Boolean)
-                        .join(', ')} {Object.entries(usersTyping).filter(([_, isTyping]) => isTyping).length === 1 ? 'está' : 'están'} escribiendo...
-                    </span>
-                  </p>
-                </div>
-              )}
-
-              {/* Input - Responsive */}
-              <form onSubmit={handleSendMessage} className="flex gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => {
-                    setNewMessage(e.target.value);
-                    handleTypingIndicator();
-                  }}
-                  placeholder="Escribe un mensaje..."
-                  className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm sm:text-base"
-                  disabled={sendingMessage || alertData.status !== 'active'}
-                />
-                <button
-                  type="submit"
-                  disabled={sendingMessage || !newMessage.trim() || alertData.status !== 'active'}
-                  className="bg-blue-600 text-white px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Send className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
-              </form>
             </div>
           </div>
         </div>
 
-        {/* Acciones - Responsive y fijas en móvil */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-2xl p-3 sm:p-4 md:relative md:mt-6 md:rounded-lg md:shadow-lg md:border-t-0 z-50">
-          <h2 className="text-sm sm:text-base md:text-xl font-bold mb-2 sm:mb-3 md:mb-4 hidden md:block">
+        {/* Acciones - Mejoradas */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-300 shadow-2xl p-4 md:relative md:mt-6 md:rounded-xl md:shadow-2xl md:border-t-0 z-50">
+          <h2 className="text-lg font-bold mb-4 hidden md:block text-center text-gray-800">
             {isEmitter ? 'Acciones de Emergencia' : 'Responder a Emergencia'}
           </h2>
           
           {isEmitter ? (
-            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <a
                 href="tel:911"
-                className="flex items-center justify-center gap-1.5 sm:gap-2 bg-red-600 text-white py-3 sm:py-3.5 md:py-4 px-3 sm:px-4 md:px-6 rounded-lg font-bold text-sm sm:text-base md:text-lg hover:bg-red-700 active:bg-red-800 transition-colors"
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 text-white py-4 px-6 rounded-xl font-bold text-lg hover:from-red-700 hover:to-red-800 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                <Phone className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                <Phone className="w-6 h-6" />
                 <span>LLAMAR 911</span>
               </a>
 
               <button
                 onClick={handleResolveAlert}
                 disabled={alertData.status !== 'active'}
-                className="flex items-center justify-center gap-1.5 sm:gap-2 bg-green-600 text-white py-3 sm:py-3.5 md:py-4 px-3 sm:px-4 md:px-6 rounded-lg font-bold text-sm sm:text-base md:text-lg hover:bg-green-700 active:bg-green-800 disabled:bg-gray-400 transition-colors"
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-600 to-green-700 text-white py-4 px-6 rounded-xl font-bold text-lg hover:from-green-700 hover:to-green-800 active:scale-95 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
               >
-                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
+                <CheckCircle className="w-6 h-6" />
                 <span className="hidden sm:inline">MARCAR RESUELTA</span>
                 <span className="sm:hidden">RESUELTA</span>
               </button>
             </div>
           ) : (
-            <div className="space-y-2 sm:space-y-3 md:space-y-4">
+            <div className="space-y-4">
               {!hasAcknowledged && (
                 <button
                   onClick={handleAcknowledgeAlert}
-                  className="w-full flex items-center justify-center gap-2 bg-green-600 text-white py-3.5 sm:py-4 md:py-5 px-4 sm:px-5 md:px-6 rounded-lg font-bold text-base sm:text-lg md:text-xl hover:bg-green-700 active:bg-green-800 shadow-lg transition-colors"
+                  className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-green-600 to-green-700 text-white py-5 px-6 rounded-xl font-bold text-xl hover:from-green-700 hover:to-green-800 active:scale-95 shadow-2xl hover:shadow-3xl transition-all duration-200"
                 >
-                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 md:w-7 md:h-7" />
+                  <CheckCircle className="w-7 h-7" />
                   <span>HE SIDO NOTIFICADO</span>
                 </button>
               )}
 
               {hasAcknowledged && (
-                <div className="bg-green-50 border-2 border-green-500 rounded-lg p-3 sm:p-4">
-                  <div className="flex items-center justify-center gap-2 text-green-700">
-                    <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />
-                    <span className="font-bold text-sm sm:text-base md:text-lg">Ya confirmaste</span>
+                <div className="bg-gradient-to-r from-green-50 to-green-100 border-2 border-green-400 rounded-xl p-4">
+                  <div className="flex items-center justify-center gap-3 text-green-700">
+                    <CheckCircle className="w-6 h-6" />
+                    <span className="font-bold text-lg">¡Ya confirmaste tu recepción!</span>
                   </div>
-                  <p className="text-center text-green-600 text-xs sm:text-sm mt-1 sm:mt-2">
-                    Continúa usando el chat
+                  <p className="text-center text-green-600 text-sm mt-2">
+                    Continúa usando el chat para coordinar la ayuda
                   </p>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <a
                   href="tel:911"
-                  className="flex items-center justify-center gap-1.5 sm:gap-2 bg-red-600 text-white py-2.5 sm:py-3 md:py-3.5 px-3 sm:px-4 md:px-6 rounded-lg font-bold text-sm sm:text-base hover:bg-red-700 active:bg-red-800 transition-colors"
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-red-700 text-white py-3 px-4 rounded-xl font-bold text-base hover:from-red-700 hover:to-red-800 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
-                  <Phone className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Phone className="w-5 h-5" />
                   <span>LLAMAR 911</span>
                 </a>
 
                 <button
                   onClick={() => routerRef.current.push('/residentes/panico')}
-                  className="flex items-center justify-center gap-1.5 sm:gap-2 bg-gray-600 text-white py-2.5 sm:py-3 md:py-3.5 px-3 sm:px-4 md:px-6 rounded-lg font-semibold text-sm sm:text-base hover:bg-gray-700 active:bg-gray-800 transition-colors"
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white py-3 px-4 rounded-xl font-semibold text-base hover:from-gray-700 hover:to-gray-800 active:scale-95 transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
-                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <X className="w-5 h-5" />
                   <span>VOLVER</span>
                 </button>
               </div>
