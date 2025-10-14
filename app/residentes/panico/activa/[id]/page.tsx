@@ -341,119 +341,131 @@ const ActivePanicPage: React.FC = () => {
     }
   }, [alertId]);
 
-  // WebSocket para chat de emergencia en tiempo real + Carga inicial
+  // Cargar mensajes históricos al montar el componente
+  useEffect(() => {
+    if (!alertId || loading) {
+      return;
+    }
+    
+    console.log('📚 Cargando mensajes históricos iniciales...');
+    loadHistoricalMessages();
+  }, [alertId, loading, loadHistoricalMessages]);
+
+  // WebSocket para chat de emergencia en tiempo real
   useEffect(() => {
     if (!alertId || !user || !userProfile || loading) {
-      console.log('⏳ Esperando condiciones para cargar chat:', { alertId, user: !!user, userProfile: !!userProfile, loading });
+      console.log('⏳ Esperando condiciones para configurar chat WebSocket:', { 
+        alertId: !!alertId, 
+        user: !!user, 
+        userProfile: !!userProfile, 
+        loading 
+      });
       return;
     }
 
-    console.log('🚀 Iniciando carga del chat para alerta:', alertId);
-    
-    // 1. Cargar mensajes históricos primero
-    loadHistoricalMessages();
-
-    // 2. Unirse al chat de la alerta vía WebSocket
-    if (socket) {
-      console.log(`💬 Uniéndose al chat de alerta ${alertId}`);
-      
-      // Unirse a la sala del chat
-      socket.emit('chat:join', {
-        alertId,
-        userId: user.uid,
-        userName: userProfile.displayName || user.displayName || 'Usuario'
+    if (!socket || !isConnected) {
+      console.log('⏳ Socket no disponible o no conectado, esperando...', { 
+        socket: !!socket, 
+        isConnected 
       });
+      return;
+    }
 
-      // Escuchar nuevos mensajes
-      const handleNewMessage = (message: ChatMessage & { firestoreId?: string }) => {
-        console.log('💬 Nuevo mensaje recibido:', message);
-        setChatMessages(prev => {
-          // Evitar duplicados usando el ID del mensaje o el ID de Firestore
-          const exists = prev.some(msg => 
-            msg.id === message.id || 
-            (message.firestoreId && msg.id === message.firestoreId)
-          );
-          if (exists) {
-            console.log('🔄 Mensaje duplicado ignorado:', message.id);
-            return prev;
-          }
-          
-          // Agregar mensaje y ordenar por timestamp
-          const newMessages = [...prev, message].sort((a, b) => {
-            const timeA = new Date(a.timestamp).getTime();
-            const timeB = new Date(b.timestamp).getTime();
-            return timeA - timeB;
-          });
-          
-          // Scroll al final después de agregar mensaje
-          setTimeout(() => {
-            chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-          
-          return newMessages;
-        });
-      };
+    console.log(`💬 Configurando chat WebSocket para alerta ${alertId} (Socket: ${socket.id}, Conectado: ${isConnected})`);
+    
+    // Unirse a la sala del chat
+    socket.emit('chat:join', {
+      alertId,
+      userId: user.uid,
+      userName: userProfile.displayName || user.displayName || 'Usuario'
+    });
 
-      // Escuchar confirmación de envío
-      const handleMessageSent = (data: any) => {
-        console.log('✅ Mensaje enviado confirmado:', data);
-        setSendingMessage(false);
-      };
-
-      // Escuchar errores del chat
-      const handleChatError = (error: any) => {
-        console.error('❌ Error en chat:', error);
-        toast.error('Error al enviar mensaje');
-        setSendingMessage(false);
-      };
-
-      // Escuchar cuando alguien se une al chat
-      const handleUserJoined = (data: any) => {
-        console.log(`👋 Usuario se unió al chat: ${data.userName}`);
-        // Opcional: mostrar notificación
-      };
-
-      // Escuchar cuando alguien sale del chat
-      const handleUserLeft = (data: any) => {
-        console.log(`👋 Usuario salió del chat: ${data.userName}`);
-        // Opcional: mostrar notificación
-      };
-
-      // Registrar listeners
-      socket.on('chat:new_message', handleNewMessage);
-      socket.on('chat:message_sent', handleMessageSent);
-      socket.on('chat:error', handleChatError);
-      socket.on('chat:user_joined', handleUserJoined);
-      socket.on('chat:user_left', handleUserLeft);
-
-      // Cleanup al desmontar
-      return () => {
-        console.log(`💬 Saliendo del chat de alerta ${alertId}`);
+    // Escuchar nuevos mensajes
+    const handleNewMessage = (message: ChatMessage & { firestoreId?: string }) => {
+      console.log('💬 Nuevo mensaje recibido vía WebSocket:', message);
+      setChatMessages(prev => {
+        // Evitar duplicados usando el ID del mensaje o el ID de Firestore
+        const exists = prev.some(msg => 
+          msg.id === message.id || 
+          (message.firestoreId && msg.id === message.firestoreId)
+        );
+        if (exists) {
+          console.log('🔄 Mensaje duplicado ignorado:', message.id);
+          return prev;
+        }
         
-        // Salir de la sala del chat
+        // Agregar mensaje y ordenar por timestamp
+        const newMessages = [...prev, message].sort((a, b) => {
+          const timeA = new Date(a.timestamp).getTime();
+          const timeB = new Date(b.timestamp).getTime();
+          return timeA - timeB;
+        });
+        
+        console.log(`✅ Mensaje agregado al chat. Total mensajes: ${newMessages.length}`);
+        
+        // Scroll al final después de agregar mensaje
+        setTimeout(() => {
+          chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+        
+        return newMessages;
+      });
+    };
+
+    // Escuchar confirmación de envío
+    const handleMessageSent = (data: any) => {
+      console.log('✅ Mensaje enviado confirmado:', data);
+      setSendingMessage(false);
+    };
+
+    // Escuchar errores del chat
+    const handleChatError = (error: any) => {
+      console.error('❌ Error en chat:', error);
+      toast.error('Error al enviar mensaje');
+      setSendingMessage(false);
+    };
+
+    // Escuchar cuando alguien se une al chat
+    const handleUserJoined = (data: any) => {
+      console.log(`👋 Usuario se unió al chat: ${data.userName}`);
+      // Opcional: mostrar notificación
+    };
+
+    // Escuchar cuando alguien sale del chat
+    const handleUserLeft = (data: any) => {
+      console.log(`👋 Usuario salió del chat: ${data.userName}`);
+      // Opcional: mostrar notificación
+    };
+
+    // Registrar listeners
+    console.log('📡 Registrando listeners de WebSocket para chat...');
+    socket.on('chat:new_message', handleNewMessage);
+    socket.on('chat:message_sent', handleMessageSent);
+    socket.on('chat:error', handleChatError);
+    socket.on('chat:user_joined', handleUserJoined);
+    socket.on('chat:user_left', handleUserLeft);
+
+    // Cleanup al desmontar o cuando cambien las dependencias
+    return () => {
+      console.log(`💬 Limpiando listeners y saliendo del chat de alerta ${alertId}`);
+      
+      // Remover listeners primero
+      socket.off('chat:new_message', handleNewMessage);
+      socket.off('chat:message_sent', handleMessageSent);
+      socket.off('chat:error', handleChatError);
+      socket.off('chat:user_joined', handleUserJoined);
+      socket.off('chat:user_left', handleUserLeft);
+      
+      // Salir de la sala del chat
+      if (socket.connected) {
         socket.emit('chat:leave', {
           alertId,
           userId: user.uid,
           userName: userProfile.displayName || user.displayName || 'Usuario'
         });
-
-        // Remover listeners
-        socket.off('chat:new_message', handleNewMessage);
-        socket.off('chat:message_sent', handleMessageSent);
-        socket.off('chat:error', handleChatError);
-        socket.off('chat:user_joined', handleUserJoined);
-        socket.off('chat:user_left', handleUserLeft);
-      };
-    }
-  }, [alertId, user, userProfile, loading, socket]);
-
-  // Cargar mensajes históricos independientemente del WebSocket
-  useEffect(() => {
-    if (!alertId || loading) return;
-    
-    console.log('🔄 Cargando mensajes históricos (efecto independiente)...');
-    loadHistoricalMessages();
-  }, [alertId, loadHistoricalMessages, loading]);
+      }
+    };
+  }, [alertId, user, userProfile, loading, socket, isConnected]);
 
   // Actualizar tiempo restante
   useEffect(() => {
