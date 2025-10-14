@@ -176,3 +176,4 @@ Si en el futuro la base de datos crece mucho, se pueden:
 **Fecha:** Octubre 2025  
 **Versión:** 1.1 - Sin Índices Compuestos
 
+

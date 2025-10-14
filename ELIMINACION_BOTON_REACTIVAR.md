@@ -219,3 +219,4 @@ La página de detalle de alertas ahora:
 ¡Sistema más robusto y seguro para gestión de alertas! 🔒
 
 
+
