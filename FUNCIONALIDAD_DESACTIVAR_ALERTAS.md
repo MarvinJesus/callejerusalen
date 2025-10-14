@@ -254,3 +254,4 @@ Usuario intenta desactivar/resolver
 **Fecha:** Octubre 2025  
 **Versión:** 1.0 - Desactivar Alertas Activas
 
+

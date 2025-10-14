@@ -255,3 +255,4 @@ Paginación se recalcula automáticamente
 **Fecha:** Octubre 2025  
 **Versión:** 1.1 - Mejoras de UI/UX en Paginación y Filtros
 
+

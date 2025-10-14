@@ -246,3 +246,4 @@ El mapa se encuentra en la **columna principal** (izquierda), entre:
 ¡El mapa GPS está completamente funcional y listo para mostrar la ubicación exacta donde se emitió cada alerta! 🗺️✅
 
 
+
