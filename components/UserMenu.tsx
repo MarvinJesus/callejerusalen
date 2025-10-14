@@ -66,12 +66,12 @@ const UserMenu: React.FC = () => {
         <>
           {/* Overlay para cerrar el menú */}
           <div 
-            className="fixed inset-0 z-10" 
+            className="fixed inset-0 z-[100]" 
             onClick={() => setIsOpen(false)}
           />
           
           {/* Menú desplegable */}
-          <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+          <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-[101]">
             <div className="p-4 border-b border-gray-200">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">

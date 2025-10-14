@@ -62,8 +62,6 @@ import {
   checkEmailExists
 } from '@/lib/auth';
 import { Permission, hasPermission, hasAnyPermission, canPerformAction } from '@/lib/permissions';
-import PermissionManager from '@/components/PermissionManager';
-import { PermissionList } from '@/components/PermissionBadge';
 import UserSearch from '@/components/UserSearch';
 import { auth } from '@/lib/firebase';
 import { getServerLogs, getSystemMetrics, ServerLog } from '@/lib/server-logging';
@@ -77,8 +75,6 @@ const AdminDashboard: React.FC = () => {
   const [systemLogs, setSystemLogs] = useState<ServerLog[]>([]);
   const [metrics, setMetrics] = useState<any>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'offline' | 'error'>('connected');
-  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [userPermissions, setUserPermissions] = useState<Permission[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -178,10 +174,6 @@ const AdminDashboard: React.FC = () => {
     { id: 'users', label: 'Usuarios', icon: Users, required: ['users.view'] as Permission[] },
     { id: 'registrations', label: 'Solicitudes', icon: Clock, required: ['registrations.view'] as Permission[] },
     { id: 'logs', label: 'Logs', icon: FileText, required: ['logs.view'] as Permission[] },
-    ...(isSuperAdmin() 
-      ? [{ id: 'permissions', label: 'Permisos', icon: Key, required: [] as Permission[] }]
-      : [{ id: 'permissions', label: 'Permisos', icon: Key, required: ['permissions.view'] as Permission[] }]
-    ),
     { id: 'security', label: 'Seguridad', icon: Shield, required: ['security.view'] as Permission[] },
     { id: 'history', label: 'Historias', icon: BookOpen, required: ['community.view'] as Permission[] },
     { id: 'events', label: 'Eventos', icon: Calendar, required: ['community.events'] as Permission[] },
@@ -471,26 +463,6 @@ const AdminDashboard: React.FC = () => {
     return 'Hace unos segundos';
   };
 
-  const loadUserPermissions = async (user: UserProfile) => {
-    try {
-      const permissions = await getUserPermissions(user.uid);
-      setUserPermissions(permissions);
-      setSelectedUser(user);
-      // Cambiar automáticamente a la pestaña de permisos
-      setActiveTab('permissions');
-    } catch (error) {
-      console.error('Error al cargar permisos del usuario:', error);
-    }
-  };
-
-  const handlePermissionsUpdated = () => {
-    // Recargar datos del dashboard
-    loadDashboardData();
-    // Recargar permisos del usuario seleccionado
-    if (selectedUser) {
-      loadUserPermissions(selectedUser);
-    }
-  };
 
   const handleApproveRegistration = async (requestId: string, role: UserRole = 'comunidad') => {
     if (!userProfile?.uid) return;
@@ -1159,13 +1131,13 @@ const AdminDashboard: React.FC = () => {
                          </>
                        )}
                        {canViewPermissions() && (
-                         <button
-                           onClick={() => loadUserPermissions(user)}
+                         <Link
+                           href={`/admin/permissions?userId=${user.uid}`}
                            className="text-purple-600 hover:text-purple-900 transition-colors"
                            title="Gestionar permisos"
                          >
                            <Shield className="w-4 h-4" />
-                         </button>
+                         </Link>
                        )}
                      </td>
                    </tr>
@@ -1182,31 +1154,41 @@ const AdminDashboard: React.FC = () => {
      
      return (
        <div className="space-y-6">
-         <div className="flex justify-between items-center mb-4">
-           <h2 className="text-xl font-semibold text-gray-900">Gestión de Usuarios</h2>
-           <div className="flex items-center space-x-3">
-             {isSuperAdmin() && (
-               <button
-                 onClick={() => setShowUserSearch(true)}
-                 className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                 title="Buscar usuario por ID - Solo Super Admin"
-               >
-                 <Search className="w-4 h-4" />
-                 <span>Buscar Usuario</span>
-               </button>
-             )}
-             {canCreateUsers() && (
-               <button
-                 onClick={() => setShowCreateUser(true)}
-                 className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                 title="Crear nuevo usuario"
-               >
-                 <Plus className="w-4 h-4" />
-                 <span>Crear Usuario</span>
-               </button>
-             )}
-           </div>
-         </div>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-900">Gestión de Usuarios</h2>
+          <div className="flex items-center space-x-3">
+            {canViewPermissions() && (
+              <Link
+                href="/admin/permissions"
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl"
+                title="Ir al Centro de Permisos"
+              >
+                <Shield className="w-4 h-4" />
+                <span>Centro de Permisos</span>
+              </Link>
+            )}
+            {isSuperAdmin() && (
+              <button
+                onClick={() => setShowUserSearch(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                title="Buscar usuario por ID - Solo Super Admin"
+              >
+                <Search className="w-4 h-4" />
+                <span>Buscar Usuario</span>
+              </button>
+            )}
+            {canCreateUsers() && (
+              <button
+                onClick={() => setShowCreateUser(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                title="Crear nuevo usuario"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Crear Usuario</span>
+              </button>
+            )}
+          </div>
+        </div>
 
          {/* Filtro de Estado */}
          <div className="flex items-center justify-between mb-6">
@@ -1234,6 +1216,32 @@ const AdminDashboard: React.FC = () => {
              </div>
            )}
          </div>
+
+         {/* Información sobre Centro de Permisos */}
+         {canViewPermissions() && (
+           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-6">
+             <div className="flex items-center justify-between">
+               <div className="flex items-center space-x-3">
+                 <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-2 rounded-lg">
+                   <Shield className="w-5 h-5 text-white" />
+                 </div>
+                 <div>
+                   <h3 className="text-sm font-semibold text-gray-900">Centro de Permisos</h3>
+                   <p className="text-xs text-gray-600">
+                     Gestiona permisos de usuarios de forma centralizada y unificada
+                   </p>
+                 </div>
+               </div>
+               <Link
+                 href="/admin/permissions"
+                 className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-medium rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm hover:shadow-md"
+               >
+                 <Shield className="w-4 h-4" />
+                 <span>Ir al Centro</span>
+               </Link>
+             </div>
+           </div>
+         )}
          
          {loading ? (
            <div className="text-center py-8">
@@ -1344,124 +1352,7 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 
-  const renderPermissions = () => (
-    <div className="space-y-6">
-      {selectedUser ? (
-        <div className="space-y-6">
-          {/* Header con información del usuario */}
-          <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Gestión de Permisos
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Usuario: {selectedUser.displayName} ({selectedUser.email})
-                </p>
-                <p className="text-sm text-gray-500">
-                  Rol: {selectedUser.role} | Estado: {selectedUser.isActive ? 'Activo' : 'Inactivo'}
-                </p>
-              </div>
-              <button
-                onClick={() => setSelectedUser(null)}
-                className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 border border-gray-200"
-              >
-                Volver a Lista
-              </button>
-            </div>
-          </div>
-
-          {/* Gestor de permisos */}
-          <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
-            <PermissionManager
-              targetUser={selectedUser}
-              onPermissionsUpdated={handlePermissionsUpdated}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Gestión de Permisos de Usuarios
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Selecciona un usuario administrador de la lista para gestionar sus permisos específicos.
-            </p>
-
-            {/* Lista de usuarios administradores */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-gray-900">Usuarios Administradores</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {users
-                  .filter(user => user.role === 'admin' && user.isActive)
-                  .map((user) => (
-                    <div key={user.uid} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h5 className="font-medium text-gray-900">{user.displayName}</h5>
-                          <p className="text-sm text-gray-500">{user.email}</p>
-                          <div className="mt-2">
-                            <PermissionList 
-                              permissions={user.permissions || []} 
-                              size="sm" 
-                              maxVisible={3}
-                            />
-                          </div>
-                        </div>
-                         <button
-                           onClick={() => loadUserPermissions(user)}
-                           className="flex items-center space-x-1 px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors shadow-sm"
-                         >
-                           <Key className="w-3 h-3" />
-                           <span>Gestionar</span>
-                         </button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-              
-              {users.filter(user => user.role === 'admin' && user.isActive).length === 0 && (
-                <div className="text-center py-8">
-                  <Key className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">No hay usuarios administradores activos</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Información sobre permisos */}
-          <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
-            <h4 className="font-medium text-gray-900 mb-4">Información sobre Permisos</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h5 className="font-medium text-gray-900 mb-2">Tipos de Permisos</h5>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• <strong>Gestión de Usuarios:</strong> Crear, editar, eliminar usuarios</li>
-                  <li>• <strong>Gestión de Roles:</strong> Asignar roles y permisos</li>
-                  <li>• <strong>Gestión de Registros:</strong> Aprobar/rechazar solicitudes</li>
-                  <li>• <strong>Seguridad:</strong> Acceso a cámaras y alertas</li>
-                  <li>• <strong>Reportes:</strong> Ver y exportar reportes</li>
-                  <li>• <strong>Logs:</strong> Ver y gestionar logs del sistema</li>
-                </ul>
-              </div>
-              <div>
-                <h5 className="font-medium text-gray-900 mb-2">Niveles de Acceso</h5>
-                <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• <strong>Super Admin:</strong> Todos los permisos</li>
-                  <li>• <strong>Admin:</strong> Permisos específicos asignados</li>
-                  <li>• <strong>Comunidad:</strong> Acceso básico a funcionalidades</li>
-                  <li>• <strong>Visitante:</strong> Solo lectura de información pública</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-   const renderLogs = () => (
+  const renderLogs = () => (
      <div className="space-y-6">
        <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
          <div className="flex justify-between items-center mb-4">
@@ -2400,11 +2291,6 @@ const AdminDashboard: React.FC = () => {
                 isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'logs.view')
                   ? renderLogs()
                   : <div className="card"><p className="text-gray-700">No tienes permiso para ver logs.</p></div>
-              )}
-              {activeTab === 'permissions' && (
-                isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'permissions.view')
-                  ? renderPermissions()
-                  : <div className="card"><p className="text-gray-700">No tienes permiso para gestionar permisos.</p></div>
               )}
               {activeTab === 'security' && (
                 isSuperAdmin() || hasPermission((userProfile?.permissions || []) as Permission[], 'security.view')

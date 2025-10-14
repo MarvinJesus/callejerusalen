@@ -73,12 +73,12 @@ const SettingsDropdown: React.FC = () => {
         <>
           {/* Overlay para cerrar el menú */}
           <div 
-            className="fixed inset-0 z-10" 
+            className="fixed inset-0 z-[100]" 
             onClick={() => setIsOpen(false)}
           />
           
           {/* Menú de configuración */}
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-20 overflow-hidden">
+          <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-[101] overflow-hidden">
             <div className="p-4 border-b border-gray-100">
               <h3 className="text-lg font-semibold text-gray-900">Configuración</h3>
               <p className="text-sm text-gray-600">Personaliza tu experiencia</p>
