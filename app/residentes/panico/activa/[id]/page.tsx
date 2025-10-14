@@ -4,8 +4,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useWebSocket } from '@/context/WebSocketContext';
-import { doc, getDoc, updateDoc, arrayUnion, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useAlarmSound } from '@/lib/alarmSound';
 import { 
   AlertTriangle, 
   MapPin, 
@@ -65,6 +66,7 @@ const ActivePanicPage: React.FC = () => {
   const router = useRouter();
   const { user, userProfile } = useAuth();
   const { isConnected, socket } = useWebSocket();
+  const { startAlarm, stopAlarm, isPlaying } = useAlarmSound();
 
   // Agregar estilos CSS para la animación de neón
   React.useEffect(() => {
@@ -151,13 +153,21 @@ const ActivePanicPage: React.FC = () => {
   const [isEmitter, setIsEmitter] = useState(false);
   const [hasAcknowledged, setHasAcknowledged] = useState(false);
   
+  // Estados de presencia
+  const [onlineUsers, setOnlineUsers] = useState<Record<string, { userName: string; lastSeen: number }>>({});
+  const [usersTyping, setUsersTyping] = useState<Record<string, boolean>>({});
+  
+  // Estado de sonido de alarma
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [alarmPlayed, setAlarmPlayed] = useState(false);
+  
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timeIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const routerRef = useRef(router); // Mantener referencia estable del router
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Actualizar routerRef cuando cambie router
   useEffect(() => {
@@ -241,56 +251,150 @@ const ActivePanicPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [alertId, user]);
 
-  // Polling manual para actualizar datos (cada 5 segundos) en lugar de onSnapshot
+  // Cargar configuración de sonido desde localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('panic_sound_enabled');
+      if (stored !== null) {
+        setSoundEnabled(stored === 'true');
+      }
+    }
+  }, []);
+
+  // Reproducir sonido de alarma cuando se carga la alerta activa
+  useEffect(() => {
+    if (!alertData || loading || alarmPlayed) return;
+
+    // Solo reproducir para receptores, no para el emisor
+    if (isEmitter) return;
+
+    // Solo reproducir si la alerta está activa
+    if (alertData.status !== 'active') return;
+
+    // Verificar si el sonido está habilitado
+    if (!soundEnabled) {
+      console.log('🔇 Sonido de alarma deshabilitado por el usuario');
+      return;
+    }
+
+    // Verificar si ya se está reproduciendo
+    if (isPlaying()) {
+      console.log('🔊 Sonido de alarma ya se está reproduciendo');
+      return;
+    }
+
+    console.log('🚨 Reproduciendo sonido de alarma para alerta activa');
+    
+    // Reproducir sonido de emergencia
+    try {
+      startAlarm('emergency');
+      setAlarmPlayed(true);
+      
+      toast('🔊 Sonido de emergencia activado', {
+        duration: 3000,
+        icon: '🔊'
+      });
+    } catch (error) {
+      console.error('Error al reproducir sonido:', error);
+      toast.error('No se pudo reproducir el sonido de alerta');
+    }
+  }, [alertData, loading, isEmitter, soundEnabled, startAlarm, isPlaying, alarmPlayed]);
+
+  // Guardar configuración de sonido en localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('panic_sound_enabled', soundEnabled.toString());
+    }
+  }, [soundEnabled]);
+
+  // Detener sonido cuando se sale de la página o la alerta se resuelve
+  useEffect(() => {
+    return () => {
+      if (isPlaying()) {
+        console.log('🛑 Deteniendo sonido al salir de la página');
+        stopAlarm();
+      }
+    };
+  }, [isPlaying, stopAlarm]);
+
+  // Escucha en TIEMPO REAL de cambios en la alerta (reemplaza polling)
   useEffect(() => {
     if (!alertId || !user || loading) return;
 
-    const refreshData = async () => {
-      try {
-        const alertRef = doc(db, 'panicReports', alertId);
-        const alertSnap = await getDoc(alertRef);
+    console.log('📡 Iniciando escucha en tiempo real de alerta:', alertId);
 
-        if (alertSnap.exists()) {
-          const data = alertSnap.data();
-          setAlertData(prev => {
-            // Solo actualizar si hay cambios reales
-            if (!prev) return null;
-            
-            const acknowledgedChanged = JSON.stringify(prev.acknowledgedBy) !== JSON.stringify(data.acknowledgedBy || []);
-            const statusChanged = prev.status !== data.status;
-            
-            if (!acknowledgedChanged && !statusChanged) {
-              return prev; // No actualizar si no hay cambios
-            }
-            
-            return {
-              ...prev,
-              acknowledgedBy: data.acknowledgedBy || [],
-              status: data.status
-            };
-          });
-          
-          // Verificar acknowledged sin depender de isEmitter
-          const userIsEmitter = data.userId === user.uid;
-          if (!userIsEmitter) {
-            const userHasAcknowledged = (data.acknowledgedBy || []).includes(user.uid);
-            setHasAcknowledged(userHasAcknowledged);
-          }
+    const alertRef = doc(db, 'panicReports', alertId);
+    
+    // onSnapshot detecta cambios en TIEMPO REAL
+    const unsubscribe = onSnapshot(
+      alertRef,
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          console.log('⚠️ Alerta no existe o fue eliminada');
+          return;
         }
-      } catch (error) {
-        console.error('Error al actualizar datos:', error);
-      }
-    };
 
-    // Actualizar cada 5 segundos
-    refreshIntervalRef.current = setInterval(refreshData, 5000);
+        const data = snapshot.data();
+        console.log('🔄 Alerta actualizada en tiempo real:', {
+          status: data.status,
+          acknowledgedCount: data.acknowledgedBy?.length || 0
+        });
+
+        // Actualizar datos de la alerta
+        setAlertData(prev => {
+          if (!prev) return null;
+          
+          // Detectar cambios de estado para notificaciones
+          const wasActive = prev.status === 'active';
+          const nowResolved = data.status === 'resolved';
+          const nowExpired = data.status === 'expired';
+          
+          // Mostrar notificaciones según cambios de estado
+          if (wasActive && nowResolved) {
+            toast.success('La alerta ha sido resuelta');
+            // Detener sonido de alarma si está sonando
+            if (isPlaying()) {
+              stopAlarm();
+            }
+          }
+          
+          if (wasActive && nowExpired) {
+            toast('La alerta ha expirado', { icon: '⏱️' });
+            // Detener sonido de alarma si está sonando
+            if (isPlaying()) {
+              stopAlarm();
+            }
+          }
+          
+          return {
+            ...prev,
+            acknowledgedBy: data.acknowledgedBy || [],
+            status: data.status,
+            notifiedUsers: data.notifiedUsers || [],
+            // Actualizar cualquier otro campo que pueda cambiar
+            resolvedAt: data.resolvedAt,
+            resolvedBy: data.resolvedBy,
+            autoResolved: data.autoResolved
+          };
+        });
+        
+        // Verificar si el usuario actual ha confirmado
+        const userIsEmitter = data.userId === user.uid;
+        if (!userIsEmitter) {
+          const userHasAcknowledged = (data.acknowledgedBy || []).includes(user.uid);
+          setHasAcknowledged(userHasAcknowledged);
+        }
+      },
+      (error) => {
+        console.error('❌ Error al escuchar cambios en alerta:', error);
+      }
+    );
 
     return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
+      console.log('📡 Deteniendo escucha de alerta');
+      unsubscribe();
     };
-  }, [alertId, user, loading]); // Removido isEmitter de las dependencias
+  }, [alertId, user, loading]);
 
   // Chat en tiempo real usando Firestore onSnapshot (funciona en producción)
   useEffect(() => {
@@ -402,13 +506,164 @@ const ActivePanicPage: React.FC = () => {
     }
   }, [alertId, user, userProfile, loading, socket, isConnected]);
 
+  // Presencia de usuarios en TIEMPO REAL (quién está viendo la alerta)
+  useEffect(() => {
+    if (!alertId || !user || !userProfile) return;
+
+    console.log('🟢 Iniciando sistema de presencia para alerta:', alertId);
+
+    // Referencia a la presencia de esta alerta específica
+    const presenceRef = doc(db, 'alertPresence', alertId);
+    const userId = user.uid;
+    const userName = userProfile.displayName || user.displayName || 'Usuario';
+
+    // Marcar como presente
+    const markPresent = async () => {
+      try {
+        const presenceData: any = {};
+        presenceData[userId] = {
+          userName,
+          lastSeen: Date.now(),
+          isTyping: false
+        };
+
+        await setDoc(presenceRef, presenceData, { merge: true });
+      } catch (error) {
+        console.error('Error al marcar presencia:', error);
+      }
+    };
+
+    // Marcar como ausente
+    const markAbsent = async () => {
+      try {
+        const presenceData: any = {};
+        presenceData[userId] = {
+          userName,
+          lastSeen: Date.now(),
+          isTyping: false,
+          offline: true
+        };
+
+        await setDoc(presenceRef, presenceData, { merge: true });
+      } catch (error) {
+        console.error('Error al marcar ausencia:', error);
+      }
+    };
+
+    // Marcar presente al inicio
+    markPresent();
+
+    // Heartbeat cada 10 segundos
+    const heartbeatInterval = setInterval(markPresent, 10000);
+
+    // Escuchar cambios en presencia (otros usuarios)
+    const unsubscribe = onSnapshot(presenceRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        const now = Date.now();
+        const onlineThreshold = 20000; // 20 segundos
+
+        // Filtrar usuarios que están realmente en línea
+        const online: Record<string, { userName: string; lastSeen: number }> = {};
+        const typing: Record<string, boolean> = {};
+
+        Object.entries(data).forEach(([uid, userData]: [string, any]) => {
+          if (uid === userId) return; // Ignorar a sí mismo
+          
+          const isOnline = !userData.offline && (now - userData.lastSeen) < onlineThreshold;
+          
+          if (isOnline) {
+            online[uid] = {
+              userName: userData.userName,
+              lastSeen: userData.lastSeen
+            };
+            typing[uid] = userData.isTyping || false;
+          }
+        });
+
+        setOnlineUsers(online);
+        setUsersTyping(typing);
+      }
+    });
+
+    // Marcar ausente al salir
+    window.addEventListener('beforeunload', markAbsent);
+
+    // Cleanup
+    return () => {
+      clearInterval(heartbeatInterval);
+      window.removeEventListener('beforeunload', markAbsent);
+      markAbsent();
+      unsubscribe();
+    };
+  }, [alertId, user, userProfile]);
+
+  // Indicador de "escribiendo" en TIEMPO REAL
+  const handleTypingIndicator = useCallback(async () => {
+    if (!alertId || !user) return;
+
+    const presenceRef = doc(db, 'alertPresence', alertId);
+    const userId = user.uid;
+
+    try {
+      // Marcar como escribiendo
+      const presenceData: any = {};
+      presenceData[userId] = {
+        userName: userProfile?.displayName || user.displayName || 'Usuario',
+        lastSeen: Date.now(),
+        isTyping: true
+      };
+      await setDoc(presenceRef, presenceData, { merge: true });
+
+      // Limpiar timeout anterior
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Marcar como NO escribiendo después de 3 segundos
+      typingTimeoutRef.current = setTimeout(async () => {
+        presenceData[userId].isTyping = false;
+        await setDoc(presenceRef, presenceData, { merge: true });
+      }, 3000);
+    } catch (error) {
+      console.error('Error al indicar escritura:', error);
+    }
+  }, [alertId, user, userProfile]);
+
   // Actualizar tiempo restante
   useEffect(() => {
     if (!alertData?.expiresAt) return;
 
+    // Si la alerta ya no está activa, detener el cronómetro
+    if (alertData.status !== 'active') {
+      // Limpiar intervalo si existe
+      if (timeIntervalRef.current) {
+        clearInterval(timeIntervalRef.current);
+        timeIntervalRef.current = null;
+      }
+      
+      // Mostrar estado apropiado
+      if (alertData.status === 'resolved') {
+        setTimeRemaining('Resuelta');
+      } else if (alertData.status === 'expired') {
+        setTimeRemaining('Expirada');
+      }
+      
+      return;
+    }
+
     const expiresAt = alertData.expiresAt;
 
     const updateTime = () => {
+      // Verificar nuevamente el estado antes de actualizar
+      if (alertData.status !== 'active') {
+        if (timeIntervalRef.current) {
+          clearInterval(timeIntervalRef.current);
+          timeIntervalRef.current = null;
+        }
+        return;
+      }
+
       const now = new Date();
       const expires = expiresAt.toDate ? expiresAt.toDate() : new Date(expiresAt);
       const diffMs = expires.getTime() - now.getTime();
@@ -417,6 +672,7 @@ const ActivePanicPage: React.FC = () => {
         setTimeRemaining('Expirada');
         if (timeIntervalRef.current) {
           clearInterval(timeIntervalRef.current);
+          timeIntervalRef.current = null;
         }
         return;
       }
@@ -432,9 +688,10 @@ const ActivePanicPage: React.FC = () => {
     return () => {
       if (timeIntervalRef.current) {
         clearInterval(timeIntervalRef.current);
+        timeIntervalRef.current = null;
       }
     };
-  }, [alertData?.expiresAt]);
+  }, [alertData?.expiresAt, alertData?.status]);
 
   // Iniciar video (solo emisor) - una sola vez
   useEffect(() => {
@@ -553,12 +810,19 @@ const ActivePanicPage: React.FC = () => {
       });
 
       setHasAcknowledged(true);
+      
+      // Detener sonido de alarma al confirmar
+      if (isPlaying()) {
+        stopAlarm();
+        console.log('🔇 Sonido detenido al confirmar recepción');
+      }
+      
       toast.success('✅ Confirmación registrada', { icon: '✅', duration: 3000 });
     } catch (error) {
       console.error('Error al confirmar:', error);
       toast.error('Error al registrar confirmación');
     }
-  }, [alertId, user]);
+  }, [alertId, user, isPlaying, stopAlarm]);
 
   // Resolver alerta (emisor)
   const handleResolveAlert = useCallback(async () => {
@@ -645,11 +909,37 @@ const ActivePanicPage: React.FC = () => {
               </div>
             </div>
             
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-              isConnected ? 'bg-green-500 bg-opacity-30' : 'bg-yellow-500 bg-opacity-30'
-            }`}>
-              {isConnected ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
-              <span className="font-semibold">{isConnected ? 'En línea' : 'Offline'}</span>
+            <div className="flex items-center gap-3">
+              {/* Control de sonido */}
+              <button
+                onClick={() => {
+                  const newState = !soundEnabled;
+                  setSoundEnabled(newState);
+                  if (!newState && isPlaying()) {
+                    stopAlarm();
+                  }
+                  toast.success(newState ? '🔊 Sonido activado' : '🔇 Sonido desactivado');
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors ${
+                  soundEnabled
+                    ? 'bg-white bg-opacity-20 hover:bg-opacity-30'
+                    : 'bg-gray-600 bg-opacity-50 hover:bg-opacity-60'
+                }`}
+                title={soundEnabled ? 'Desactivar sonido' : 'Activar sonido'}
+              >
+                <span className="text-xl">{soundEnabled ? '🔊' : '🔇'}</span>
+                <span className="hidden sm:inline">
+                  {soundEnabled ? 'Sonido' : 'Silencio'}
+                </span>
+              </button>
+
+              {/* Indicador de conexión */}
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+                isConnected ? 'bg-green-500 bg-opacity-30' : 'bg-yellow-500 bg-opacity-30'
+              }`}>
+                {isConnected ? <Wifi className="w-5 h-5" /> : <WifiOff className="w-5 h-5" />}
+                <span className="font-semibold">{isConnected ? 'En línea' : 'Offline'}</span>
+              </div>
             </div>
           </div>
 
@@ -778,6 +1068,27 @@ const ActivePanicPage: React.FC = () => {
                 Estado de Notificaciones
               </h2>
 
+              {/* Usuarios viendo la alerta en TIEMPO REAL */}
+              {Object.keys(onlineUsers).length > 0 && (
+                <div className="mb-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                  <h3 className="text-sm font-semibold text-green-800 mb-2 flex items-center">
+                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                    Viendo ahora ({Object.keys(onlineUsers).length})
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(onlineUsers).map(([uid, userData]) => (
+                      <div 
+                        key={uid}
+                        className="inline-flex items-center px-2 py-1 bg-white rounded-full text-xs font-medium text-green-700 border border-green-300"
+                      >
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></span>
+                        {userData.userName}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">Confirmaciones</span>
@@ -796,6 +1107,7 @@ const ActivePanicPage: React.FC = () => {
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {alertData.notifiedUsers?.map((userId) => {
                   const hasAck = alertData.acknowledgedBy?.includes(userId);
+                  const isOnline = onlineUsers[userId] !== undefined;
                   return (
                     <div
                       key={userId}
@@ -803,14 +1115,21 @@ const ActivePanicPage: React.FC = () => {
                         hasAck ? 'bg-green-50' : 'bg-gray-50'
                       }`}
                     >
-                      <span className="text-sm">Contacto</span>
+                      <span className="text-sm flex items-center">
+                        {isOnline && (
+                          <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                        )}
+                        {onlineUsers[userId]?.userName || 'Contacto'}
+                      </span>
                       {hasAck ? (
                         <span className="flex items-center text-green-600 text-sm font-medium">
                           <CheckCircle className="w-4 h-4 mr-1" />
                           Confirmó
                         </span>
                       ) : (
-                        <span className="text-orange-600 text-sm font-medium">Pendiente...</span>
+                        <span className={`text-sm font-medium ${isOnline ? 'text-blue-600' : 'text-orange-600'}`}>
+                          {isOnline ? 'Viendo...' : 'Pendiente...'}
+                        </span>
                       )}
                     </div>
                   );
@@ -909,12 +1228,33 @@ const ActivePanicPage: React.FC = () => {
                 )}
               </div>
 
+              {/* Indicador de usuarios escribiendo */}
+              {Object.entries(usersTyping).some(([_, isTyping]) => isTyping) && (
+                <div className="mb-2 px-3 py-1 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-blue-600 flex items-center">
+                    <span className="flex space-x-1 mr-2">
+                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                    </span>
+                    {Object.entries(usersTyping)
+                      .filter(([_, isTyping]) => isTyping)
+                      .map(([uid, _]) => onlineUsers[uid]?.userName)
+                      .filter(Boolean)
+                      .join(', ')} {Object.entries(usersTyping).filter(([_, isTyping]) => isTyping).length === 1 ? 'está' : 'están'} escribiendo...
+                  </p>
+                </div>
+              )}
+
               {/* Input */}
               <form onSubmit={handleSendMessage} className="flex space-x-2">
                 <input
                   type="text"
                   value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                  onChange={(e) => {
+                    setNewMessage(e.target.value);
+                    handleTypingIndicator(); // Indicar que está escribiendo
+                  }}
                   placeholder="Escribe un mensaje..."
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   disabled={sendingMessage || alertData.status !== 'active'}
