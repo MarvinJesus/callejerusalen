@@ -65,7 +65,7 @@ const ActivePanicPage: React.FC = () => {
   const params = useParams();
   const router = useRouter();
   const { user, userProfile } = useAuth();
-  const { isConnected, socket } = useWebSocket();
+  const { isConnected } = useWebSocket();
   const { startAlarm, stopAlarm, isPlaying } = useAlarmSound();
 
   // Agregar estilos CSS para la animación de neón
@@ -540,50 +540,9 @@ const ActivePanicPage: React.FC = () => {
       return;
     }
 
-    // Si el WebSocket está disponible, úsalo como complemento
-    if (socket && isConnected) {
-      console.log(`💬 WebSocket disponible - Uniéndose al chat (Socket: ${socket.id})`);
-      
-      // Unirse a la sala del chat
-      socket.emit('chat:join', {
-        alertId,
-        userId: user.uid,
-        userName: userProfile.displayName || user.displayName || 'Usuario'
-      });
-
-      // Escuchar confirmación de envío
-      const handleMessageSent = (data: any) => {
-        console.log('✅ Mensaje enviado confirmado vía WebSocket:', data);
-        setSendingMessage(false);
-      };
-
-      // Escuchar errores del chat
-      const handleChatError = (error: any) => {
-        console.error('❌ Error en chat WebSocket:', error);
-        setSendingMessage(false);
-      };
-
-      // Registrar listeners
-      socket.on('chat:message_sent', handleMessageSent);
-      socket.on('chat:error', handleChatError);
-
-      // Cleanup
-      return () => {
-        socket.off('chat:message_sent', handleMessageSent);
-        socket.off('chat:error', handleChatError);
-        
-        if (socket.connected) {
-          socket.emit('chat:leave', {
-            alertId,
-            userId: user.uid,
-            userName: userProfile.displayName || user.displayName || 'Usuario'
-          });
-        }
-      };
-    } else {
-      console.log('ℹ️ WebSocket no disponible - Usando solo Firestore en tiempo real');
-    }
-  }, [alertId, user, userProfile, loading, socket, isConnected]);
+    // Firebase maneja el chat automáticamente
+    console.log('💬 Usando Firebase para chat en tiempo real');
+  }, [alertId, user, userProfile, loading, isConnected]);
 
   // Presencia de usuarios en TIEMPO REAL (quién está viendo la alerta)
   useEffect(() => {
@@ -857,17 +816,6 @@ const ActivePanicPage: React.FC = () => {
 
       console.log('💾 Mensaje guardado en Firestore:', messageRef.id);
       
-      // Si WebSocket está disponible, también enviar por ahí (opcional, complementario)
-      if (socket && socket.connected) {
-        socket.emit('chat:send_message', {
-          alertId,
-          userId: user.uid,
-          userName,
-          message: messageText,
-          firestoreId: messageRef.id
-        });
-      }
-      
       // Marcar como enviado después de guardar en Firestore
       setSendingMessage(false);
 
@@ -876,7 +824,7 @@ const ActivePanicPage: React.FC = () => {
       toast.error('Error al enviar mensaje');
       setSendingMessage(false);
     }
-  }, [newMessage, user, userProfile, alertId, socket]);
+  }, [newMessage, user, userProfile, alertId]);
 
   // Confirmar alerta (receptores)
   const handleAcknowledgeAlert = useCallback(async () => {

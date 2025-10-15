@@ -26,20 +26,20 @@ const HeroStats: React.FC<HeroStatsProps> = ({ className = "" }) => {
     try {
       setLoading(true);
       
-      // Obtener estadísticas de usuarios
-      const usersResponse = await fetch('/api/admin/users');
-      let totalUsers = 0;
-      if (usersResponse.ok) {
-        const usersData = await usersResponse.json();
-        totalUsers = usersData.users?.length || 0;
-      }
-
-      // Obtener estadísticas de lugares
-      const placesResponse = await fetch('/api/places');
-      let totalPlaces = 0;
-      if (placesResponse.ok) {
-        const placesData = await placesResponse.json();
-        totalPlaces = placesData.places?.length || 0;
+      console.log('📊 HeroStats: Obteniendo estadísticas públicas...');
+      
+      // Obtener estadísticas desde API pública
+      const response = await fetch('/api/public-stats');
+      let totalUsers = 5; // Valor por defecto
+      let totalPlaces = 5; // Valor por defecto
+      
+      if (response.ok) {
+        const data = await response.json();
+        totalUsers = data.users?.total || 5;
+        totalPlaces = data.places?.total || 5;
+        console.log('✅ HeroStats: Estadísticas obtenidas:', { totalUsers, totalPlaces });
+      } else {
+        console.warn('⚠️ HeroStats: Error en respuesta de estadísticas públicas:', response.status);
       }
 
       setStats({
@@ -47,10 +47,10 @@ const HeroStats: React.FC<HeroStatsProps> = ({ className = "" }) => {
         totalPlaces
       });
     } catch (error) {
-      console.error('Error fetching real stats:', error);
+      console.error('❌ HeroStats: Error fetching real stats:', error);
       setStats({
-        totalUsers: 0,
-        totalPlaces: 0
+        totalUsers: 5, // Valor por defecto en caso de error
+        totalPlaces: 5
       });
     } finally {
       setLoading(false);

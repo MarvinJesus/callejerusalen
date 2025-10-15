@@ -18,11 +18,11 @@ import { useAlarmSound } from '@/lib/alarmSound';
 import { AlertTriangle, X, MapPin, Clock, User, Phone, CheckCircle, Video } from 'lucide-react';
 import toast from 'react-hot-toast';
 import EmergencyLocationMap from './EmergencyLocationMap';
-import { doc, updateDoc, arrayUnion, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, collection, query, where, getDocs, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 const PanicAlertModal: React.FC = () => {
-  const { socket, isConnected, acknowledgePanicAlert } = useWebSocket();
+  const { isConnected, acknowledgePanicAlert } = useWebSocket();
   const { user, securityPlan } = useAuth();
   const router = useRouter();
   const pathname = usePathname(); // Para detectar la ruta actual
@@ -199,110 +199,131 @@ const PanicAlertModal: React.FC = () => {
     return () => clearInterval(interval);
   }, [currentAlert]);
 
-  // Escuchar nuevas alertas de pánico vía WebSocket
+  // Escuchar nuevas alertas de pánico vía Firebase
   useEffect(() => {
-    if (!socket || !hasSecurityAccess || !user) {
+    if (!hasSecurityAccess || !user) {
       return;
     }
 
-    const handleNewAlert = (alert: PanicAlert) => {
-      console.log('🚨 Nueva alerta de pánico recibida vía WebSocket:', alert);
+    console.log('🔔 Configurando listeners de alertas de pánico desde Firebase...');
 
-      // Verificar que el usuario NO sea el emisor de la alerta
-      if (alert.userId === user.uid) {
-        console.log('⚠️ Usuario es el emisor de la alerta, no mostrar');
-        return;
-      }
+    // Escuchar alertas activas desde Firestore
+    const panicAlertsQuery = query(
+      collection(db, 'panicAlerts'),
+      where('status', '==', 'active'),
+      orderBy('timestamp', 'desc')
+    );
 
-      // Verificar que el usuario está en la lista de notificados
-      if (!alert.notifiedUsers.includes(user.uid)) {
-        console.log('⚠️ Usuario no está en la lista de notificados');
-        return;
-      }
-
-      // Verificar que no sea una alerta duplicada
-      if (hasShownAlert.current.has(alert.id)) {
-        console.log('⚠️ Alerta duplicada, ignorando');
-        return;
-      }
-
-      // ✅ CORRECCIÓN: NO redirigir si ya estamos en la página de esta alerta
-      const isAlreadyOnAlertPage = pathname === `/residentes/panico/activa/${alert.id}`;
-      if (isAlreadyOnAlertPage) {
-        console.log(`ℹ️ Usuario ya está en la página de la alerta ${alert.id}, no redirigir`);
-        hasShownAlert.current.add(alert.id);
-        return;
-      }
-
-      // Marcar como mostrada
-      hasShownAlert.current.add(alert.id);
-
-      // Reproducir sonido de alarma
-      if (soundEnabled && !isPlaying()) {
-        console.log('🔊 Reproduciendo sonido de alarma...');
-        startAlarm('emergency');
-      }
-
-      // Redirigir a la página de emergencia activa
-      console.log('🔄 Redirigiendo a página de emergencia activa:', alert.id);
-      router.push(`/residentes/panico/activa/${alert.id}`);
-
-      // Toast de notificación
-      toast.error(
-        `🚨 ¡ALERTA DE PÁNICO! ${alert.userName} necesita ayuda urgente`,
-        {
-          duration: 10000,
-          icon: '🚨',
-          style: {
-            background: '#DC2626',
-            color: '#FFFFFF',
-            fontWeight: 'bold',
-            fontSize: '16px',
-          },
-        }
-      );
-
-      // Notificación del navegador si está disponible
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('🚨 ALERTA DE PÁNICO', {
-          body: `${alert.userName} solicita ayuda urgente\nUbicación: ${alert.location}`,
-          icon: '/logo.png',
-          badge: '/logo.png',
-          tag: `panic-${alert.id}`,
-          requireInteraction: true,
-        });
-      }
-    };
-
-    const handleAlertResolved = (data: { alertId: string; resolvedBy: string; timestamp: string }) => {
-      console.log('✅ Alerta resuelta:', data);
+    const unsubscribe = onSnapshot(panicAlertsQuery, (snapshot) => {
+      console.log('📡 Alertas de pánico actualizadas desde Firebase:', snapshot.size);
       
-      // Si es la alerta actual, cerrarla
-      if (currentAlert && currentAlert.id === data.alertId) {
-        setCurrentAlert(null);
-        stopAlarm();
-        toast.success('La alerta de pánico ha sido resuelta');
-        
-        // Mostrar siguiente alerta de la cola si existe
-        if (alertQueue.length > 0) {
-          const nextAlert = alertQueue[0];
-          setAlertQueue(prev => prev.slice(1));
-          setCurrentAlert(nextAlert);
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const alertData = {
+            id: change.doc.id,
+            ...change.doc.data(),
+            timestamp: change.doc.data().timestamp?.toDate?.()?.toISOString() || change.doc.data().timestamp,
+          } as PanicAlert;
+          
+          console.log('🚨 Nueva alerta de pánico recibida vía Firebase:', alertData);
+
+          // Verificar que el usuario NO sea el emisor de la alerta
+          if (alertData.userId === user.uid) {
+            console.log('⚠️ Usuario es el emisor de la alerta, no mostrar');
+            return;
+          }
+
+          // Verificar que el usuario está en la lista de notificados
+          if (!alertData.notifiedUsers.includes(user.uid)) {
+            console.log('⚠️ Usuario no está en la lista de notificados');
+            return;
+          }
+
+          // Verificar que no sea una alerta duplicada
+          if (hasShownAlert.current.has(alertData.id)) {
+            console.log('⚠️ Alerta duplicada, ignorando');
+            return;
+          }
+
+          // ✅ CORRECCIÓN: NO redirigir si ya estamos en la página de esta alerta
+          const isAlreadyOnAlertPage = pathname === `/residentes/panico/activa/${alertData.id}`;
+          if (isAlreadyOnAlertPage) {
+            console.log(`ℹ️ Usuario ya está en la página de la alerta ${alertData.id}, no redirigir`);
+            hasShownAlert.current.add(alertData.id);
+            return;
+          }
+
+          // Marcar como mostrada
+          hasShownAlert.current.add(alertData.id);
+
+          // Reproducir sonido de alarma
           if (soundEnabled && !isPlaying()) {
+            console.log('🔊 Reproduciendo sonido de alarma...');
             startAlarm('emergency');
           }
-        }
-      }
-    };
 
-    socket.on('panic:new_alert', handleNewAlert);
-    socket.on('panic:resolved', handleAlertResolved);
+          // Redirigir a la página de emergencia activa
+          console.log('🔄 Redirigiendo a página de emergencia activa:', alertData.id);
+          router.push(`/residentes/panico/activa/${alertData.id}`);
+
+          // Toast de notificación
+          toast.error(
+            `🚨 ¡ALERTA DE PÁNICO! ${alertData.userName} necesita ayuda urgente`,
+            {
+              duration: 10000,
+              icon: '🚨',
+              style: {
+                background: '#DC2626',
+                color: '#FFFFFF',
+                fontWeight: 'bold',
+                fontSize: '16px',
+              },
+            }
+          );
+
+          // Notificación del navegador si está disponible
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            new Notification('🚨 ALERTA DE PÁNICO', {
+              body: `${alertData.userName} solicita ayuda urgente\nUbicación: ${alertData.location}`,
+              icon: '/logo.png',
+              badge: '/logo.png',
+              tag: `panic-${alertData.id}`,
+              requireInteraction: true,
+            });
+          }
+        } else if (change.type === 'modified') {
+          const alertData = change.doc.data();
+          if (alertData.status === 'resolved') {
+            const alertId = change.doc.id;
+            console.log('✅ Alerta resuelta:', alertId);
+            
+            // Si es la alerta actual, cerrarla
+            if (currentAlert && currentAlert.id === alertId) {
+              setCurrentAlert(null);
+              stopAlarm();
+              toast.success('La alerta de pánico ha sido resuelta');
+              
+              // Mostrar siguiente alerta de la cola si existe
+              if (alertQueue.length > 0) {
+                const nextAlert = alertQueue[0];
+                setAlertQueue(prev => prev.slice(1));
+                setCurrentAlert(nextAlert);
+                if (soundEnabled && !isPlaying()) {
+                  startAlarm('emergency');
+                }
+              }
+            }
+          }
+        }
+      });
+    }, (error) => {
+      console.error('❌ Error al escuchar alertas:', error);
+    });
 
     return () => {
-      socket.off('panic:new_alert', handleNewAlert);
-      socket.off('panic:resolved', handleAlertResolved);
+      unsubscribe();
     };
-  }, [socket, hasSecurityAccess, user, currentAlert, alertQueue, soundEnabled, startAlarm, stopAlarm, isPlaying, pathname]);
+  }, [hasSecurityAccess, user, currentAlert, alertQueue, soundEnabled, startAlarm, stopAlarm, isPlaying, pathname, router]);
 
   // Cerrar alerta actual y guardar confirmación en Firestore
   const handleCloseAlert = useCallback(async () => {

@@ -45,13 +45,13 @@ export default function RootLayout({
             <GlobalAlertBanner />
             
             <AuthProvider>
-              {/* WebSocket Provider - Conecta al servidor de tiempo real */}
+              {/* Firebase Provider - Conecta a Firebase para tiempo real */}
               <WebSocketProvider>
                 <GlobalRegistrationAlert />
                 
-                {/* Sistema de notificaciones de pánico dual:
-                    - PanicAlertModal: WebSocket en tiempo real (prioridad)
-                    - PanicNotificationSystem: Firestore fallback */}
+                {/* Sistema de notificaciones de pánico:
+                    - PanicAlertModal: Firebase en tiempo real
+                    - PanicNotificationSystem: Sistema de respaldo */}
                 <PanicAlertModal />
                 <PanicNotificationSystem />
                 
