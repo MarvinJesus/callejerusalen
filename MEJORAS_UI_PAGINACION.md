@@ -256,3 +256,5 @@ Paginación se recalcula automáticamente
 **Versión:** 1.1 - Mejoras de UI/UX en Paginación y Filtros
 
 
+
+

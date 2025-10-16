@@ -1544,6 +1544,22 @@ const AdminDashboard: React.FC = () => {
                   <span>Hace 2 minutos</span>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Link 
+                  href="/admin/security-cameras"
+                  className="w-full px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center justify-center space-x-2"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Gestionar Cámaras</span>
+                </Link>
+                <Link 
+                  href="/admin/monitoring"
+                  className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center space-x-2"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>Centro de Monitoreo</span>
+                </Link>
+              </div>
             </div>
             <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
               <div className="flex items-center space-x-3 mb-3">
