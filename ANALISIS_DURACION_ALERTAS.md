@@ -251,3 +251,5 @@ Estado: "Activa" (Blanco)
 **Versión:** 1.0 - Análisis de Duración de Alertas
 
 
+
+

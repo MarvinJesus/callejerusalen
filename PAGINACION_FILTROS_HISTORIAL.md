@@ -304,3 +304,5 @@ Rendimiento: Mejor (menos páginas)
 **Versión:** 1.0 - Paginación y Filtros en Historial
 
 
+
+
