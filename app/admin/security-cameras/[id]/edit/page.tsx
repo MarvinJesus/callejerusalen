@@ -22,6 +22,7 @@ import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
+import { useProductionStreamUrl } from '@/hooks/useStreamUrl';
 
 // Tipos
 interface Camera {
@@ -60,6 +61,9 @@ const EditCameraPage: React.FC = () => {
     status: 'active' as Camera['status'],
     coordinates: { lat: 0, lng: 0 }
   });
+  
+  // Usar el hook para obtener la URL del stream con proxy en producción
+  const streamUrl = useProductionStreamUrl(formData.streamUrl);
 
   // Cargar datos de la cámara
   useEffect(() => {
@@ -124,7 +128,7 @@ const EditCameraPage: React.FC = () => {
   };
 
   const loadStream = () => {
-    if (!formData.streamUrl) return;
+    if (!formData.streamUrl || !streamUrl) return;
     
     setStreamError(false);
     setIsStreamPlaying(false);
@@ -135,7 +139,7 @@ const EditCameraPage: React.FC = () => {
       playerRef.current = null;
     }
     
-    // Detectar tipo de stream
+    // Detectar tipo de stream (usar URL original para detectar tipo)
     const isMjpeg = formData.streamUrl.includes('.mjpg') || 
                    formData.streamUrl.includes('.mjpeg') || 
                    formData.streamUrl.includes('.jpg') ||
@@ -144,9 +148,9 @@ const EditCameraPage: React.FC = () => {
     const isHls = formData.streamUrl.includes('.m3u8');
     
     if (isMjpeg) {
-      // Para streams MJPEG, usar elemento img
+      // Para streams MJPEG, usar elemento img con URL procesada
       if (imgRef.current) {
-        imgRef.current.src = `${formData.streamUrl}?t=${Date.now()}`;
+        imgRef.current.src = `${streamUrl}?t=${Date.now()}`;
         imgRef.current.onload = () => {
           console.log('Stream MJPEG cargado');
           setIsStreamPlaying(true);
@@ -159,7 +163,7 @@ const EditCameraPage: React.FC = () => {
         };
       }
     } else {
-      // Para otros tipos de stream (HLS, MP4, etc.) usar Video.js
+      // Para otros tipos de stream (HLS, MP4, etc.) usar Video.js con URL procesada
       if (videoRef.current) {
         const player = videojs(videoRef.current, {
           controls: false,
@@ -168,7 +172,7 @@ const EditCameraPage: React.FC = () => {
           autoplay: true,
           muted: true,
           sources: [{
-            src: formData.streamUrl,
+            src: streamUrl,
             type: isHls ? 'application/x-mpegURL' : 'video/mp4'
           }],
           html5: {
@@ -241,10 +245,10 @@ const EditCameraPage: React.FC = () => {
                    formData.streamUrl.includes('snapshot');
     
     if (isMjpeg) {
-      // Para MJPEG, recargar la imagen con timestamp
+      // Para MJPEG, recargar la imagen con timestamp usando URL procesada
       if (imgRef.current) {
         try {
-          imgRef.current.src = `${formData.streamUrl}?t=${Date.now()}`;
+          imgRef.current.src = `${streamUrl}?t=${Date.now()}`;
         } catch (error) {
           console.error('Error al recargar stream MJPEG:', error);
         }
@@ -556,7 +560,7 @@ const EditCameraPage: React.FC = () => {
                       <div className="relative">
                         <img
                           ref={imgRef}
-                          src={`${formData.streamUrl}?t=${Date.now()}`}
+                          src={`${streamUrl}?t=${Date.now()}`}
                           alt="Stream MJPEG"
                           className="w-full aspect-video bg-black rounded-lg object-cover"
                           onLoad={() => {
