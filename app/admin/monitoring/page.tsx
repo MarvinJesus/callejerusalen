@@ -121,12 +121,24 @@ const MonitoringPage = () => {
       return baseUrl;
     }
 
+    // Detectar si estamos en producción
+    const isProduction = process.env.NODE_ENV === 'production' || 
+                        process.env.VERCEL === '1' ||
+                        (typeof window !== 'undefined' && window.location.hostname !== 'localhost');
+
+    // Aplicar proxy solo en producción para URLs HTTP
+    let proxiedUrl = baseUrl;
+    if (isProduction && baseUrl.startsWith('http://')) {
+      const encodedUrl = encodeURIComponent(baseUrl);
+      proxiedUrl = `/api/stream-proxy?url=${encodedUrl}`;
+    }
+
     const timestamp = useStableTimestamp 
       ? Math.floor(Date.now() / 30000) * 30000  // Actualizar cada 30 segundos
       : Date.now();  // Timestamp único
 
-    const separator = baseUrl.includes('?') ? '&' : '?';
-    return `${baseUrl}${separator}t=${timestamp}`;
+    const separator = proxiedUrl.includes('?') ? '&' : '?';
+    return `${proxiedUrl}${separator}t=${timestamp}`;
   };
 
 

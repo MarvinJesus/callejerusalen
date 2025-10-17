@@ -10,13 +10,13 @@ const nextConfig = {
             key: 'Content-Type',
             value: 'text/html; charset=utf-8',
           },
-          // Permitir contenido mixto solo en desarrollo para cámaras de seguridad
-          ...(process.env.NODE_ENV === 'development' ? [
-            {
-              key: 'Content-Security-Policy',
-              value: "default-src 'self'; img-src 'self' data: http: https:; connect-src 'self' http: https: ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
-            }
-          ] : [])
+          // Configuración de CSP para desarrollo y producción
+          {
+            key: 'Content-Security-Policy',
+            value: process.env.NODE_ENV === 'development' 
+              ? "default-src 'self'; img-src 'self' data: http: https:; connect-src 'self' http: https: ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+              : "default-src 'self'; img-src 'self' data: https:; connect-src 'self' https: ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+          }
         ],
       },
     ];
