@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Configuración de headers para UTF-8
+  // Configuración de headers para UTF-8 y seguridad
   async headers() {
     return [
       {
@@ -10,6 +10,13 @@ const nextConfig = {
             key: 'Content-Type',
             value: 'text/html; charset=utf-8',
           },
+          // Permitir contenido mixto solo en desarrollo para cámaras de seguridad
+          ...(process.env.NODE_ENV === 'development' ? [
+            {
+              key: 'Content-Security-Policy',
+              value: "default-src 'self'; img-src 'self' data: http: https:; connect-src 'self' http: https: ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+            }
+          ] : [])
         ],
       },
     ];
@@ -25,6 +32,44 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'via.placeholder.com',
+        port: '',
+        pathname: '/**',
+      },
+      // Permitir URLs de cámaras de seguridad HTTP para desarrollo
+      {
+        protocol: 'http',
+        hostname: '77.222.181.11',
+        port: '8080',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '24.35.236.133',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '67.53.46.161',
+        port: '65123',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '200.107.234.131',
+        port: '',
+        pathname: '/**',
+      },
+      // Permitir cualquier IP local para cámaras
+      {
+        protocol: 'http',
+        hostname: '192.168.*',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '10.*',
         port: '',
         pathname: '/**',
       },

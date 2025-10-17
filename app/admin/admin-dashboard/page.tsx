@@ -63,8 +63,9 @@ import {
 } from '@/lib/auth';
 import { Permission, hasPermission, hasAnyPermission, canPerformAction } from '@/lib/permissions';
 import UserSearch from '@/components/UserSearch';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { getServerLogs, getSystemMetrics, ServerLog } from '@/lib/server-logging';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 const AdminDashboard: React.FC = () => {
   const { userProfile } = useAuth();
@@ -95,6 +96,7 @@ const AdminDashboard: React.FC = () => {
   const [eventStats, setEventStats] = useState<{[key: string]: any}>({});
   const [mapPlaces, setMapPlaces] = useState<any[]>([]);
   const [securityRegistrations, setSecurityRegistrations] = useState<any[]>([]);
+  const [securityCameras, setSecurityCameras] = useState<any[]>([]);
 
   // Función para verificar si el usuario es super admin
   const isSuperAdmin = () => {
@@ -272,12 +274,73 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  // Función para cargar cámaras de seguridad
+  const loadSecurityCameras = async () => {
+    try {
+      const camerasRef = collection(db, 'security_cameras');
+      const q = query(camerasRef, orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      
+      const camerasData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        updatedAt: doc.data().updatedAt?.toDate()
+      }));
+      
+      setSecurityCameras(camerasData);
+      console.log('📹 Cámaras de seguridad cargadas:', camerasData.length);
+    } catch (error) {
+      console.error('Error al cargar cámaras de seguridad:', error);
+      setSecurityCameras([]);
+    }
+  };
+
+  // Función para obtener estadísticas de cámaras
+  const getCameraStats = () => {
+    const totalCameras = securityCameras.length;
+    const activeCameras = securityCameras.filter(camera => camera.status === 'active').length;
+    const inactiveCameras = securityCameras.filter(camera => camera.status === 'inactive').length;
+    const maintenanceCameras = securityCameras.filter(camera => camera.status === 'maintenance').length;
+    const offlineCameras = securityCameras.filter(camera => camera.status === 'offline').length;
+    
+    return {
+      total: totalCameras,
+      active: activeCameras,
+      inactive: inactiveCameras,
+      maintenance: maintenanceCameras,
+      offline: offlineCameras
+    };
+  };
+
+  // Función para obtener la última verificación de cámaras
+  const getLastCameraUpdate = () => {
+    if (securityCameras.length === 0) return 'Sin datos';
+    
+    const lastUpdate = Math.max(...securityCameras.map(camera => 
+      camera.updatedAt ? camera.updatedAt.getTime() : camera.createdAt.getTime()
+    ));
+    
+    const now = Date.now();
+    const diffMinutes = Math.floor((now - lastUpdate) / (1000 * 60));
+    
+    if (diffMinutes < 1) return 'Hace menos de 1 minuto';
+    if (diffMinutes < 60) return `Hace ${diffMinutes} minuto${diffMinutes !== 1 ? 's' : ''}`;
+    
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `Hace ${diffHours} hora${diffHours !== 1 ? 's' : ''}`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `Hace ${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+  };
+
   // Cargar datos al montar el componente
   useEffect(() => {
     if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || isSuperAdmin()) {
       loadDashboardData();
       loadHistoryData();
       loadMapPlaces();
+      loadSecurityCameras();
     }
   }, [userProfile, userStatusFilter]);
 
@@ -1533,15 +1596,17 @@ const AdminDashboard: React.FC = () => {
                 <Camera className="w-6 h-6 text-green-600" />
                 <h4 className="font-medium text-gray-900">Cámaras de Seguridad</h4>
               </div>
-              <p className="text-sm text-gray-600 mb-2">12 cámaras activas</p>
+              <p className="text-sm text-gray-600 mb-2">{getCameraStats().active} cámaras activas</p>
               <div className="space-y-2">
                 <div className="flex justify-between text-xs">
                   <span>Estado del sistema</span>
-                  <span className="text-green-600">Operativo</span>
+                  <span className={`${getCameraStats().active > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {getCameraStats().active > 0 ? 'Operativo' : 'Sin cámaras activas'}
+                  </span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span>Última verificación</span>
-                  <span>Hace 2 minutos</span>
+                  <span>{getLastCameraUpdate()}</span>
                 </div>
               </div>
               <div className="space-y-2">
