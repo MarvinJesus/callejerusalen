@@ -102,6 +102,33 @@ const MonitoringPage = () => {
   
   const ffmpegRef = useRef<FFmpeg | null>(null);
 
+  // Función para validar URL de stream
+  const validateStreamUrl = (url: string): boolean => {
+    try {
+      const urlObj = new URL(url);
+      // Verificar que sea HTTP/HTTPS y tenga un hostname válido
+      return (urlObj.protocol === 'http:' || urlObj.protocol === 'https:') && 
+             urlObj.hostname.length > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  // Función para generar URL de stream con parámetros de cache-busting
+  const generateStreamUrl = (baseUrl: string, useStableTimestamp: boolean = false): string => {
+    if (!validateStreamUrl(baseUrl)) {
+      console.warn(`[STREAM] URL inválida: ${baseUrl}`);
+      return baseUrl;
+    }
+
+    const timestamp = useStableTimestamp 
+      ? Math.floor(Date.now() / 30000) * 30000  // Actualizar cada 30 segundos
+      : Date.now();  // Timestamp único
+
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    return `${baseUrl}${separator}t=${timestamp}`;
+  };
+
 
   // Actualizar tiempo cada segundo
   useEffect(() => {
@@ -558,8 +585,57 @@ const MonitoringPage = () => {
       // Crear imagen del stream
       const imgElement = document.createElement('img');
       imgElement.id = 'fullscreen-camera-stream';
-      imgElement.src = `${camera.streamUrl}?t=${Date.now()}`;
+      // Usar función de generación de URL con timestamp estable
+      imgElement.src = generateStreamUrl(camera.streamUrl, true);
       imgElement.alt = camera.name;
+      
+      // Sistema de reintentos para pantalla completa
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      const handleFullscreenImageError = () => {
+        retryCount++;
+        console.log(`[FULLSCREEN] Error cargando stream de ${camera.name}, intento ${retryCount}/${maxRetries}`);
+        
+        if (retryCount < maxRetries) {
+          setTimeout(() => {
+            imgElement.src = `${generateStreamUrl(camera.streamUrl)}&retry=${retryCount}`;
+            console.log(`[FULLSCREEN] Reintentando stream de ${camera.name} (intento ${retryCount})`);
+          }, 2000 * retryCount);
+        } else {
+          console.error(`[FULLSCREEN] Falló definitivamente el stream de ${camera.name}`);
+          imgElement.style.display = 'none';
+          
+          // Mostrar mensaje de error en pantalla completa
+          const errorDiv = document.createElement('div');
+          errorDiv.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #ef4444;
+            background: rgba(0,0,0,0.9);
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 16px;
+          `;
+          errorDiv.innerHTML = `
+            <svg width="32" height="32" fill="currentColor" style="margin: 0 auto 8px; display: block;">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-2.5-2.5L7 16l3.5 3.5L17 13l-1.41-1.41L10 17z"/>
+            </svg>
+            <div style="font-weight: 600; margin-bottom: 4px;">Stream no disponible</div>
+            <div style="font-size: 14px; opacity: 0.8;">Verifica la conexión de la cámara</div>
+          `;
+          videoElement.appendChild(errorDiv);
+        }
+      };
+      
+      imgElement.onerror = handleFullscreenImageError;
+      imgElement.onload = () => {
+        retryCount = 0; // Reset on successful load
+        console.log(`[FULLSCREEN] Stream de ${camera.name} cargado exitosamente`);
+      };
       
       // Establecer tamaño responsive por defecto con proporción 16:9
       const isMobile = window.innerWidth < 768;
@@ -1273,14 +1349,24 @@ const MonitoringPage = () => {
         if (img) {
           const currentTimestamp = Math.floor(Date.now() / 30000) * 30000;
           const currentSrc = img.src;
-          const newSrc = `${camera.streamUrl}?t=${currentTimestamp}`;
+          const newSrc = generateStreamUrl(camera.streamUrl, true);
           
           if (!currentSrc.includes(currentTimestamp.toString())) {
             // Solo actualizar si el timestamp ha cambiado
             img.style.opacity = '0';
+            
+            // Mejorar manejo de errores en actualizaciones
+            const handleUpdateError = () => {
+              console.log(`[UPDATE] Error actualizando stream de ${camera.name}`);
+              img.style.opacity = '1'; // Mantener imagen anterior si hay error
+            };
+            
             img.onload = () => {
               img.style.opacity = '1';
+              img.onerror = null; // Limpiar error handler temporal
             };
+            
+            img.onerror = handleUpdateError;
             img.src = newSrc;
           }
         }
@@ -1382,20 +1468,64 @@ const MonitoringPage = () => {
 
     if (camera.status === 'active') {
       const img = document.createElement('img');
-      // Usar un timestamp estable para evitar parpadeo en pantalla completa
-      const stableTimestamp = Math.floor(Date.now() / 30000) * 30000; // Actualizar cada 30 segundos
-      img.src = `${camera.streamUrl}?t=${stableTimestamp}`;
+      // Usar función de generación de URL con timestamp estable
+      img.src = generateStreamUrl(camera.streamUrl, true);
       img.alt = camera.name;
       img.style.cssText = `
         width: 100%;
         height: 100%;
         object-fit: cover;
       `;
-      img.onerror = () => {
-        img.style.display = 'none';
+      
+      // Mejorar manejo de errores con reintentos
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      const handleImageError = () => {
+        retryCount++;
+        console.log(`[STREAM] Error cargando stream de ${camera.name}, intento ${retryCount}/${maxRetries}`);
+        
+        if (retryCount < maxRetries) {
+          // Reintentar con nuevo timestamp después de un breve delay
+          setTimeout(() => {
+            img.src = `${generateStreamUrl(camera.streamUrl)}&retry=${retryCount}`;
+            console.log(`[STREAM] Reintentando stream de ${camera.name} (intento ${retryCount})`);
+          }, 2000 * retryCount); // Delay incremental: 2s, 4s, 6s
+        } else {
+          // Mostrar mensaje de error después de agotar reintentos
+          console.error(`[STREAM] Falló definitivamente el stream de ${camera.name} después de ${maxRetries} intentos`);
+          img.style.display = 'none';
+          
+          // Mostrar indicador de error
+          const errorIndicator = document.createElement('div');
+          errorIndicator.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #ef4444;
+            background: rgba(0,0,0,0.8);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+          `;
+          errorIndicator.innerHTML = `
+            <svg width="16" height="16" fill="currentColor" style="margin: 0 auto 4px; display: block;">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-2.5-2.5L7 16l3.5 3.5L17 13l-1.41-1.41L10 17z"/>
+            </svg>
+            Stream no disponible
+          `;
+          streamContainer.appendChild(errorIndicator);
+        }
       };
+      
+      img.onerror = handleImageError;
       img.onload = () => {
         img.style.opacity = '1';
+        // Reset retry count on successful load
+        retryCount = 0;
+        console.log(`[STREAM] Stream de ${camera.name} cargado exitosamente`);
       };
       img.style.opacity = '0';
       img.style.transition = 'opacity 0.3s ease-in-out';
@@ -1965,13 +2095,32 @@ const MonitoringPage = () => {
                   <div className="w-full h-full bg-black flex items-center justify-center">
                     {camera.status === 'active' ? (
                       <img
-                        src={`${camera.streamUrl}?t=${Date.now()}`}
+                        src={generateStreamUrl(camera.streamUrl, true)}
                         alt={camera.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
+                          const retryCount = parseInt(target.dataset.retryCount || '0');
+                          
+                          if (retryCount < 3) {
+                            // Reintentar después de un delay
+                            setTimeout(() => {
+                              target.dataset.retryCount = (retryCount + 1).toString();
+                              target.src = `${generateStreamUrl(camera.streamUrl)}&retry=${retryCount + 1}`;
+                              console.log(`[STREAM] Reintentando stream de ${camera.name}, intento ${retryCount + 1}/3`);
+                            }, 2000 * (retryCount + 1));
+                          } else {
+                            // Mostrar error después de agotar reintentos
+                            target.style.display = 'none';
+                            console.error(`[STREAM] Stream de ${camera.name} falló definitivamente`);
+                          }
                         }}
+                        onLoad={(e) => {
+                          // Reset retry count on successful load
+                          const target = e.target as HTMLImageElement;
+                          target.dataset.retryCount = '0';
+                        }}
+                        data-retry-count="0"
                       />
                     ) : (
                       <div className="text-center text-gray-500">
