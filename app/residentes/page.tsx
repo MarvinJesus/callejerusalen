@@ -7,23 +7,25 @@ import { Shield, Camera, AlertTriangle, Users, MapPin, Bell, Settings, ArrowLeft
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import SecurityPlanModal from '@/components/SecurityPlanModal';
+import { useStats } from '@/hooks/useStats';
 
 const ResidentesPage: React.FC = () => {
   const { user, userProfile, securityPlan } = useAuth();
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const stats = useStats();
 
   const isEnrolledInSecurityPlan = securityPlan !== null && securityPlan.status === 'active';
   const isAlreadyEnrolled = securityPlan !== null;
 
   const features = [
     {
-      title: 'Cámaras de Seguridad',
-      description: 'Monitorea las cámaras de seguridad de la comunidad en tiempo real',
+      title: 'Panel de Seguridad Personal',
+      description: 'Accede a tu panel personalizado de vigilancia y solicita acceso a cámaras específicas',
       icon: Camera,
-      href: '/residentes/camaras',
+      href: '/residentes/seguridad',
       color: 'blue',
-      available: false,
+      available: true,
       requiresAuth: true,
       requiresSecurityPlan: true
     },
@@ -372,6 +374,14 @@ const ResidentesPage: React.FC = () => {
         </div>
 
         {/* Stats Section with Glassmorphism */}
+        {stats.error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-red-500 mr-2" />
+              <p className="text-red-700 text-sm">{stats.error}</p>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="group relative overflow-hidden bg-white/70 backdrop-blur-sm rounded-2xl p-6 border border-gray-200/50 hover:shadow-xl transition-all duration-300">
             <div className="flex items-center justify-between">
@@ -385,8 +395,14 @@ const ResidentesPage: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Cámaras Activas</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">12</p>
+                  <p className="text-sm font-medium text-gray-500">Cámaras Accesibles</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                    {stats.loading ? (
+                      <span className="inline-block w-8 h-8 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></span>
+                    ) : (
+                      stats.accessibleCameras
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
@@ -401,7 +417,13 @@ const ResidentesPage: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Residentes Conectados</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-800 bg-clip-text text-transparent">45</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-800 bg-clip-text text-transparent">
+                    {stats.loading ? (
+                      <span className="inline-block w-8 h-8 border-2 border-green-300 border-t-green-600 rounded-full animate-spin"></span>
+                    ) : (
+                      stats.connectedResidents
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
@@ -415,15 +437,21 @@ const ResidentesPage: React.FC = () => {
                   <div className="w-14 h-14 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                     <Bell className="w-7 h-7 text-white" />
                   </div>
-                  {user && (
+                  {user && stats.recentAlerts > 0 && (
                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center">
-                      <span className="text-[10px] font-bold text-white">3</span>
+                      <span className="text-[10px] font-bold text-white">{stats.recentAlerts}</span>
                     </div>
                   )}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-500">Alertas Recientes</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-amber-800 bg-clip-text text-transparent">3</p>
+                  <p className="text-3xl font-bold bg-gradient-to-r from-yellow-600 to-amber-800 bg-clip-text text-transparent">
+                    {stats.loading ? (
+                      <span className="inline-block w-8 h-8 border-2 border-yellow-300 border-t-yellow-600 rounded-full animate-spin"></span>
+                    ) : (
+                      stats.recentAlerts
+                    )}
+                  </p>
                 </div>
               </div>
             </div>

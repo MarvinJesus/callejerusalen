@@ -187,8 +187,10 @@ const PanicPage: React.FC = () => {
       if (!user) return;
 
       try {
+        console.log('🔍 PanicoPage - Cargando usuarios del plan de seguridad...');
         // Cargar usuarios del plan de seguridad
         const users = await getActiveSecurityPlanUsers();
+        console.log('🔍 PanicoPage - Usuarios cargados:', users.length, users);
         setSecurityUsers(users);
 
         // Cargar configuración del usuario
@@ -209,7 +211,9 @@ const PanicPage: React.FC = () => {
         // Cargar reportes recientes
         await loadRecentReports();
       } catch (error) {
-        console.error('Error al cargar datos:', error);
+        console.error('❌ PanicoPage - Error al cargar datos:', error);
+        console.error('❌ PanicoPage - Error details:', error.message);
+        console.error('❌ PanicoPage - Error stack:', error.stack);
         toast.error('Error al cargar configuración');
       }
     };

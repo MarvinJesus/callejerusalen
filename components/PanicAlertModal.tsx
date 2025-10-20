@@ -234,7 +234,7 @@ const PanicAlertModal: React.FC = () => {
           }
 
           // Verificar que el usuario está en la lista de notificados
-          if (!alertData.notifiedUsers.includes(user.uid)) {
+          if (!alertData.notifiedUsers || !alertData.notifiedUsers.includes(user.uid)) {
             console.log('⚠️ Usuario no está en la lista de notificados');
             return;
           }

@@ -31,6 +31,9 @@ export type Permission =
   | 'security.monitor'
   | 'security.alerts'
   | 'security.cameras'
+  | 'security.camera_requests'
+  | 'security.camera_approve'
+  | 'security.camera_reject'
   
   // Reportes y analytics
   | 'reports.view'
@@ -81,6 +84,9 @@ export const ALL_PERMISSIONS: Permission[] = [
   'security.monitor',
   'security.alerts',
   'security.cameras',
+  'security.camera_requests',
+  'security.camera_approve',
+  'security.camera_reject',
   
   // Reportes y analytics
   'reports.view',
@@ -135,7 +141,10 @@ export const PERMISSION_GROUPS = {
     'security.view',
     'security.monitor',
     'security.alerts',
-    'security.cameras'
+    'security.cameras',
+    'security.camera_requests',
+    'security.camera_approve',
+    'security.camera_reject'
   ] as Permission[],
   
   REPORTS_ANALYTICS: [
@@ -191,6 +200,9 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   'security.monitor': 'Monitorear actividad de seguridad',
   'security.alerts': 'Gestionar alertas de seguridad',
   'security.cameras': 'Acceder a cámaras de seguridad',
+  'security.camera_requests': 'Ver solicitudes de acceso a cámaras',
+  'security.camera_approve': 'Aprobar solicitudes de acceso a cámaras',
+  'security.camera_reject': 'Rechazar solicitudes de acceso a cámaras',
   
   // Reportes y analytics
   'reports.view': 'Ver reportes del sistema',
@@ -218,6 +230,9 @@ export const DEFAULT_PERMISSIONS: Record<string, Permission[]> = {
     'users.view',
     'registrations.view',
     'security.view',
+    'security.camera_requests',
+    'security.camera_approve',
+    'security.camera_reject',
     'reports.view',
     'analytics.view',
     'logs.view',

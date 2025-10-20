@@ -18,6 +18,7 @@ import {
   Heart,
   Zap
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const SecurityPlanEnrollmentPage: React.FC = () => {
   const { user, userProfile } = useAuth();
@@ -27,6 +28,15 @@ const SecurityPlanEnrollmentPage: React.FC = () => {
   const [enrollmentStatus, setEnrollmentStatus] = useState<'checking' | 'enrolled' | 'not_enrolled'>('checking');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  
+  // Estados para el formulario
+  const [formData, setFormData] = useState({
+    phoneNumber: '',
+    address: '',
+    availability: '',
+    skills: [] as string[],
+    otherSkills: ''
+  });
 
   useEffect(() => {
     if (!user) {
@@ -52,9 +62,49 @@ const SecurityPlanEnrollmentPage: React.FC = () => {
     checkEnrollmentStatus();
   }, [user, router]);
 
+  const handleInputChange = (field: string, value: string | string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSkillToggle = (skill: string) => {
+    setFormData(prev => ({
+      ...prev,
+      skills: prev.skills.includes(skill)
+        ? prev.skills.filter(s => s !== skill)
+        : [...prev.skills, skill]
+    }));
+  };
+
+  const validateForm = () => {
+    if (!formData.phoneNumber.trim()) {
+      setError('El número de teléfono es requerido');
+      return false;
+    }
+    if (!formData.address.trim()) {
+      setError('La dirección es requerida');
+      return false;
+    }
+    if (!formData.availability.trim()) {
+      setError('La disponibilidad es requerida');
+      return false;
+    }
+    if (formData.skills.length === 0) {
+      setError('Debes seleccionar al menos una habilidad');
+      return false;
+    }
+    return true;
+  };
+
   const handleEnroll = async () => {
     if (!agreedToTerms) {
       setError('Debes aceptar los términos del Plan de Seguridad para continuar');
+      return;
+    }
+
+    if (!validateForm()) {
       return;
     }
 
@@ -70,6 +120,11 @@ const SecurityPlanEnrollmentPage: React.FC = () => {
         body: JSON.stringify({
           uid: user?.uid,
           agreedToTerms: true,
+          phoneNumber: formData.phoneNumber,
+          address: formData.address,
+          availability: formData.availability,
+          skills: formData.skills,
+          otherSkills: formData.otherSkills,
         }),
       });
 
@@ -320,6 +375,116 @@ const SecurityPlanEnrollmentPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Enrollment Form */}
+        {!success && (
+          <div className="bg-white rounded-2xl p-8 shadow-xl border-2 border-gray-100 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Información Personal</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              {/* Teléfono */}
+              <div>
+                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                  Número de Teléfono *
+                </label>
+                <input
+                  type="tel"
+                  id="phoneNumber"
+                  value={formData.phoneNumber}
+                  onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Ej: +57 300 123 4567"
+                  required
+                />
+              </div>
+
+              {/* Dirección */}
+              <div>
+                <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-2">
+                  Dirección de Residencia *
+                </label>
+                <input
+                  type="text"
+                  id="address"
+                  value={formData.address}
+                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Ej: Calle 123 #45-67, Sector A"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Disponibilidad */}
+            <div className="mb-6">
+              <label htmlFor="availability" className="block text-sm font-medium text-gray-700 mb-2">
+                Disponibilidad para Emergencias *
+              </label>
+              <select
+                id="availability"
+                value={formData.availability}
+                onChange={(e) => handleInputChange('availability', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              >
+                <option value="">Selecciona tu disponibilidad</option>
+                <option value="24/7">24/7 - Siempre disponible</option>
+                <option value="mañanas">Mañanas (6:00 AM - 12:00 PM)</option>
+                <option value="tardes">Tardes (12:00 PM - 6:00 PM)</option>
+                <option value="noches">Noches (6:00 PM - 12:00 AM)</option>
+                <option value="fines_semana">Fines de semana</option>
+                <option value="limitada">Disponibilidad limitada</option>
+              </select>
+            </div>
+
+            {/* Habilidades */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Habilidades y Capacidades * (Selecciona al menos una)
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {[
+                  'Primeros auxilios',
+                  'Seguridad ciudadana',
+                  'Comunicación',
+                  'Liderazgo',
+                  'Tecnología',
+                  'Vigilancia',
+                  'Emergencias médicas',
+                  'Coordinación',
+                  'Otras'
+                ].map((skill) => (
+                  <label key={skill} className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.skills.includes(skill)}
+                      onChange={() => handleSkillToggle(skill)}
+                      className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                    />
+                    <span className="text-sm text-gray-700">{skill}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Otras habilidades */}
+            {formData.skills.includes('Otras') && (
+              <div className="mb-6">
+                <label htmlFor="otherSkills" className="block text-sm font-medium text-gray-700 mb-2">
+                  Especifica otras habilidades
+                </label>
+                <textarea
+                  id="otherSkills"
+                  value={formData.otherSkills}
+                  onChange={(e) => handleInputChange('otherSkills', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  rows={3}
+                  placeholder="Describe tus otras habilidades o capacidades..."
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Terms and Enrollment */}
         {!success && (
