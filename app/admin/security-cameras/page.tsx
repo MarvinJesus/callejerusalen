@@ -53,15 +53,22 @@ import { db } from '@/lib/firebase';
 interface Camera {
   id: string;
   name: string;
+  location: string;
   description: string;
   streamUrl: string;
   status: 'active' | 'inactive' | 'maintenance' | 'offline';
+  accessLevel: 'public' | 'restricted' | 'private';
   coordinates: {
     lat: number;
     lng: number;
   };
+  fps?: number;
+  resolution?: string;
+  recordingEnabled?: boolean;
   createdAt: Date;
   updatedAt?: Date;
+  createdBy?: string;
+  lastSeen?: Date;
 }
 
 // Componente SortableCameraCard
@@ -125,12 +132,18 @@ const SortableCameraCard: React.FC<SortableCameraCardProps> = ({
 
       {/* Contenido */}
       <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
-        {/* Descripción */}
-        {camera.description && (
-          <div className="pb-3 sm:pb-4 border-b border-gray-600/50">
+        {/* Ubicación y Descripción */}
+        <div className="pb-3 sm:pb-4 border-b border-gray-600/50 space-y-2">
+          {camera.location && (
+            <div className="flex items-center space-x-2">
+              <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-green-400 flex-shrink-0" />
+              <span className="text-xs sm:text-sm text-gray-300 font-medium">{camera.location}</span>
+            </div>
+          )}
+          {camera.description && (
             <p className="text-xs sm:text-sm text-gray-300 leading-relaxed line-clamp-2">{camera.description}</p>
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="space-y-3 sm:space-y-4 text-xs sm:text-sm">
           <div className="flex items-start space-x-2 sm:space-x-3 group/item">
@@ -156,6 +169,37 @@ const SortableCameraCard: React.FC<SortableCameraCardProps> = ({
               </span>
             </div>
           </div>
+
+          <div className="flex items-start sm:items-center space-x-2 sm:space-x-3 group/item">
+            <div className="p-1.5 sm:p-2 bg-purple-500/20 rounded-lg group-hover/item:bg-purple-500/30 transition-colors duration-300 flex-shrink-0">
+              <Settings className="w-3 h-3 sm:w-4 sm:h-4 text-purple-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span className="text-gray-400 font-medium block sm:inline">Acceso:</span>
+              <span className={`text-[10px] sm:text-xs mt-1 sm:mt-0 sm:ml-2 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded block sm:inline-block font-medium ${
+                camera.accessLevel === 'public' ? 'bg-green-500/20 text-green-400' :
+                camera.accessLevel === 'restricted' ? 'bg-yellow-500/20 text-yellow-400' :
+                'bg-red-500/20 text-red-400'
+              }`}>
+                {camera.accessLevel === 'public' ? 'Público' :
+                 camera.accessLevel === 'restricted' ? 'Restringido' : 'Privado'}
+              </span>
+            </div>
+          </div>
+
+          {camera.resolution && (
+            <div className="flex items-start sm:items-center space-x-2 sm:space-x-3 group/item">
+              <div className="p-1.5 sm:p-2 bg-orange-500/20 rounded-lg group-hover/item:bg-orange-500/30 transition-colors duration-300 flex-shrink-0">
+                <Monitor className="w-3 h-3 sm:w-4 sm:h-4 text-orange-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-gray-400 font-medium block sm:inline">Resolución:</span>
+                <span className="text-[10px] sm:text-xs mt-1 sm:mt-0 sm:ml-2 text-gray-300 bg-gray-700/30 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded block sm:inline-block">
+                  {camera.resolution}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Acciones */}
@@ -221,10 +265,15 @@ const SecurityCamerasPage: React.FC = () => {
   // Estados del formulario
   const [formData, setFormData] = useState({
     name: '',
+    location: '',
     description: '',
     streamUrl: '',
     status: 'active' as Camera['status'],
-    coordinates: { lat: 0, lng: 0 }
+    accessLevel: 'public' as Camera['accessLevel'],
+    coordinates: { lat: 0, lng: 0 },
+    fps: 30,
+    resolution: '1920x1080',
+    recordingEnabled: true
   });
 
   // Cargar orden personalizado desde localStorage
@@ -277,12 +326,19 @@ const SecurityCamerasPage: React.FC = () => {
         return {
           id: doc.id,
           name: data.name || '',
+          location: data.location || '',
           description: data.description || '',
           streamUrl: data.streamUrl || '',
           status: data.status || 'active',
+          accessLevel: data.accessLevel || 'public',
           coordinates: data.coordinates || { lat: 0, lng: 0 },
+          fps: data.fps || 30,
+          resolution: data.resolution || '1920x1080',
+          recordingEnabled: data.recordingEnabled !== false,
           createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate()
+          updatedAt: data.updatedAt?.toDate(),
+          createdBy: data.createdBy || 'system',
+          lastSeen: data.lastSeen?.toDate()
         } as Camera;
       });
 
@@ -367,10 +423,15 @@ const SecurityCamerasPage: React.FC = () => {
   const resetForm = () => {
     setFormData({
       name: '',
+      location: '',
       description: '',
       streamUrl: '',
       status: 'active',
-      coordinates: { lat: 0, lng: 0 }
+      accessLevel: 'public',
+      coordinates: { lat: 0, lng: 0 },
+      fps: 30,
+      resolution: '1920x1080',
+      recordingEnabled: true
     });
   };
 
@@ -716,6 +777,20 @@ const SecurityCamerasPage: React.FC = () => {
                       placeholder="Ej: Cámara Entrada Principal"
                     />
                   </div>
+
+                  <div className="group">
+                    <label className="block text-xs sm:text-sm font-semibold text-gray-300 mb-2 sm:mb-3">
+                      Ubicación *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-600 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white bg-gray-700/50 placeholder-gray-400 transition-all duration-300 hover:bg-gray-700/70 text-sm sm:text-base"
+                      placeholder="Ej: Cancha Deportiva, Entrada Principal, etc."
+                    />
+                  </div>
                   
                   <div className="group">
                     <label className="block text-xs sm:text-sm font-semibold text-gray-300 mb-2 sm:mb-3">
@@ -726,8 +801,89 @@ const SecurityCamerasPage: React.FC = () => {
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-600 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white bg-gray-700/50 placeholder-gray-400 transition-all duration-300 hover:bg-gray-700/70 resize-none text-sm sm:text-base"
                       rows={3}
-                      placeholder="Descripción de la ubicación..."
+                      placeholder="Descripción de la ubicación o notas sobre la cámara..."
                     />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                    <div className="group">
+                      <label className="block text-xs sm:text-sm font-semibold text-gray-300 mb-2 sm:mb-3">
+                        Nivel de Acceso
+                      </label>
+                      <select
+                        value={formData.accessLevel}
+                        onChange={(e) => setFormData({ ...formData, accessLevel: e.target.value as Camera['accessLevel'] })}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-600 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white bg-gray-700/50 transition-all duration-300 hover:bg-gray-700/70 text-sm sm:text-base"
+                      >
+                        <option value="public">Público</option>
+                        <option value="restricted">Restringido</option>
+                        <option value="private">Privado</option>
+                      </select>
+                    </div>
+
+                    <div className="group">
+                      <label className="block text-xs sm:text-sm font-semibold text-gray-300 mb-2 sm:mb-3">
+                        Estado de la Cámara
+                      </label>
+                      <select
+                        value={formData.status}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value as Camera['status'] })}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-600 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white bg-gray-700/50 transition-all duration-300 hover:bg-gray-700/70 text-sm sm:text-base"
+                      >
+                        <option value="active">Activa</option>
+                        <option value="inactive">Inactiva</option>
+                        <option value="maintenance">En Mantenimiento</option>
+                        <option value="offline">Fuera de Línea</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                    <div className="group">
+                      <label className="block text-xs sm:text-sm font-semibold text-gray-300 mb-2 sm:mb-3">
+                        Resolución
+                      </label>
+                      <select
+                        value={formData.resolution}
+                        onChange={(e) => setFormData({ ...formData, resolution: e.target.value })}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-600 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white bg-gray-700/50 transition-all duration-300 hover:bg-gray-700/70 text-sm sm:text-base"
+                      >
+                        <option value="640x480">640x480 (VGA)</option>
+                        <option value="1280x720">1280x720 (HD)</option>
+                        <option value="1920x1080">1920x1080 (Full HD)</option>
+                        <option value="2560x1440">2560x1440 (2K)</option>
+                        <option value="3840x2160">3840x2160 (4K)</option>
+                      </select>
+                    </div>
+
+                    <div className="group">
+                      <label className="block text-xs sm:text-sm font-semibold text-gray-300 mb-2 sm:mb-3">
+                        FPS (Frames por Segundo)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={formData.fps}
+                        onChange={(e) => setFormData({ ...formData, fps: parseInt(e.target.value) || 30 })}
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-600 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white bg-gray-700/50 placeholder-gray-400 transition-all duration-300 hover:bg-gray-700/70 text-sm sm:text-base"
+                        placeholder="30"
+                      />
+                    </div>
+
+                    <div className="group flex items-end">
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.recordingEnabled}
+                          onChange={(e) => setFormData({ ...formData, recordingEnabled: e.target.checked })}
+                          className="w-4 h-4 text-blue-600 border-gray-600 rounded focus:ring-blue-500 bg-gray-700"
+                        />
+                        <span className="text-xs sm:text-sm font-semibold text-gray-300">
+                          Grabación Habilitada
+                        </span>
+                      </label>
+                    </div>
                   </div>
 
                   <div className="group">
@@ -785,21 +941,6 @@ const SecurityCamerasPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="group">
-                    <label className="block text-xs sm:text-sm font-semibold text-gray-300 mb-2 sm:mb-3">
-                      Estado de la Cámara
-                    </label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value as Camera['status'] })}
-                      className="w-full px-3 sm:px-4 py-2 sm:py-2.5 md:py-3 border border-gray-600 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white bg-gray-700/50 transition-all duration-300 hover:bg-gray-700/70 text-sm sm:text-base"
-                    >
-                      <option value="active">Activa</option>
-                      <option value="inactive">Inactiva</option>
-                      <option value="maintenance">En Mantenimiento</option>
-                      <option value="offline">Fuera de Línea</option>
-                    </select>
-                  </div>
                 </div>
 
                 <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 sm:gap-4 pt-4 sm:pt-6 border-t border-gray-600/50">

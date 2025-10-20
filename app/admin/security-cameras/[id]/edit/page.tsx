@@ -28,15 +28,22 @@ import { useProductionStreamUrl } from '@/hooks/useStreamUrl';
 interface Camera {
   id: string;
   name: string;
+  location: string;
   description: string;
   streamUrl: string;
   status: 'active' | 'inactive' | 'maintenance' | 'offline';
+  accessLevel: 'public' | 'restricted' | 'private';
   coordinates: {
     lat: number;
     lng: number;
   };
+  fps?: number;
+  resolution?: string;
+  recordingEnabled?: boolean;
   createdAt: Date;
   updatedAt?: Date;
+  createdBy?: string;
+  lastSeen?: Date;
 }
 
 const EditCameraPage: React.FC = () => {
@@ -56,10 +63,15 @@ const EditCameraPage: React.FC = () => {
   const playerRef = useRef<any>(null);
   const [formData, setFormData] = useState({
     name: '',
+    location: '',
     description: '',
     streamUrl: '',
     status: 'active' as Camera['status'],
-    coordinates: { lat: 0, lng: 0 }
+    accessLevel: 'public' as Camera['accessLevel'],
+    coordinates: { lat: 0, lng: 0 },
+    fps: 30,
+    resolution: '1920x1080',
+    recordingEnabled: true
   });
   
   // Usar el hook para obtener la URL del stream con proxy en producción
@@ -99,21 +111,33 @@ const EditCameraPage: React.FC = () => {
         const cameraData = {
           id: cameraSnap.id,
           name: data.name || '',
+          location: data.location || '',
           description: data.description || '',
           streamUrl: data.streamUrl || '',
           status: data.status || 'active',
+          accessLevel: data.accessLevel || 'public',
           coordinates: data.coordinates || { lat: 0, lng: 0 },
+          fps: data.fps || 30,
+          resolution: data.resolution || '1920x1080',
+          recordingEnabled: data.recordingEnabled !== false,
           createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate()
+          updatedAt: data.updatedAt?.toDate(),
+          createdBy: data.createdBy || 'system',
+          lastSeen: data.lastSeen?.toDate()
         } as Camera;
         
         setCamera(cameraData);
         setFormData({
           name: cameraData.name,
+          location: cameraData.location,
           description: cameraData.description,
           streamUrl: cameraData.streamUrl,
           status: cameraData.status,
-          coordinates: cameraData.coordinates
+          accessLevel: cameraData.accessLevel,
+          coordinates: cameraData.coordinates,
+          fps: cameraData.fps || 30,
+          resolution: cameraData.resolution || '1920x1080',
+          recordingEnabled: cameraData.recordingEnabled !== false
         });
       } else {
         alert('Cámara no encontrada');
@@ -418,6 +442,20 @@ const EditCameraPage: React.FC = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Ubicación *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                    placeholder="Ej: Cancha Deportiva, Entrada Principal, etc."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Descripción o Nota
                   </label>
                   <textarea
@@ -427,6 +465,87 @@ const EditCameraPage: React.FC = () => {
                     rows={3}
                     placeholder="Descripción de la ubicación o notas sobre la cámara..."
                   />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nivel de Acceso
+                    </label>
+                    <select
+                      value={formData.accessLevel}
+                      onChange={(e) => setFormData({ ...formData, accessLevel: e.target.value as Camera['accessLevel'] })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                    >
+                      <option value="public">Público</option>
+                      <option value="restricted">Restringido</option>
+                      <option value="private">Privado</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Estado de la Cámara
+                    </label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as Camera['status'] })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                    >
+                      <option value="active">Activa</option>
+                      <option value="inactive">Inactiva</option>
+                      <option value="maintenance">En Mantenimiento</option>
+                      <option value="offline">Fuera de Línea</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Resolución
+                    </label>
+                    <select
+                      value={formData.resolution}
+                      onChange={(e) => setFormData({ ...formData, resolution: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                    >
+                      <option value="640x480">640x480 (VGA)</option>
+                      <option value="1280x720">1280x720 (HD)</option>
+                      <option value="1920x1080">1920x1080 (Full HD)</option>
+                      <option value="2560x1440">2560x1440 (2K)</option>
+                      <option value="3840x2160">3840x2160 (4K)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      FPS (Frames por Segundo)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={formData.fps}
+                      onChange={(e) => setFormData({ ...formData, fps: parseInt(e.target.value) || 30 })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
+                      placeholder="30"
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <label className="flex items-center space-x-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.recordingEnabled}
+                        onChange={(e) => setFormData({ ...formData, recordingEnabled: e.target.checked })}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <span className="text-sm font-medium text-gray-700">
+                        Grabación Habilitada
+                      </span>
+                    </label>
+                  </div>
                 </div>
 
                 <div>
@@ -484,21 +603,6 @@ const EditCameraPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Estado de la Cámara
-                  </label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as Camera['status'] })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
-                  >
-                    <option value="active">Activa</option>
-                    <option value="inactive">Inactiva</option>
-                    <option value="maintenance">En Mantenimiento</option>
-                    <option value="offline">Fuera de Línea</option>
-                  </select>
-                </div>
 
                 <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                   <Link
@@ -632,54 +736,89 @@ const EditCameraPage: React.FC = () => {
                 
                 {/* Información del Stream */}
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">Información del Stream</h3>
-                  <div className="space-y-2 text-xs text-gray-600">
-                    <div className="flex justify-between items-start">
-                      <span className="font-medium">URL:</span>
-                      <span className="font-mono break-all text-right max-w-xs">
-                        {formData.streamUrl || 'No configurado'}
-                      </span>
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">Información de la Cámara</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-600">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium">URL:</span>
+                        <span className="font-mono break-all text-right max-w-xs">
+                          {formData.streamUrl || 'No configurado'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Tipo:</span>
+                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
+                          {(formData.streamUrl.includes('.mjpg') || 
+                            formData.streamUrl.includes('.mjpeg') || 
+                            formData.streamUrl.includes('.jpg') ||
+                            formData.streamUrl.includes('faststream') ||
+                            formData.streamUrl.includes('snapshot')) ? 'MJPEG' :
+                           formData.streamUrl.includes('.m3u8') ? 'HLS' : 'HTTP'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Estado:</span>
+                        <span className={`flex items-center space-x-1 ${
+                          streamError ? 'text-red-600' : 
+                          isStreamPlaying ? 'text-green-600' : 'text-gray-600'
+                        }`}>
+                          {streamError ? (
+                            <>
+                              <AlertCircle className="w-3 h-3" />
+                              <span>Error</span>
+                            </>
+                          ) : isStreamPlaying ? (
+                            <>
+                              <CheckCircle className="w-3 h-3" />
+                              <span>Reproduciendo</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+                              <span>Detenido</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Nivel de Acceso:</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          formData.accessLevel === 'public' ? 'bg-green-100 text-green-800' :
+                          formData.accessLevel === 'restricted' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {formData.accessLevel === 'public' ? 'Público' :
+                           formData.accessLevel === 'restricted' ? 'Restringido' : 'Privado'}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">Tipo:</span>
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-medium">
-                        {(formData.streamUrl.includes('.mjpg') || 
-                          formData.streamUrl.includes('.mjpeg') || 
-                          formData.streamUrl.includes('.jpg') ||
-                          formData.streamUrl.includes('faststream') ||
-                          formData.streamUrl.includes('snapshot')) ? 'MJPEG' :
-                         formData.streamUrl.includes('.m3u8') ? 'HLS' : 'HTTP'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">Estado:</span>
-                      <span className={`flex items-center space-x-1 ${
-                        streamError ? 'text-red-600' : 
-                        isStreamPlaying ? 'text-green-600' : 'text-gray-600'
-                      }`}>
-                        {streamError ? (
-                          <>
-                            <AlertCircle className="w-3 h-3" />
-                            <span>Error</span>
-                          </>
-                        ) : isStreamPlaying ? (
-                          <>
-                            <CheckCircle className="w-3 h-3" />
-                            <span>Reproduciendo</span>
-                          </>
-                        ) : (
-                          <>
-                            <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                            <span>Detenido</span>
-                          </>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="font-medium">Coordenadas:</span>
-                      <span className="font-mono text-xs">
-                        {formData.coordinates.lat.toFixed(6)}, {formData.coordinates.lng.toFixed(6)}
-                      </span>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Resolución:</span>
+                        <span className="font-mono text-xs">
+                          {formData.resolution}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">FPS:</span>
+                        <span className="font-mono text-xs">
+                          {formData.fps}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Grabación:</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          formData.recordingEnabled ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {formData.recordingEnabled ? 'Habilitada' : 'Deshabilitada'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="font-medium">Coordenadas:</span>
+                        <span className="font-mono text-xs">
+                          {formData.coordinates.lat.toFixed(6)}, {formData.coordinates.lng.toFixed(6)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>

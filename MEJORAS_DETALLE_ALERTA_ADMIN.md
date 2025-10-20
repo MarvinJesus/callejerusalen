@@ -493,3 +493,10 @@ Una página de detalle de alertas completamente profesional que incluye:
 
 
 
+
+
+
+
+
+
+

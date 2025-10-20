@@ -1339,37 +1339,67 @@ export async function getActiveSecurityPlanUsers(): Promise<SecurityPlanRegistra
       return [];
     }
 
-    const registrationsRef = collection(db, 'securityRegistrations');
-    const q = query(registrationsRef, where('status', '==', 'active'));
+    // Primero obtener usuarios aprobados en registrationRequests
+    const registrationRequestsRef = collection(db, 'registrationRequests');
+    const approvedQuery = query(registrationRequestsRef, where('status', '==', 'approved'));
+    const approvedSnapshot = await getDocs(approvedQuery);
     
-    const querySnapshot = await getDocs(q);
+    console.log('🔍 Usuarios aprobados encontrados:', approvedSnapshot.size);
     
-    console.log('🔍 Usuarios activos encontrados:', querySnapshot.size);
-    
+    if (approvedSnapshot.empty) {
+      console.log('❌ No hay usuarios aprobados en registrationRequests');
+      return [];
+    }
+
+    // Obtener IDs de usuarios aprobados
+    const approvedUserIds: string[] = [];
+    approvedSnapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.userId) {
+        approvedUserIds.push(data.userId);
+      }
+    });
+
+    console.log('🔍 IDs de usuarios aprobados:', approvedUserIds);
+
+    // Ahora obtener datos completos de securityRegistrations para usuarios aprobados
     const users: SecurityPlanRegistration[] = [];
     
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      users.push({
-        id: doc.id,
-        userId: data.userId,
-        userDisplayName: data.userDisplayName,
-        userEmail: data.userEmail,
-        phoneNumber: data.phoneNumber,
-        address: data.address,
-        availability: data.availability,
-        skills: data.skills || [],
-        otherSkills: data.otherSkills,
-        status: data.status,
-        sector: data.sector,
-        submittedAt: data.submittedAt,
-        reviewedBy: data.reviewedBy,
-        reviewedAt: data.reviewedAt,
-        reviewNotes: data.reviewNotes,
-        createdAt: data.createdAt,
-        updatedAt: data.updatedAt
-      });
-    });
+    for (const userId of approvedUserIds) {
+      const securityQuery = query(
+        collection(db, 'securityRegistrations'),
+        where('userId', '==', userId)
+      );
+      const securitySnapshot = await getDocs(securityQuery);
+      
+      if (!securitySnapshot.empty) {
+        const doc = securitySnapshot.docs[0];
+        const data = doc.data();
+        
+        // Solo incluir si el status es 'active'
+        if (data.status === 'active') {
+          users.push({
+            id: doc.id,
+            userId: data.userId,
+            userDisplayName: data.userDisplayName,
+            userEmail: data.userEmail,
+            phoneNumber: data.phoneNumber,
+            address: data.address,
+            availability: data.availability,
+            skills: data.skills || [],
+            otherSkills: data.otherSkills,
+            status: data.status,
+            sector: data.sector,
+            submittedAt: data.submittedAt,
+            reviewedBy: data.reviewedBy,
+            reviewedAt: data.reviewedAt,
+            reviewNotes: data.reviewNotes,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
+          });
+        }
+      }
+    }
     
     // Ordenar por sector y disponibilidad
     users.sort((a, b) => {
@@ -1377,8 +1407,10 @@ export async function getActiveSecurityPlanUsers(): Promise<SecurityPlanRegistra
       if (a.sector && b.sector && a.sector !== b.sector) {
         return a.sector.localeCompare(b.sector);
       }
-      // Luego por nombre
-      return a.userDisplayName.localeCompare(b.userDisplayName);
+      // Luego por nombre (manejar casos donde userDisplayName puede ser undefined)
+      const nameA = a.userDisplayName || a.userEmail || 'Sin nombre';
+      const nameB = b.userDisplayName || b.userEmail || 'Sin nombre';
+      return nameA.localeCompare(nameB);
     });
     
     console.log('✅ Usuarios del plan de seguridad obtenidos:', users.length);

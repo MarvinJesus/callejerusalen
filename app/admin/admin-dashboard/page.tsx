@@ -28,6 +28,7 @@ import {
   XCircle,
   Plus,
   Edit,
+  RefreshCw,
   Trash2,
   RotateCcw,
   BookOpen,
@@ -63,12 +64,13 @@ import {
 } from '@/lib/auth';
 import { Permission, hasPermission, hasAnyPermission, canPerformAction } from '@/lib/permissions';
 import UserSearch from '@/components/UserSearch';
+import CameraRequestModal from '@/components/CameraRequestModal';
 import { auth, db } from '@/lib/firebase';
 import { getServerLogs, getSystemMetrics, ServerLog } from '@/lib/server-logging';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 
 const AdminDashboard: React.FC = () => {
-  const { userProfile } = useAuth();
+  const { user, userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -97,6 +99,20 @@ const AdminDashboard: React.FC = () => {
   const [mapPlaces, setMapPlaces] = useState<any[]>([]);
   const [securityRegistrations, setSecurityRegistrations] = useState<any[]>([]);
   const [securityCameras, setSecurityCameras] = useState<any[]>([]);
+  const [cameraAccessRequests, setCameraAccessRequests] = useState<any[]>([]);
+  const [cameraRequestsLoading, setCameraRequestsLoading] = useState<boolean>(false);
+  const [showCameraRequestModal, setShowCameraRequestModal] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [emailTimeout, setEmailTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [formData, setFormData] = useState({
+    displayName: '',
+    email: '',
+    password: '',
+    role: 'comunidad' as 'comunidad' | 'admin' | 'super_admin',
+    isActive: true
+  });
 
   // Función para verificar si el usuario es super admin
   const isSuperAdmin = () => {
@@ -296,6 +312,130 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  // Función para cargar solicitudes de acceso a cámaras
+  const loadCameraAccessRequests = async () => {
+    try {
+      setCameraRequestsLoading(true);
+      console.log('🔍 Iniciando carga de solicitudes de acceso a cámaras...');
+      console.log('👤 Usuario actual:', user?.email, 'Rol:', userProfile?.role);
+      
+      // Usar user en lugar de userProfile para obtener el token (igual que en camera-requests)
+      const token = await user?.getIdToken();
+      if (!token) {
+        console.log('❌ No hay token disponible para cargar solicitudes de cámaras');
+        return;
+      }
+
+      console.log('🔍 Cargando solicitudes de acceso a cámaras...');
+      const response = await fetch('/api/cameras/requests', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      console.log('📡 Respuesta de la API:', response.status, response.statusText);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📊 Datos recibidos de la API:', data);
+        console.log('📋 Solicitudes en data.requests:', data.requests?.length || 0);
+        console.log('📋 Estructura de data:', Object.keys(data));
+        
+        // Usar la misma lógica que en camera-requests
+        const requests = data.requests || [];
+        console.log('📋 Requests procesadas:', requests.length);
+        
+        if (requests.length > 0) {
+          const stats = {
+            total: requests.length,
+            pending: requests.filter((r: any) => r.status === 'pending').length,
+            approved: requests.filter((r: any) => r.status === 'approved').length,
+            rejected: requests.filter((r: any) => r.status === 'rejected').length,
+          };
+          console.log('📈 Estadísticas calculadas:', stats);
+          
+          // Mostrar algunos ejemplos de las solicitudes
+          console.log('📋 Primeras 3 solicitudes:', requests.slice(0, 3));
+        }
+        
+        setCameraAccessRequests(requests);
+        console.log('💾 Estado actualizado con', requests.length, 'solicitudes');
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Error en la respuesta de la API:', errorData);
+        setCameraAccessRequests([]);
+      }
+    } catch (error) {
+      console.error('❌ Error al cargar solicitudes de acceso a cámaras:', error);
+      setCameraAccessRequests([]);
+    } finally {
+      setCameraRequestsLoading(false);
+    }
+  };
+
+  // Función para procesar solicitud de acceso a cámara
+  const handleCameraRequestAction = async (requestId: string, action: 'approve' | 'reject', modalData: any) => {
+    try {
+      const token = await user?.getIdToken();
+      if (!token) return;
+
+      const response = await fetch(`/api/cameras/requests/${requestId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action,
+          reviewNotes: modalData.reviewNotes || null
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Dashboard - Respuesta exitosa:', data);
+        await loadCameraAccessRequests(); // Recargar solicitudes
+        setShowCameraRequestModal(null);
+        
+        // Usar el mensaje de la API si está disponible
+        const message = data.message || `Solicitud ${action === 'approve' ? 'aprobada' : 'rechazada'} exitosamente`;
+        console.log('📢 Dashboard - Mensaje:', message);
+      } else {
+        const error = await response.json();
+        console.error('Error al procesar solicitud:', error.error);
+      }
+    } catch (error) {
+      console.error('Error al procesar solicitud:', error);
+      // Asegurar que el modal se cierre incluso si hay error
+      setShowCameraRequestModal(null);
+    }
+  };
+
+  // Función para eliminar solicitud de acceso a cámara
+  const handleDeleteCameraRequest = async (requestId: string) => {
+    try {
+      const token = await user?.getIdToken();
+      if (!token) return;
+
+      const response = await fetch(`/api/cameras/requests/${requestId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        await loadCameraAccessRequests(); // Recargar solicitudes
+        console.log('Solicitud eliminada exitosamente');
+      } else {
+        const error = await response.json();
+        console.error('Error al eliminar solicitud:', error.error);
+      }
+    } catch (error) {
+      console.error('Error al eliminar solicitud:', error);
+    }
+  };
+
   // Función para obtener estadísticas de cámaras
   const getCameraStats = () => {
     const totalCameras = securityCameras.length;
@@ -336,13 +476,25 @@ const AdminDashboard: React.FC = () => {
 
   // Cargar datos al montar el componente
   useEffect(() => {
-    if (userProfile?.role === 'admin' || userProfile?.role === 'super_admin' || isSuperAdmin()) {
-      loadDashboardData();
-      loadHistoryData();
-      loadMapPlaces();
-      loadSecurityCameras();
+    console.log('🔄 useEffect ejecutado - Usuario:', user?.email, 'Rol:', userProfile?.role);
+    
+    // Verificar si la autenticación está completa
+    if (user !== undefined && userProfile !== undefined) {
+      setAuthLoading(false);
+      
+      // Usar la misma condición que en camera-requests
+      if (user && (userProfile?.role === 'admin' || userProfile?.role === 'super_admin')) {
+        console.log('✅ Usuario autorizado, cargando datos...');
+        loadDashboardData();
+        loadHistoryData();
+        loadMapPlaces();
+        loadSecurityCameras();
+        loadCameraAccessRequests();
+      } else {
+        console.log('❌ Usuario no autorizado para cargar datos del dashboard');
+      }
     }
-  }, [userProfile, userStatusFilter]);
+  }, [user, userProfile, userStatusFilter]);
 
   // Cargar estadísticas de eventos cuando se carguen los datos de historia
   useEffect(() => {
@@ -350,6 +502,11 @@ const AdminDashboard: React.FC = () => {
       loadEventStats();
     }
   }, [historyData]);
+
+  // Monitorear cambios en cameraAccessRequests
+  useEffect(() => {
+    console.log('🔄 cameraAccessRequests cambió:', cameraAccessRequests.length, cameraAccessRequests);
+  }, [cameraAccessRequests]);
 
   // Abrir sidebar por defecto en pantallas medianas+ y cerrarlo en mobile
   useEffect(() => {
@@ -1652,6 +1809,159 @@ const AdminDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Gestión de Solicitudes de Acceso a Cámaras */}
+        <div className="card border border-gray-100 rounded-xl shadow-sm bg-white">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <Camera className="w-5 h-5 mr-2 text-blue-600" />
+                Solicitudes de Acceso a Cámaras
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">Gestiona las solicitudes de acceso a cámaras de seguridad</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={loadCameraAccessRequests}
+                disabled={cameraRequestsLoading}
+                className="flex items-center space-x-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+              >
+                <div className={`w-4 h-4 ${cameraRequestsLoading ? 'animate-spin' : ''}`}>
+                  {cameraRequestsLoading ? (
+                    <div className="rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
+                </div>
+                <span>Recargar</span>
+              </button>
+              <Link 
+                href="/admin/camera-requests"
+                className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Gestionar Solicitudes</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* Estadísticas de Solicitudes de Cámaras */}
+          {cameraRequestsLoading && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700 flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                Cargando solicitudes de acceso a cámaras...
+              </p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between mb-2">
+                <Camera className="w-5 h-5 text-blue-600" />
+                <span className="text-xs text-blue-600 font-medium">Total</span>
+              </div>
+              <p className="text-2xl font-bold text-blue-900">{cameraAccessRequests.length}</p>
+              <p className="text-xs text-blue-700">Solicitudes totales</p>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg border border-yellow-200">
+              <div className="flex items-center justify-between mb-2">
+                <Clock className="w-5 h-5 text-yellow-600" />
+                <span className="text-xs text-yellow-600 font-medium">Pendientes</span>
+              </div>
+              <p className="text-2xl font-bold text-yellow-900">{cameraAccessRequests.filter(r => r.status === 'pending').length}</p>
+              <p className="text-xs text-yellow-700">Por revisar</p>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border border-green-200">
+              <div className="flex items-center justify-between mb-2">
+                <Check className="w-5 h-5 text-green-600" />
+                <span className="text-xs text-green-600 font-medium">Aprobados</span>
+              </div>
+              <p className="text-2xl font-bold text-green-900">{cameraAccessRequests.filter(r => r.status === 'approved').length}</p>
+              <p className="text-xs text-green-700">Con acceso activo</p>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-lg border border-red-200">
+              <div className="flex items-center justify-between mb-2">
+                <X className="w-5 h-5 text-red-600" />
+                <span className="text-xs text-red-600 font-medium">Rechazados</span>
+              </div>
+              <p className="text-2xl font-bold text-red-900">{cameraAccessRequests.filter(r => r.status === 'rejected').length}</p>
+              <p className="text-xs text-red-700">Sin acceso</p>
+            </div>
+          </div>
+
+          {/* Lista de Solicitudes Recientes */}
+          {cameraAccessRequests.length > 0 && (
+            <div className="mb-6">
+              <h4 className="text-md font-semibold text-gray-900 mb-4">Solicitudes Recientes</h4>
+              <div className="space-y-3">
+                {cameraAccessRequests.slice(0, 5).map((request) => (
+                  <div key={request.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <span className="font-medium text-gray-900">{request.userName}</span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            request.status === 'pending' 
+                              ? 'bg-yellow-100 text-yellow-800' 
+                              : request.status === 'approved'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {request.status === 'pending' ? 'Pendiente' : 
+                             request.status === 'approved' ? 'Aprobado' : 'Rechazado'}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-1">
+                          <strong>Cámara:</strong> {request.cameraName}
+                        </p>
+                        <p className="text-sm text-gray-600 mb-2">
+                          <strong>Razón:</strong> {request.reason}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {request.requestedAt ? new Date(request.requestedAt).toLocaleString() : 'Fecha no disponible'}
+                        </p>
+                      </div>
+                      {request.status === 'pending' && (
+                        <div className="flex space-x-2 ml-4">
+                          <button
+                            onClick={() => setShowCameraRequestModal(request)}
+                            className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                          >
+                            Gestionar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Acciones rápidas */}
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start space-x-3">
+            <Camera className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-blue-900">
+                Sistema de Solicitudes de Acceso a Cámaras
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Los residentes pueden solicitar acceso a cámaras específicas desde la sección de seguridad
+              </p>
+            </div>
+            <Link 
+              href="/admin/camera-requests"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium whitespace-nowrap"
+            >
+              Ver Solicitudes
+            </Link>
+          </div>
+        </div>
       </div>
     );
   };
@@ -2169,6 +2479,63 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 
+  // Verificar si el usuario actual es el super-admin principal
+
+  // Mostrar pantalla de carga mientras se verifica la autenticación
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 text-green-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Verificando permisos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Función para verificar email con debounce
+  const checkEmailAvailability = async (email: string) => {
+    if (!email || !email.includes('@')) {
+      setEmailError(null);
+      return;
+    }
+
+    setIsCheckingEmail(true);
+    setEmailError(null);
+
+    try {
+      const exists = await checkEmailExists(email);
+      
+      if (exists) {
+        setEmailError('Este email ya está registrado en el sistema');
+      } else {
+        setEmailError(null);
+      }
+    } catch (error) {
+      console.error('Error al verificar email:', error);
+      setEmailError(null);
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
+
+  // Función para manejar cambios en el email
+  const handleEmailChange = (email: string) => {
+    setFormData({ ...formData, email });
+    
+    // Limpiar timeout anterior
+    if (emailTimeout) {
+      clearTimeout(emailTimeout);
+    }
+    
+    // Establecer nuevo timeout
+    const timeout = setTimeout(() => {
+      checkEmailAvailability(email);
+    }, 500);
+    
+    setEmailTimeout(timeout);
+  };
+
   return (
     <ProtectedRoute 
       allowedRoles={['admin', 'super_admin']}
@@ -2452,6 +2819,20 @@ const AdminDashboard: React.FC = () => {
         />
       )}
 
+      {/* Modal para gestionar solicitud de acceso a cámara */}
+      {showCameraRequestModal && (
+        <CameraRequestModal
+          request={showCameraRequestModal}
+          onClose={() => setShowCameraRequestModal(null)}
+          onApprove={(reviewNotes) => handleCameraRequestAction(showCameraRequestModal.id, 'approve', { reviewNotes })}
+          onReject={(reviewNotes) => handleCameraRequestAction(showCameraRequestModal.id, 'reject', { reviewNotes })}
+          onDelete={() => {
+            handleDeleteCameraRequest(showCameraRequestModal.id);
+            setShowCameraRequestModal(null);
+          }}
+        />
+      )}
+
       {/* Modal para búsqueda de usuario */}
       {showUserSearch && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -2482,63 +2863,6 @@ const CreateUserModal: React.FC<{
   const [emailError, setEmailError] = useState<string | null>(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   
-  // Verificar si el usuario actual es el super-admin principal
-  const isMainSuperAdminUser = userProfile?.email === 'mar90jesus@gmail.com';
-
-  // Función para verificar email con debounce
-  const checkEmailAvailability = async (email: string) => {
-    if (!email || !email.includes('@')) {
-      setEmailError(null);
-      return;
-    }
-
-    setIsCheckingEmail(true);
-    setEmailError(null);
-
-    try {
-      const exists = await checkEmailExists(email);
-      
-      if (exists) {
-        setEmailError('Este email ya está registrado en el sistema');
-      } else {
-        setEmailError(null);
-      }
-    } catch (error) {
-      console.error('Error al verificar email:', error);
-      setEmailError(null);
-    } finally {
-      setIsCheckingEmail(false);
-    }
-  };
-
-  // Debounce para verificar email
-  const [emailTimeout, setEmailTimeout] = useState<NodeJS.Timeout | null>(null);
-
-  // Cleanup del timeout al desmontar el componente
-  React.useEffect(() => {
-    return () => {
-      if (emailTimeout) {
-        clearTimeout(emailTimeout);
-      }
-    };
-  }, [emailTimeout]);
-  
-  const handleEmailChange = (email: string) => {
-    setFormData({ ...formData, email });
-    
-    // Limpiar timeout anterior
-    if (emailTimeout) {
-      clearTimeout(emailTimeout);
-    }
-    
-    // Establecer nuevo timeout
-    const timeout = setTimeout(() => {
-      checkEmailAvailability(email);
-    }, 500);
-    
-    setEmailTimeout(timeout);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -2585,7 +2909,7 @@ const CreateUserModal: React.FC<{
                 type="email"
                 required
                 value={formData.email}
-                onChange={(e) => handleEmailChange(e.target.value)}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className={`w-full px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-2 text-gray-900 bg-white ${
                   emailError 
                     ? 'border-red-300 focus:ring-red-500' 
@@ -2660,11 +2984,11 @@ const CreateUserModal: React.FC<{
             >
               <option value="comunidad">Residente</option>
               <option value="admin">Administrador</option>
-              {isMainSuperAdminUser && (
+              {userProfile?.email === 'mar90jesus@gmail.com' && (
                 <option value="super_admin">Super Administrador</option>
               )}
             </select>
-            {!isMainSuperAdminUser && (
+            {userProfile?.email !== 'mar90jesus@gmail.com' && (
               <p className="text-xs text-gray-500 mt-1">ℹ️ Solo el super administrador principal puede asignar el rol de Super Administrador</p>
             )}
           </div>
@@ -2704,7 +3028,6 @@ const EditUserModal: React.FC<{
   });
   
   // Verificar si el usuario actual es el super-admin principal
-  const isMainSuperAdminUser = userProfile?.email === 'mar90jesus@gmail.com';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2756,14 +3079,14 @@ const EditUserModal: React.FC<{
             >
               <option value="comunidad">Residente</option>
               <option value="admin">Administrador</option>
-              {isMainSuperAdminUser && (
+              {userProfile?.email === 'mar90jesus@gmail.com' && (
                 <option value="super_admin">Super Administrador</option>
               )}
             </select>
             {isMainSuperAdmin(user.email) && (
               <p className="text-xs text-yellow-600 mt-1">⭐ El rol del super administrador principal no puede ser modificado</p>
             )}
-            {!isMainSuperAdminUser && !isMainSuperAdmin(user.email) && (
+            {userProfile?.email !== 'mar90jesus@gmail.com' && !isMainSuperAdmin(user.email) && (
               <p className="text-xs text-gray-500 mt-1">ℹ️ Solo el super administrador principal puede asignar el rol de Super Administrador</p>
             )}
           </div>
