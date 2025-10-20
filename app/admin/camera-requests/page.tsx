@@ -16,7 +16,8 @@ import {
   RefreshCw,
   Search,
   ArrowLeft,
-  Shield
+  Shield,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import CameraRequestModal from '@/components/CameraRequestModal';
@@ -25,9 +26,11 @@ interface CameraAccessRequest {
   id: string;
   userId: string;
   cameraId: string;
+  cameraName: string;
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   requestedAt: Date;
+  requestedBy: string;
   reviewedAt?: Date;
   reviewedBy?: string;
   reviewNotes?: string;
@@ -76,11 +79,6 @@ const CameraRequestsPage: React.FC = () => {
         }
       });
       
-      if (requestsResponse.ok) {
-        const requestsData = await requestsResponse.json();
-        setRequests(requestsData.requests || []);
-      }
-
       // Cargar información de cámaras
       const camerasResponse = await fetch('/api/cameras', {
         headers: {
@@ -88,13 +86,24 @@ const CameraRequestsPage: React.FC = () => {
         }
       });
       
+      let camerasMap: Record<string, Camera> = {};
       if (camerasResponse.ok) {
         const camerasData = await camerasResponse.json();
-        const camerasMap: Record<string, Camera> = {};
         camerasData.cameras.forEach((camera: Camera) => {
           camerasMap[camera.id] = camera;
         });
         setCameras(camerasMap);
+      }
+
+      // Cargar y enriquecer solicitudes con información de cámaras
+      if (requestsResponse.ok) {
+        const requestsData = await requestsResponse.json();
+        const enrichedRequests = (requestsData.requests || []).map((request: any) => ({
+          ...request,
+          cameraName: camerasMap[request.cameraId]?.name || 'Cámara no encontrada',
+          requestedBy: request.userName || request.userEmail || 'Usuario desconocido'
+        }));
+        setRequests(enrichedRequests);
       }
 
     } catch (error) {

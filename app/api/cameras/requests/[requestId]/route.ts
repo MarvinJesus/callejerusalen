@@ -46,28 +46,33 @@ export async function PUT(
     const requestData = requestDoc.data();
     console.log('📋 API - Estado actual de la solicitud:', requestData?.status);
     
+    // Verificar que requestData existe
+    if (!requestData) {
+      return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 });
+    }
+    
     // Verificar que la solicitud esté en un estado válido para procesar
-    if (!['pending', 'approved', 'rejected'].includes(requestData?.status)) {
-      console.log('❌ API - La solicitud no puede ser procesada. Estado actual:', requestData?.status);
+    if (!['pending', 'approved', 'rejected'].includes(requestData.status)) {
+      console.log('❌ API - La solicitud no puede ser procesada. Estado actual:', requestData.status);
       return NextResponse.json({ error: 'La solicitud no puede ser procesada en su estado actual' }, { status: 400 });
     }
 
     // Si la solicitud está aprobada y se intenta aprobar de nuevo, no permitir
-    if (requestData?.status === 'approved' && action === 'approve') {
+    if (requestData.status === 'approved' && action === 'approve') {
       console.log('❌ API - La solicitud ya está aprobada');
       return NextResponse.json({ error: 'La solicitud ya está aprobada' }, { status: 400 });
     }
 
     // Si la solicitud está rechazada y se intenta rechazar de nuevo, no permitir
-    if (requestData?.status === 'rejected' && action === 'reject') {
+    if (requestData.status === 'rejected' && action === 'reject') {
       console.log('❌ API - La solicitud ya está rechazada');
       return NextResponse.json({ error: 'La solicitud ya está rechazada' }, { status: 400 });
     }
 
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
     const reviewTime = new Date();
-    const isDisapproving = requestData?.status === 'approved' && action === 'reject';
-    const isReapproving = requestData?.status === 'rejected' && action === 'approve';
+    const isDisapproving = requestData.status === 'approved' && action === 'reject';
+    const isReapproving = requestData.status === 'rejected' && action === 'approve';
 
     // Actualizar la solicitud
     const updateData: any = {
@@ -140,7 +145,7 @@ export async function PUT(
       timestamp: reviewTime,
       details: {
         action,
-        previousStatus: requestData?.status,
+        previousStatus: requestData.status,
         newStatus,
         isDisapproving,
         isReapproving
@@ -216,6 +221,11 @@ export async function DELETE(
     }
 
     const requestData = requestDoc.data();
+    
+    // Verificar que requestData existe
+    if (!requestData) {
+      return NextResponse.json({ error: 'Solicitud no encontrada' }, { status: 404 });
+    }
 
     // Eliminar la solicitud
     await db.collection('cameraAccessRequests').doc(params.requestId).delete();
@@ -225,15 +235,15 @@ export async function DELETE(
       action: 'camera_access_request_deleted',
       userId: decodedToken.uid,
       userEmail: userData?.email,
-      targetUserId: requestData?.userId,
-      targetUserEmail: requestData?.userEmail,
-      cameraId: requestData?.cameraId,
-      cameraName: requestData?.cameraName,
+      targetUserId: requestData.userId,
+      targetUserEmail: requestData.userEmail,
+      cameraId: requestData.cameraId,
+      cameraName: requestData.cameraName,
       requestId: params.requestId,
       timestamp: new Date(),
       details: {
         deletedBy: userData?.email,
-        requestStatus: requestData?.status
+        requestStatus: requestData.status
       }
     });
 

@@ -65,7 +65,7 @@ export async function GET(
         const userAccessDoc = await db.collection('cameraAccess').doc(decodedToken.uid).get();
         const userAccess = userAccessDoc.exists ? userAccessDoc.data() : {};
         
-        if (!userAccess[cameraId]) {
+        if (!userAccess || !userAccess[cameraId]) {
           return NextResponse.json({ error: 'No tienes acceso a esta cámara' }, { status: 403 });
         }
       }

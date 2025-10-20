@@ -28,6 +28,7 @@ import {
   XCircle,
   Plus,
   Edit,
+  RefreshCw,
   Trash2,
   RotateCcw,
   BookOpen,
@@ -102,6 +103,16 @@ const AdminDashboard: React.FC = () => {
   const [cameraRequestsLoading, setCameraRequestsLoading] = useState<boolean>(false);
   const [showCameraRequestModal, setShowCameraRequestModal] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [emailTimeout, setEmailTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
+  const [formData, setFormData] = useState({
+    displayName: '',
+    email: '',
+    password: '',
+    role: 'comunidad' as 'comunidad' | 'admin' | 'super_admin',
+    isActive: true
+  });
 
   // Función para verificar si el usuario es super admin
   const isSuperAdmin = () => {
@@ -1837,7 +1848,6 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           {/* Estadísticas de Solicitudes de Cámaras */}
-          {console.log('🎯 Renderizando indicadores - cameraAccessRequests:', cameraAccessRequests.length, cameraAccessRequests)}
           {cameraRequestsLoading && (
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-700 flex items-center">
@@ -2469,6 +2479,63 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 
+  // Verificar si el usuario actual es el super-admin principal
+
+  // Mostrar pantalla de carga mientras se verifica la autenticación
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-green-50 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 text-green-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Verificando permisos...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Función para verificar email con debounce
+  const checkEmailAvailability = async (email: string) => {
+    if (!email || !email.includes('@')) {
+      setEmailError(null);
+      return;
+    }
+
+    setIsCheckingEmail(true);
+    setEmailError(null);
+
+    try {
+      const exists = await checkEmailExists(email);
+      
+      if (exists) {
+        setEmailError('Este email ya está registrado en el sistema');
+      } else {
+        setEmailError(null);
+      }
+    } catch (error) {
+      console.error('Error al verificar email:', error);
+      setEmailError(null);
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
+
+  // Función para manejar cambios en el email
+  const handleEmailChange = (email: string) => {
+    setFormData({ ...formData, email });
+    
+    // Limpiar timeout anterior
+    if (emailTimeout) {
+      clearTimeout(emailTimeout);
+    }
+    
+    // Establecer nuevo timeout
+    const timeout = setTimeout(() => {
+      checkEmailAvailability(email);
+    }, 500);
+    
+    setEmailTimeout(timeout);
+  };
+
   return (
     <ProtectedRoute 
       allowedRoles={['admin', 'super_admin']}
@@ -2796,75 +2863,6 @@ const CreateUserModal: React.FC<{
   const [emailError, setEmailError] = useState<string | null>(null);
   const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   
-  // Verificar si el usuario actual es el super-admin principal
-  const isMainSuperAdminUser = userProfile?.email === 'mar90jesus@gmail.com';
-
-  // Mostrar pantalla de carga mientras se verifica la autenticación
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-green-50 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-green-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Verificando permisos...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Función para verificar email con debounce
-  const checkEmailAvailability = async (email: string) => {
-    if (!email || !email.includes('@')) {
-      setEmailError(null);
-      return;
-    }
-
-    setIsCheckingEmail(true);
-    setEmailError(null);
-
-    try {
-      const exists = await checkEmailExists(email);
-      
-      if (exists) {
-        setEmailError('Este email ya está registrado en el sistema');
-      } else {
-        setEmailError(null);
-      }
-    } catch (error) {
-      console.error('Error al verificar email:', error);
-      setEmailError(null);
-    } finally {
-      setIsCheckingEmail(false);
-    }
-  };
-
-  // Debounce para verificar email
-  const [emailTimeout, setEmailTimeout] = useState<NodeJS.Timeout | null>(null);
-
-  // Cleanup del timeout al desmontar el componente
-  React.useEffect(() => {
-    return () => {
-      if (emailTimeout) {
-        clearTimeout(emailTimeout);
-      }
-    };
-  }, [emailTimeout]);
-  
-  const handleEmailChange = (email: string) => {
-    setFormData({ ...formData, email });
-    
-    // Limpiar timeout anterior
-    if (emailTimeout) {
-      clearTimeout(emailTimeout);
-    }
-    
-    // Establecer nuevo timeout
-    const timeout = setTimeout(() => {
-      checkEmailAvailability(email);
-    }, 500);
-    
-    setEmailTimeout(timeout);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -2911,7 +2909,7 @@ const CreateUserModal: React.FC<{
                 type="email"
                 required
                 value={formData.email}
-                onChange={(e) => handleEmailChange(e.target.value)}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className={`w-full px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-2 text-gray-900 bg-white ${
                   emailError 
                     ? 'border-red-300 focus:ring-red-500' 
@@ -2986,11 +2984,11 @@ const CreateUserModal: React.FC<{
             >
               <option value="comunidad">Residente</option>
               <option value="admin">Administrador</option>
-              {isMainSuperAdminUser && (
+              {userProfile?.email === 'mar90jesus@gmail.com' && (
                 <option value="super_admin">Super Administrador</option>
               )}
             </select>
-            {!isMainSuperAdminUser && (
+            {userProfile?.email !== 'mar90jesus@gmail.com' && (
               <p className="text-xs text-gray-500 mt-1">ℹ️ Solo el super administrador principal puede asignar el rol de Super Administrador</p>
             )}
           </div>
@@ -3030,7 +3028,6 @@ const EditUserModal: React.FC<{
   });
   
   // Verificar si el usuario actual es el super-admin principal
-  const isMainSuperAdminUser = userProfile?.email === 'mar90jesus@gmail.com';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -3082,14 +3079,14 @@ const EditUserModal: React.FC<{
             >
               <option value="comunidad">Residente</option>
               <option value="admin">Administrador</option>
-              {isMainSuperAdminUser && (
+              {userProfile?.email === 'mar90jesus@gmail.com' && (
                 <option value="super_admin">Super Administrador</option>
               )}
             </select>
             {isMainSuperAdmin(user.email) && (
               <p className="text-xs text-yellow-600 mt-1">⭐ El rol del super administrador principal no puede ser modificado</p>
             )}
-            {!isMainSuperAdminUser && !isMainSuperAdmin(user.email) && (
+            {userProfile?.email !== 'mar90jesus@gmail.com' && !isMainSuperAdmin(user.email) && (
               <p className="text-xs text-gray-500 mt-1">ℹ️ Solo el super administrador principal puede asignar el rol de Super Administrador</p>
             )}
           </div>

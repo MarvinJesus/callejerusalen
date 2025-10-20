@@ -212,8 +212,8 @@ const PanicPage: React.FC = () => {
         await loadRecentReports();
       } catch (error) {
         console.error('❌ PanicoPage - Error al cargar datos:', error);
-        console.error('❌ PanicoPage - Error details:', error.message);
-        console.error('❌ PanicoPage - Error stack:', error.stack);
+        console.error('❌ PanicoPage - Error details:', error instanceof Error ? error.message : 'Unknown error');
+        console.error('❌ PanicoPage - Error stack:', error instanceof Error ? error.stack : 'No stack trace');
         toast.error('Error al cargar configuración');
       }
     };

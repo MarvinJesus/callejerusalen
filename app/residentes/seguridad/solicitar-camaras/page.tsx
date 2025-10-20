@@ -222,7 +222,7 @@ const RequestCamerasPage: React.FC = () => {
       if (camerasResponse.ok) {
         const camerasData = await camerasResponse.json();
         console.log('📹 Cámaras cargadas:', camerasData.cameras?.length || 0);
-        console.log('📷 Detalles de cámaras:', camerasData.cameras?.map(c => ({
+        console.log('📷 Detalles de cámaras:', camerasData.cameras?.map((c: any) => ({
           id: c.id,
           name: c.name,
           status: c.status,

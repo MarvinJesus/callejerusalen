@@ -77,12 +77,12 @@ export async function GET(request: NextRequest) {
         }
         
         // Mostrar cámaras restringidas si el usuario tiene acceso
-        if (camera.accessLevel === 'restricted' && userAccess[camera.id]) {
+        if (camera.accessLevel === 'restricted' && userAccess && userAccess[camera.id]) {
           return true;
         }
         
         // Mostrar cámaras privadas solo si el usuario tiene acceso específico
-        if (camera.accessLevel === 'private' && userAccess[camera.id]) {
+        if (camera.accessLevel === 'private' && userAccess && userAccess[camera.id]) {
           return true;
         }
         
