@@ -1332,94 +1332,73 @@ export interface PanicButtonSettings {
 // Función para obtener todos los usuarios activos del plan de seguridad
 export async function getActiveSecurityPlanUsers(): Promise<SecurityPlanRegistration[]> {
   try {
-    console.log('🔍 Obteniendo usuarios activos del plan de seguridad...');
-    
+    console.log('[PANIC] Obteniendo usuarios activos del plan de seguridad...');
+
     if (!db) {
       console.error('Firebase no está inicializado');
       return [];
     }
 
-    // Primero obtener usuarios aprobados en registrationRequests
-    const registrationRequestsRef = collection(db, 'registrationRequests');
-    const approvedQuery = query(registrationRequestsRef, where('status', '==', 'approved'));
-    const approvedSnapshot = await getDocs(approvedQuery);
-    
-    console.log('🔍 Usuarios aprobados encontrados:', approvedSnapshot.size);
-    
-    if (approvedSnapshot.empty) {
-      console.log('❌ No hay usuarios aprobados en registrationRequests');
+    const registrationsRef = collection(db, 'securityRegistrations');
+    const activeQuery = query(registrationsRef, where('status', '==', 'active'));
+    const snapshot = await getDocs(activeQuery);
+
+    console.log('[PANIC] Registros activos encontrados en securityRegistrations:', snapshot.size);
+
+    if (snapshot.empty) {
+      console.log('[PANIC] No hay registros activos en securityRegistrations');
       return [];
     }
 
-    // Obtener IDs de usuarios aprobados
-    const approvedUserIds: string[] = [];
-    approvedSnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.userId) {
-        approvedUserIds.push(data.userId);
-      }
-    });
+    const users: SecurityPlanRegistration[] = snapshot.docs
+      .map((docSnapshot) => {
+        const data = docSnapshot.data();
 
-    console.log('🔍 IDs de usuarios aprobados:', approvedUserIds);
-
-    // Ahora obtener datos completos de securityRegistrations para usuarios aprobados
-    const users: SecurityPlanRegistration[] = [];
-    
-    for (const userId of approvedUserIds) {
-      const securityQuery = query(
-        collection(db, 'securityRegistrations'),
-        where('userId', '==', userId)
-      );
-      const securitySnapshot = await getDocs(securityQuery);
-      
-      if (!securitySnapshot.empty) {
-        const doc = securitySnapshot.docs[0];
-        const data = doc.data();
-        
-        // Solo incluir si el status es 'active'
-        if (data.status === 'active') {
-          users.push({
-            id: doc.id,
-            userId: data.userId,
-            userDisplayName: data.userDisplayName,
-            userEmail: data.userEmail,
-            phoneNumber: data.phoneNumber,
-            address: data.address,
-            availability: data.availability,
-            skills: data.skills || [],
-            otherSkills: data.otherSkills,
-            status: data.status,
-            sector: data.sector,
-            submittedAt: data.submittedAt,
-            reviewedBy: data.reviewedBy,
-            reviewedAt: data.reviewedAt,
-            reviewNotes: data.reviewNotes,
-            createdAt: data.createdAt,
-            updatedAt: data.updatedAt
-          });
+        return {
+          id: docSnapshot.id,
+          userId: data.userId,
+          userDisplayName: data.userDisplayName,
+          userEmail: data.userEmail,
+          phoneNumber: data.phoneNumber,
+          address: data.address,
+          availability: data.availability,
+          skills: data.skills || [],
+          otherSkills: data.otherSkills,
+          status: data.status,
+          sector: data.sector,
+          submittedAt: data.submittedAt,
+          reviewedBy: data.reviewedBy,
+          reviewedAt: data.reviewedAt,
+          reviewNotes: data.reviewNotes,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt
+        };
+      })
+      .filter((user) => {
+        if (!user.userId) {
+          console.warn('[PANIC] Registro en securityRegistrations sin userId, se omite:', user.id);
+          return false;
         }
-      }
-    }
-    
-    // Ordenar por sector y disponibilidad
+        return true;
+      });
+
     users.sort((a, b) => {
-      // Primero por sector
-      if (a.sector && b.sector && a.sector !== b.sector) {
+      if (a.sector && b.sector && a.sector != b.sector) {
         return a.sector.localeCompare(b.sector);
       }
-      // Luego por nombre (manejar casos donde userDisplayName puede ser undefined)
       const nameA = a.userDisplayName || a.userEmail || 'Sin nombre';
       const nameB = b.userDisplayName || b.userEmail || 'Sin nombre';
       return nameA.localeCompare(nameB);
     });
-    
-    console.log('✅ Usuarios del plan de seguridad obtenidos:', users.length);
+
+    console.log('[PANIC] Usuarios del plan de seguridad obtenidos:', users.length);
     return users;
   } catch (error) {
     console.error('Error al obtener usuarios del plan de seguridad:', error);
     return [];
   }
 }
+
 
 // Función para guardar configuración del botón de pánico
 export async function savePanicButtonSettings(
