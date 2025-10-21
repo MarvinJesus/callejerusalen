@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
       '24.35.236.133', 
       '67.53.46.161',
       '200.107.234.131',
+      '80.28.111.68',  // Nueva cámara agregada
       '192.168.',
       '10.',
       '172.'
@@ -32,8 +33,15 @@ export async function GET(request: NextRequest) {
     );
 
     if (!isAllowed) {
-      return NextResponse.json({ error: 'Host not allowed' }, { status: 403 });
+      console.warn(`🚫 Host no permitido: ${urlObj.hostname} para URL: ${streamUrl}`);
+      return NextResponse.json({ 
+        error: 'Host not allowed', 
+        hostname: urlObj.hostname,
+        message: 'Esta IP de cámara no está en la lista de hosts permitidos. Contacta al administrador para agregarla.'
+      }, { status: 403 });
     }
+
+    console.log(`✅ Host permitido: ${urlObj.hostname} para URL: ${streamUrl}`);
 
     // Hacer la petición al stream HTTP
     const response = await fetch(streamUrl, {
