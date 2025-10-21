@@ -328,12 +328,12 @@ const SecurityPanelPage: React.FC = () => {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-gray-900 bg-white"
               >
-                <option value="all">Todas las cámaras</option>
-                <option value="online">En línea</option>
-                <option value="offline">Desconectadas</option>
-                <option value="maintenance">Mantenimiento</option>
+                <option value="all" className="text-gray-900">Todas las cámaras</option>
+                <option value="online" className="text-gray-900">En línea</option>
+                <option value="offline" className="text-gray-900">Desconectadas</option>
+                <option value="maintenance" className="text-gray-900">Mantenimiento</option>
               </select>
             </div>
             
