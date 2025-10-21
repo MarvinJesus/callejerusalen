@@ -14,8 +14,8 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value: process.env.NODE_ENV === 'development' 
-              ? "default-src 'self'; img-src 'self' data: http: https:; connect-src 'self' http: https: ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline';"
-              : "default-src 'self'; img-src 'self' data: https:; connect-src 'self' https: ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline';"
+              ? "default-src 'self'; img-src 'self' data: http: https:; connect-src 'self' http: https: ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline'; frame-src 'self' https://www.openstreetmap.org;"
+              : "default-src 'self'; img-src 'self' data: https:; connect-src 'self' https: ws: wss:; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://maps.googleapis.com; style-src 'self' 'unsafe-inline'; frame-src 'self' https://www.openstreetmap.org;"
           }
         ],
       },

@@ -1060,6 +1060,55 @@ const PanicPage: React.FC = () => {
     // El useEffect se encargará de aplicar la paginación
   };
 
+  const selectedContactsCount = notifyAll ? securityUsers.length : selectedContacts.length;
+  const hasContactsConfigured = notifyAll ? securityUsers.length > 0 : selectedContacts.length > 0;
+  const latestAlert = allReports.length > 0 ? allReports[0] : null;
+  const activeAlertCount = allReports.filter((report) => report.status === 'active').length;
+  const resolvedAlertCount = allReports.filter((report) => report.status === 'resolved').length;
+  const totalAlerts = allReports.length;
+  const lastAlertSummary = latestAlert
+    ? formatDate(
+        latestAlert.timestamp instanceof Date
+          ? latestAlert.timestamp
+          : latestAlert.timestamp?.toDate
+          ? latestAlert.timestamp.toDate()
+          : new Date(latestAlert.timestamp)
+      )
+    : 'Sin alertas registradas';
+  const latestAlertStatusLabel = latestAlert
+    ? latestAlert.status === 'resolved'
+      ? 'Resuelta'
+      : latestAlert.status === 'expired'
+      ? 'Expirada'
+      : 'Activa'
+    : 'Sin registros';
+  const isGpsSharing = shareGPSLocation && gpsPermissionStatus === 'granted';
+  const gpsStatusLabel = shareGPSLocation
+    ? gpsPermissionStatus === 'granted'
+      ? 'Compartiendo ubicación'
+      : gpsPermissionStatus === 'denied'
+      ? 'Permisos denegados'
+      : 'Permiso pendiente'
+    : 'Inactivo';
+  const gpsStatusHelper = shareGPSLocation
+    ? gpsPermissionStatus === 'granted'
+      ? 'Tu equipo verá tu posición cuando envíes una alerta.'
+      : 'Concede permisos de GPS para compartir tu ubicación en emergencias.'
+    : 'Activa el GPS para enviar tu ubicación automáticamente.';
+  const cameraStatusLabel =
+    cameraPermissionStatus === 'granted'
+      ? 'Cámara lista'
+      : cameraPermissionStatus === 'denied'
+      ? 'Permisos denegados'
+      : 'Sin configurar';
+  const cameraStatusHelper =
+    cameraPermissionStatus === 'granted'
+      ? 'El modo extremo grabará video automáticamente al activar el pánico.'
+      : 'Permite el acceso a la cámara para habilitar el modo extremo.';
+  const panicReadyCopy = hasContactsConfigured
+    ? 'Listo para responder en segundos.'
+    : 'Configura tus contactos para activar el sistema.';
+
   // Mostrar pantalla de carga
   if (loading) {
     return (
@@ -1305,7 +1354,7 @@ const PanicPage: React.FC = () => {
                         type="text"
                         value={userLocation}
                         onChange={(e) => setUserLocation(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-500"
                         placeholder="Ej: Calle Principal #123, Apartamento 2B"
                       />
                     </div>
@@ -1317,7 +1366,7 @@ const PanicPage: React.FC = () => {
                       <textarea
                         value={customMessage}
                         onChange={(e) => setCustomMessage(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder:text-gray-500"
                         rows={3}
                         placeholder="Mensaje que se enviará junto con la alerta..."
                       />
