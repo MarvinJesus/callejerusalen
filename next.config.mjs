@@ -66,6 +66,48 @@ const nextConfig = {
         port: '81',
         pathname: '/**',
       },
+      {
+        protocol: 'http',
+        hostname: '50.199.215.189',
+        port: '80',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '145.238.185.10',
+        port: '80',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '97.68.79.162',
+        port: '80',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '155.31.14.42',
+        port: '80',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '162.17.65.121',
+        port: '80',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '75.112.36.194',
+        port: '80',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '206.40.97.180',
+        port: '80',
+        pathname: '/**',
+      },
       // Permitir cualquier IP local para cámaras
       {
         protocol: 'http',
