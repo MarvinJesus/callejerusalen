@@ -120,7 +120,7 @@ export default function HomePage() {
                         </Link>
                       )}
                       {userProfile.role === 'comunidad' && (
-                        <Link href="/residentes/camaras" className="btn-theme-primary text-lg px-8 py-3 shadow-lg hover:shadow-xl transition-all">
+                        <Link href="/residentes/seguridad" className="btn-theme-primary text-lg px-8 py-3 shadow-lg hover:shadow-xl transition-all">
                           Ver Cámaras
                         </Link>
                       )}
