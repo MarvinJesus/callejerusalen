@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useWebSocket } from '@/context/WebSocketContext';
 import { doc, getDoc, updateDoc, arrayUnion, collection, addDoc, query, where, orderBy, getDocs, serverTimestamp, onSnapshot, setDoc } from 'firebase/firestore';
+import { createPanicResolutionNotifications } from '@/lib/notifications';
 import { db } from '@/lib/firebase';
 import { useAlarmSound } from '@/lib/alarmSound';
 import { 

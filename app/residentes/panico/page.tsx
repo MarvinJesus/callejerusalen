@@ -33,13 +33,14 @@ import {
   Info
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { 
-  getActiveSecurityPlanUsers, 
+import {
+  getActiveSecurityPlanUsers,
   SecurityPlanRegistration,
   getPanicButtonSettings,
   savePanicButtonSettings,
   PanicButtonSettings
 } from '@/lib/auth';
+import { createPanicActivationNotifications } from '@/lib/notifications';
 
 interface PanicReport {
   id: string;
@@ -840,7 +841,22 @@ const PanicPage: React.FC = () => {
 
       const docRef = await addDoc(collection(db, 'panicReports'), panicReport);
       console.log('✅ Alerta guardada en Firestore:', docRef.id);
-      
+
+      try {
+        const notificationTargets = contactsToNotify.filter((contactId) => contactId && contactId !== user.uid);
+        await createPanicActivationNotifications({
+          alertId: docRef.id,
+          triggeredByName: userProfile.displayName || user.displayName || 'Usuario',
+          location,
+          description,
+          notifiedUserIds: notificationTargets,
+          extremeMode: extremeModeEnabled,
+          hasVideo: extremeModeEnabled && autoRecordVideo
+        });
+      } catch (notificationError) {
+        console.error('Error al crear notificaciones de pánico:', notificationError);
+      }
+
       setIsPanicActive(true);
       toast.success(
         `¡Alerta de emergencia enviada! ${contactsToNotify.length} personas notificadas. Durará ${alertDurationMinutes} min.`,
@@ -1354,8 +1370,9 @@ const PanicPage: React.FC = () => {
                         type="text"
                         value={userLocation}
                         onChange={(e) => setUserLocation(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-500"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder:text-gray-500 bg-white"
                         placeholder="Ej: Calle Principal #123, Apartamento 2B"
+                        style={{ color: '#111827' }}
                       />
                     </div>
 
@@ -1366,9 +1383,10 @@ const PanicPage: React.FC = () => {
                       <textarea
                         value={customMessage}
                         onChange={(e) => setCustomMessage(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder:text-gray-500"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-gray-900 placeholder:text-gray-500 bg-white"
                         rows={3}
                         placeholder="Mensaje que se enviará junto con la alerta..."
+                        style={{ color: '#111827' }}
                       />
                     </div>
                   </div>
@@ -1733,8 +1751,9 @@ const PanicPage: React.FC = () => {
                           id="panicLocation"
                           value={panicLocation}
                           onChange={(e) => setPanicLocation(e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-gray-900 placeholder:text-gray-500 bg-white"
                           placeholder={userLocation || "Ej: Calle Principal #123"}
+                          style={{ color: '#111827' }}
                         />
                       </div>
 
@@ -1746,8 +1765,9 @@ const PanicPage: React.FC = () => {
                           id="panicDescription"
                           value={panicDescription}
                           onChange={(e) => setPanicDescription(e.target.value)}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none text-gray-900 placeholder:text-gray-500 bg-white"
                           rows={3}
+                          style={{ color: '#111827' }}
                           placeholder={customMessage || "Describe brevemente la situación..."}
                         />
                       </div>

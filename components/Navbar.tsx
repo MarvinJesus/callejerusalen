@@ -28,6 +28,7 @@ import {
   Database
 } from 'lucide-react';
 import SettingsDropdown from './SettingsDropdown';
+import NotificationsDropdown from './NotificationsDropdown';
 import NavDropdown from './NavDropdown';
 import NavDropdownMobile from './NavDropdownMobile';
 import toast from 'react-hot-toast';
@@ -259,6 +260,9 @@ const Navbar: React.FC = () => {
                   <span className="text-sm">{getRoleLabel(userProfile?.role || 'visitante')}</span>
                 </div>
 
+                {/* Notificaciones */}
+                <NotificationsDropdown />
+
                 {/* Configuración */}
                 <SettingsDropdown />
 
@@ -328,7 +332,8 @@ const Navbar: React.FC = () => {
           </div>
 
           {/* Botón de menú móvil */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center space-x-3">
+            {user && <NotificationsDropdown />}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-gray-700 hover:text-primary-600 transition-colors duration-200"
