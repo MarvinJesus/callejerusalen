@@ -6,6 +6,7 @@ import { useWebSocket } from '@/context/WebSocketContext';
 import { useRouter } from 'next/navigation';
 import { getPanicButtonSettings, PanicButtonSettings, getActiveSecurityPlanUsers } from '@/lib/auth';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { createPanicActivationNotifications } from '@/lib/notifications';
 import { db } from '@/lib/firebase';
 import { AlertTriangle, Video, X, Camera } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -288,7 +289,22 @@ const FloatingPanicButton: React.FC<FloatingPanicButtonProps> = ({ onPanicActiva
 
       const docRef = await addDoc(collection(db, 'panicReports'), panicReport);
       console.log('✅ Alerta guardada en Firestore:', docRef.id);
-      
+
+      try {
+        const notificationTargets = contactsToNotify.filter((contactId) => contactId && contactId !== user.uid);
+        await createPanicActivationNotifications({
+          alertId: docRef.id,
+          triggeredByName: userProfile.displayName || user.displayName || 'Usuario',
+          location,
+          description,
+          notifiedUserIds: notificationTargets,
+          extremeMode: settings.extremeModeEnabled,
+          hasVideo: Boolean(videoBlob)
+        });
+      } catch (notificationError) {
+        console.error('Error al crear notificaciones de pánico:', notificationError);
+      }
+
       // TODO: Subir video a Storage si existe
       if (videoBlob) {
         console.log('📹 Video capturado, tamaño:', videoBlob.size);
