@@ -23,7 +23,10 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { logSystemAction } from './server-logging';
-import { Permission, DEFAULT_PERMISSIONS, validatePermissions } from './permissions';
+import { Permission, DEFAULT_PERMISSIONS, ALL_PERMISSIONS, validatePermissions } from './permissions';
+import { getSuperAdminEmail, isMainSuperAdmin, authUserIsMainSuperAdmin } from './super-admin';
+
+export { getSuperAdminEmail, isMainSuperAdmin, authUserIsMainSuperAdmin } from './super-admin';
 
 // Tipos de usuario
 export type UserRole = 'visitante' | 'comunidad' | 'admin' | 'super_admin';
@@ -144,7 +147,11 @@ export const checkRegistrationStatus = async (uid: string): Promise<{
   }
 
   try {
-    const userProfile = await getUserProfile(uid);
+    let userProfile = await getUserProfile(uid);
+
+    if (!userProfile && auth?.currentUser) {
+      userProfile = await resolveUserProfile(auth.currentUser);
+    }
     
     if (!userProfile) {
       return { status: 'not_found' };
@@ -175,10 +182,41 @@ export const loginUser = async (email: string, password: string): Promise<{
     const user = userCredential.user;
 
     // Verificar el estado de registro y el estado del usuario
-    const registrationStatus = await checkRegistrationStatus(user.uid);
+    const resolvedProfile = await resolveUserProfile(user);
+    const registrationStatus = {
+      status: (resolvedProfile?.registrationStatus || (resolvedProfile ? 'approved' : 'not_found')) as 'pending' | 'approved' | 'rejected' | 'not_found',
+      userProfile: resolvedProfile || undefined,
+    };
     
     console.log('🔍 Estado de registro verificado:', registrationStatus.status);
     console.log('🔍 Perfil de usuario:', registrationStatus.userProfile);
+
+    if (isMainSuperAdmin(email) || authUserIsMainSuperAdmin(user) || isMainSuperAdmin(registrationStatus.userProfile?.email)) {
+      try {
+        const superAdminProfile = await ensureMainSuperAdminProfile(user, registrationStatus.userProfile);
+        console.log('👑 Super Admin detectado - Acceso garantizado:', superAdminProfile.email);
+        return {
+          user,
+          registrationStatus: 'approved',
+          userProfile: superAdminProfile
+        };
+      } catch (ensureError) {
+        console.warn('Login de super admin sin persistir perfil:', ensureError);
+        return {
+          user,
+          registrationStatus: 'approved',
+          userProfile: buildLocalSuperAdminProfile(user, registrationStatus.userProfile)
+        };
+      }
+    }
+
+    if (registrationStatus.userProfile?.role === 'super_admin') {
+      return {
+        user,
+        registrationStatus: 'approved',
+        userProfile: registrationStatus.userProfile
+      };
+    }
 
     // ⚠️ VERIFICACIÓN CRÍTICA: Bloquear usuarios inactivos, eliminados o bloqueados
     if (registrationStatus.userProfile) {
@@ -186,8 +224,7 @@ export const loginUser = async (email: string, password: string): Promise<{
       const isActive = registrationStatus.userProfile.isActive;
       const userEmail = registrationStatus.userProfile.email;
 
-      // 🔐 PROTECCIÓN SUPER ADMIN: El super admin NUNCA puede ser bloqueado
-      const isSuperAdmin = isMainSuperAdmin(userEmail);
+      const isSuperAdmin = registrationStatus.userProfile.role === 'super_admin' || isMainSuperAdmin(userEmail);
       
       if (isSuperAdmin) {
         console.log('👑 Super Admin detectado - Acceso garantizado:', userEmail);
@@ -299,9 +336,76 @@ export const getUserProfile = async (uid: string): Promise<UserProfile | null> =
     return null;
   } catch (error) {
     console.error('Error al obtener perfil del usuario:', error);
-    throw error;
+    return null;
   }
 };
+
+const fetchProfileFromServer = async (user: User): Promise<UserProfile | null> => {
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch('/api/auth/profile', {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return (data.user as UserProfile) || null;
+  } catch (error) {
+    console.error('Error al obtener perfil desde el servidor:', error);
+    return null;
+  }
+};
+
+export const isPrivilegedAdminRole = (role?: string | null, email?: string | null): boolean => {
+  return role === 'super_admin' || role === 'admin' || isMainSuperAdmin(email);
+};
+
+export const resolveUserProfile = async (user: User): Promise<UserProfile | null> => {
+  let profile = await getUserProfile(user.uid);
+  const serverProfile = await fetchProfileFromServer(user);
+
+  if (serverProfile) {
+    const currentRank = profile?.role === 'super_admin' ? 4 : profile?.role === 'admin' ? 3 : profile?.role === 'comunidad' ? 2 : 1;
+    const serverRank = serverProfile.role === 'super_admin' ? 4 : serverProfile.role === 'admin' ? 3 : serverProfile.role === 'comunidad' ? 2 : 1;
+    if (!profile || serverRank >= currentRank || (user.email && serverProfile.email === user.email)) {
+      profile = serverProfile;
+    }
+  }
+
+  if (authUserIsMainSuperAdmin(user) || isMainSuperAdmin(profile?.email)) {
+    try {
+      return await ensureMainSuperAdminProfile(user, profile);
+    } catch (error) {
+      console.warn('No se pudo persistir el super admin principal, usando perfil local:', error);
+      return buildLocalSuperAdminProfile(user, profile);
+    }
+  }
+
+  return profile;
+};
+
+export const buildLocalSuperAdminProfile = (
+  user: { uid: string; email: string | null; displayName: string | null },
+  existing?: UserProfile | null
+): UserProfile => ({
+  uid: user.uid,
+  email: user.email || getSuperAdminEmail(),
+  displayName: existing?.displayName || user.displayName || 'Super Administrador',
+  role: 'super_admin',
+  status: 'active',
+  createdAt: existing?.createdAt || new Date(),
+  updatedAt: new Date(),
+  isActive: true,
+  permissions: existing?.permissions?.length ? existing.permissions : ALL_PERMISSIONS,
+  registrationStatus: 'approved',
+  lastLogin: existing?.lastLogin,
+  approvedBy: existing?.approvedBy || 'system',
+  approvedAt: existing?.approvedAt || new Date(),
+});
 
 // Función para actualizar el rol del usuario
 export const updateUserRole = async (uid: string, newRole: UserRole): Promise<void> => {
@@ -319,9 +423,24 @@ export const updateUserRole = async (uid: string, newRole: UserRole): Promise<vo
 
 // === FUNCIONES DE SUPER ADMINISTRADOR ===
 
-// Función para verificar si es el super admin principal
-export const isMainSuperAdmin = (email: string): boolean => {
-  return email === 'mar90jesus@gmail.com';
+export const ensureMainSuperAdminProfile = async (
+  user: { uid: string; email: string | null; displayName: string | null },
+  existing?: UserProfile | null
+): Promise<UserProfile> => {
+  const profile = buildLocalSuperAdminProfile(user, existing);
+
+  if (db) {
+    try {
+      await setDoc(doc(db, 'users', user.uid), {
+        ...profile,
+        updatedAt: new Date(),
+      }, { merge: true });
+    } catch (error) {
+      console.warn('No se pudo persistir el perfil del super administrador:', error);
+    }
+  }
+
+  return profile;
 };
 
 // Función para verificar si un usuario puede ser eliminado
@@ -390,8 +509,8 @@ export const getAllUsers = async (includeDeleted: boolean = false): Promise<User
     // Ordenar usuarios por categorías
     const sortedUsers = filteredUsers.sort((a, b) => {
       // El super admin principal siempre va primero
-      if (a.email === 'mar90jesus@gmail.com') return -1;
-      if (b.email === 'mar90jesus@gmail.com') return 1;
+      if (isMainSuperAdmin(a.email)) return -1;
+      if (isMainSuperAdmin(b.email)) return 1;
       
       // Luego por rol: super_admin, admin, comunidad, visitante
       const roleOrder = { super_admin: 1, admin: 2, comunidad: 3, visitante: 4 };
@@ -634,7 +753,7 @@ export const updateUserAsAdmin = async (
 
     // 🔐 PROTECCIÓN: Solo el super-admin principal puede asignar el rol de super_admin
     if (updates.role === 'super_admin') {
-      if (updaterProfile.email !== 'mar90jesus@gmail.com') {
+      if (!isMainSuperAdmin(updaterProfile.email)) {
         throw new Error('Solo el super administrador principal puede asignar el rol de Super Administrador');
       }
     }
@@ -672,7 +791,7 @@ export const approveRegistration = async (
     // 🔐 PROTECCIÓN: Solo el super-admin principal puede aprobar con rol de super_admin
     if (approvedRole === 'super_admin') {
       const approverProfile = await getUserProfile(approvedBy);
-      if (!approverProfile || approverProfile.email !== 'mar90jesus@gmail.com') {
+      if (!approverProfile || !isMainSuperAdmin(approverProfile.email)) {
         throw new Error('Solo el super administrador principal puede aprobar usuarios con el rol de Super Administrador');
       }
     }

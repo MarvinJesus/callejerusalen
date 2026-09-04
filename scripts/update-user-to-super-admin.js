@@ -1,6 +1,7 @@
 const { initializeApp } = require('firebase/app');
 const { getAuth, signInWithEmailAndPassword } = require('firebase/auth');
 const { getFirestore, doc, setDoc, getDoc } = require('firebase/firestore');
+require('dotenv').config({ path: '.env.local' });
 
 // Configuración de Firebase (usar las mismas variables de entorno)
 const firebaseConfig = {
@@ -21,7 +22,7 @@ async function updateUserToSuperAdmin() {
     const db = getFirestore(app);
 
     // Email del usuario a actualizar
-    const userEmail = 'mar90jesus@gmail.com';
+    const userEmail = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || 'mar90jesus@gmail.com';
     const userPassword = 'Admin123!@#'; // Usar la contraseña actual del usuario
 
     console.log('🔧 Actualizando usuario a super administrador...');

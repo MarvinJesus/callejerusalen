@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { getUserProfile, UserProfile, UserRole, getUserSecurityPlanStatus, SecurityPlanRegistration } from '@/lib/auth';
+import { resolveUserProfile, buildLocalSuperAdminProfile, isMainSuperAdmin, authUserIsMainSuperAdmin, UserProfile, UserRole, getUserSecurityPlanStatus, SecurityPlanRegistration } from '@/lib/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -59,28 +59,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setUser(firebaseUser);
       
-      if (user) {
+      if (firebaseUser) {
         try {
-          const profile = await getUserProfile(user.uid);
+          let profile = await resolveUserProfile(firebaseUser);
+
+          const isSuperAdmin =
+            profile?.role === 'super_admin' ||
+            authUserIsMainSuperAdmin(firebaseUser) ||
+            isMainSuperAdmin(profile?.email);
+
+          if (isSuperAdmin && profile) {
+            console.log('👑 Super Admin detectado en AuthContext - Acceso garantizado:', profile.email, profile.role);
+          }
           
-          // ⚠️ VERIFICACIÓN CRÍTICA: Comprobar estado del usuario
           if (profile) {
             const userStatus = profile.status;
             const isActive = profile.isActive;
-            const userEmail = profile.email;
             
-            // 🔐 PROTECCIÓN SUPER ADMIN: El super admin NUNCA puede ser bloqueado
-            const isSuperAdmin = userEmail === 'mar90jesus@gmail.com';
-            
-            if (isSuperAdmin) {
-              console.log('👑 Super Admin detectado en AuthContext - Acceso garantizado:', userEmail);
-              // El super admin siempre tiene acceso, continuar normalmente
-            } else {
-              // Para usuarios normales, verificar el estado
-              // Solo permitir usuarios con status='active'
+            if (!isSuperAdmin) {
               if (userStatus === 'deleted' || 
                   userStatus === 'inactive' || 
                   userStatus === 'pending' ||
@@ -92,7 +91,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                   currentPath: typeof window !== 'undefined' ? window.location.pathname : 'unknown'
                 });
                 
-                // Cerrar sesión automáticamente
                 await auth.signOut();
                 setUser(null);
                 setUserProfile(null);
@@ -106,42 +104,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             
             setUserProfile(profile);
             
-            // Verificar estado de registro
-            const isPending = profile.registrationStatus === 'pending';
-            const isRejected = profile.registrationStatus === 'rejected';
+            const isPending = !isSuperAdmin && profile.registrationStatus === 'pending';
+            const isRejected = !isSuperAdmin && profile.registrationStatus === 'rejected';
             
             setIsRegistrationPending(isPending);
             setIsRegistrationRejected(isRejected);
             
-            // Cargar estado del plan de seguridad desde securityRegistrations
             try {
-              const securityPlanData = await getUserSecurityPlanStatus(user.uid);
+              const securityPlanData = await getUserSecurityPlanStatus(firebaseUser.uid);
               setSecurityPlan(securityPlanData);
             } catch (securityError) {
               console.error('Error al cargar plan de seguridad:', securityError);
               setSecurityPlan(null);
             }
             
-            // Log del estado para debugging
             console.log('🔍 Estado de registro detectado:', {
               email: profile.email,
+              role: profile.role,
               registrationStatus: profile.registrationStatus,
               status: userStatus,
               isActive: isActive,
               isPending,
-              isRejected
+              isRejected,
+              isSuperAdmin
             });
+          } else if (authUserIsMainSuperAdmin(firebaseUser)) {
+            const localProfile = buildLocalSuperAdminProfile(firebaseUser, null);
+            setUserProfile(localProfile);
+            setIsRegistrationPending(false);
+            setIsRegistrationRejected(false);
+            setSecurityPlan(null);
           } else {
+            setUserProfile(null);
             setSecurityPlan(null);
             setIsRegistrationPending(false);
             setIsRegistrationRejected(false);
           }
         } catch (error) {
           console.error('Error al cargar perfil del usuario:', error);
-          setUserProfile(null);
+          if (authUserIsMainSuperAdmin(firebaseUser)) {
+            setUserProfile(buildLocalSuperAdminProfile(firebaseUser, null));
+            setIsRegistrationPending(false);
+            setIsRegistrationRejected(false);
+          } else {
+            setUserProfile(null);
+            setIsRegistrationPending(false);
+            setIsRegistrationRejected(false);
+          }
           setSecurityPlan(null);
-          setIsRegistrationPending(false);
-          setIsRegistrationRejected(false);
         }
       } else {
         setUserProfile(null);

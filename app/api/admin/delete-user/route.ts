@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isMainSuperAdmin } from '@/lib/super-admin';
 
 // Verificar si Firebase Admin SDK está configurado
 const isFirebaseAdminConfigured = () => {
@@ -49,14 +50,6 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Verificar si es el super admin principal
-    if (deletedBy === 'mar90jesus@gmail.com') {
-      return NextResponse.json(
-        { error: 'No se puede eliminar al super administrador principal' },
-        { status: 403 }
-      );
-    }
-
     let userData: any = null;
     let deletionMethod = '';
 
@@ -76,7 +69,7 @@ export async function DELETE(request: NextRequest) {
         userData = userDoc.data();
 
         // Verificar si es el super admin principal
-        if (userData?.email === 'mar90jesus@gmail.com') {
+        if (isMainSuperAdmin(userData?.email)) {
           return NextResponse.json(
             { error: 'No se puede eliminar al super administrador principal' },
             { status: 403 }
@@ -131,7 +124,7 @@ export async function DELETE(request: NextRequest) {
       userData = userDoc.data();
 
       // Verificar si es el super admin principal
-      if (userData?.email === 'mar90jesus@gmail.com') {
+      if (isMainSuperAdmin(userData?.email)) {
         return NextResponse.json(
           { error: 'No se puede eliminar al super administrador principal' },
           { status: 403 }

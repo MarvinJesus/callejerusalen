@@ -44,6 +44,7 @@ import {
   getPermissionGroup,
   getPermissionsByGroups
 } from '@/lib/permissions';
+import { isMainSuperAdmin } from '@/lib/super-admin';
 
 interface User {
   id: string;
@@ -230,7 +231,7 @@ const AdminPermissionsPage: React.FC = () => {
     setSelectedUser(user);
     
     // Si es el super admin principal, asignar todos los permisos disponibles
-    if (user.email === 'mar90jesus@gmail.com') {
+    if (isMainSuperAdmin(user.email)) {
       const allPermissions = Object.values(PERMISSION_GROUPS).flat();
       setUserPermissions(allPermissions);
       setOriginalPermissions(allPermissions);
@@ -545,7 +546,7 @@ const AdminPermissionsPage: React.FC = () => {
                                   {getRoleIcon(user.role)}
                                   <p className={`text-sm font-semibold truncate ${isSelected ? 'text-blue-900' : 'text-gray-900'}`}>
                                     {user.name}
-                                    {user.email === 'mar90jesus@gmail.com' && (
+                                    {isMainSuperAdmin(user.email) && (
                                       <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded-full">
                                         PROTEGIDO
                                       </span>
@@ -562,7 +563,7 @@ const AdminPermissionsPage: React.FC = () => {
                                   <span className={`inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium ${getStatusColor(user.status)}`}>
                                     {getStatusText(user.status)}
                                   </span>
-                                  {user.email === 'mar90jesus@gmail.com' && (
+                                  {isMainSuperAdmin(user.email) && (
                                     <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-700">
                                       <Lock className="w-3 h-3 mr-1" />
                                       Solo Lectura
@@ -577,7 +578,7 @@ const AdminPermissionsPage: React.FC = () => {
                                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                                   isSelected ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
                                 }`}>
-                                  {user.email === 'mar90jesus@gmail.com' 
+                                  {isMainSuperAdmin(user.email) 
                                     ? `${Object.values(PERMISSION_GROUPS).flat().length} permisos (Todos)`
                                     : `${user.permissions.length} permisos`
                                   }
@@ -598,11 +599,11 @@ const AdminPermissionsPage: React.FC = () => {
               {selectedUser ? (
                 <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl border border-blue-100 overflow-hidden">
                   {/* Header del Panel Optimizado */}
-                  <div className={`px-6 py-4 border-b ${selectedUser.email === 'mar90jesus@gmail.com' ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-indigo-600'}`}>
+                  <div className={`px-6 py-4 border-b ${isMainSuperAdmin(selectedUser.email) ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-blue-500 to-indigo-600'}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center space-x-3">
-                          {selectedUser.email === 'mar90jesus@gmail.com' ? (
+                          {isMainSuperAdmin(selectedUser.email) ? (
                             <Crown className="w-5 h-5 text-white flex-shrink-0" />
                           ) : (
                             <Shield className="w-5 h-5 text-white flex-shrink-0" />
@@ -610,20 +611,20 @@ const AdminPermissionsPage: React.FC = () => {
                           <div className="min-w-0 flex-1">
                             <h2 className="text-lg font-bold text-white truncate">
                               {selectedUser.name}
-                              {selectedUser.email === 'mar90jesus@gmail.com' && (
+                              {isMainSuperAdmin(selectedUser.email) && (
                                 <span className="ml-2 px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full">
                                   SUPER ADMIN PRINCIPAL
                                 </span>
                               )}
                             </h2>
                             <p className="text-blue-100 text-sm truncate">
-                              {selectedUser.email} • {selectedUser.email === 'mar90jesus@gmail.com' 
+                              {selectedUser.email} • {isMainSuperAdmin(selectedUser.email) 
                                 ? `${Object.values(PERMISSION_GROUPS).flat().length} permisos (Todos)`
                                 : `${userPermissions.length} permisos`
                               }
                             </p>
                           </div>
-                          {hasChanges && selectedUser.email !== 'mar90jesus@gmail.com' && (
+                          {hasChanges && !isMainSuperAdmin(selectedUser.email) && (
                             <span className="animate-pulse px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex-shrink-0">
                               ⚠ Sin guardar
                             </span>
@@ -631,7 +632,7 @@ const AdminPermissionsPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2 ml-4">
-                        {selectedUser.email !== 'mar90jesus@gmail.com' ? (
+                        {!isMainSuperAdmin(selectedUser.email) ? (
                           <>
                             <button
                               onClick={() => setShowTemplates(!showTemplates)}
@@ -671,7 +672,7 @@ const AdminPermissionsPage: React.FC = () => {
                   </div>
 
                   {/* Nota especial para Super Admin Principal */}
-                  {selectedUser.email === 'mar90jesus@gmail.com' && (
+                  {isMainSuperAdmin(selectedUser.email) && (
                     <div className="px-6 py-4 border-b border-red-200 bg-gradient-to-r from-purple-50 to-pink-50">
                       <div className="flex items-center space-x-3">
                         <div className="bg-gradient-to-br from-purple-500 to-pink-500 p-2 rounded-lg">
@@ -690,7 +691,7 @@ const AdminPermissionsPage: React.FC = () => {
                   )}
 
                   {/* Plantillas Mejoradas */}
-                  {showTemplates && selectedUser.email !== 'mar90jesus@gmail.com' && (
+                  {showTemplates && !isMainSuperAdmin(selectedUser.email) && (
                     <div className="px-6 py-5 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center space-x-2">
@@ -805,14 +806,14 @@ const AdminPermissionsPage: React.FC = () => {
                                   </button>
                                   <button
                                     onClick={() => handleGroupToggle(groupPermissions)}
-                                    disabled={selectedUser.email === 'mar90jesus@gmail.com'}
+                                    disabled={isMainSuperAdmin(selectedUser.email)}
                                     className={`flex items-center space-x-2 transition-transform ${
-                                      selectedUser.email === 'mar90jesus@gmail.com' 
+                                      isMainSuperAdmin(selectedUser.email) 
                                         ? 'cursor-not-allowed opacity-50' 
                                         : 'hover:scale-105'
                                     }`}
                                   >
-                                    {selectedUser.email === 'mar90jesus@gmail.com' ? (
+                                    {isMainSuperAdmin(selectedUser.email) ? (
                                       <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
                                         <Crown className="w-4 h-4 text-white" />
                                       </div>
@@ -872,9 +873,9 @@ const AdminPermissionsPage: React.FC = () => {
                                       >
                                         <button
                                           onClick={() => handlePermissionToggle(permission)}
-                                          disabled={selectedUser.email === 'mar90jesus@gmail.com'}
+                                          disabled={isMainSuperAdmin(selectedUser.email)}
                                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 mt-0.5 ${
-                                            selectedUser.email === 'mar90jesus@gmail.com' 
+                                            isMainSuperAdmin(selectedUser.email) 
                                               ? 'bg-gradient-to-r from-purple-500 to-pink-500 cursor-not-allowed opacity-75'
                                               : isActive 
                                                 ? 'bg-gradient-to-r from-blue-500 to-indigo-600' 
@@ -883,7 +884,7 @@ const AdminPermissionsPage: React.FC = () => {
                                         >
                                           <span
                                             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                              selectedUser.email === 'mar90jesus@gmail.com' || isActive ? 'translate-x-6' : 'translate-x-1'
+                                              isMainSuperAdmin(selectedUser.email) || isActive ? 'translate-x-6' : 'translate-x-1'
                                             }`}
                                           />
                                         </button>

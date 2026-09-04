@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, db } from '@/lib/firebase-admin';
 import { Permission, validatePermissions } from '@/lib/permissions';
+import { isMainSuperAdmin } from '@/lib/super-admin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,12 +15,8 @@ export async function POST(request: NextRequest) {
     
     // Verificar que el usuario sea super admin
     const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
-    }
-
-    const userData = userDoc.data();
-    if (userData?.role !== 'super_admin') {
+    const userData = userDoc.exists ? userDoc.data() : null;
+    if (!isMainSuperAdmin(decodedToken.email) && userData?.role !== 'super_admin') {
       return NextResponse.json({ error: 'Solo los super administradores pueden gestionar permisos' }, { status: 403 });
     }
 
@@ -45,7 +42,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Verificar que no se esté modificando al super admin principal
-    if (targetUserData.email === 'mar90jesus@gmail.com') {
+    if (isMainSuperAdmin(targetUserData.email)) {
       return NextResponse.json({ error: 'No se puede modificar los permisos del super administrador principal' }, { status: 403 });
     }
 
@@ -115,14 +112,9 @@ export async function GET(request: NextRequest) {
     const token = authHeader.split('Bearer ')[1];
     const decodedToken = await adminAuth.verifyIdToken(token);
     
-    // Verificar que el usuario sea super admin
     const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
-    }
-
-    const userData = userDoc.data();
-    if (userData?.role !== 'super_admin') {
+    const userData = userDoc.exists ? userDoc.data() : null;
+    if (!isMainSuperAdmin(decodedToken.email) && userData?.role !== 'super_admin') {
       return NextResponse.json({ error: 'Solo los super administradores pueden ver permisos' }, { status: 403 });
     }
 

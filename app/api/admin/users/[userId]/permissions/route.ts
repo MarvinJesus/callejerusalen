@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminAuth, db } from '@/lib/firebase-admin';
 import { Permission } from '@/lib/permissions';
+import { isMainSuperAdmin, getSuperAdminEmail } from '@/lib/super-admin';
 
 // Validar permisos
 function validatePermissions(permissions: any[]): Permission[] {
@@ -53,12 +54,8 @@ export async function PUT(
     
     // Verificar que el usuario sea admin o super admin
     const userDoc = await db.collection('users').doc(decodedToken.uid).get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 404 });
-    }
-
-    const userData = userDoc.data();
-    if (!userData || (userData.role !== 'super_admin' && userData.role !== 'admin')) {
+    const userData = userDoc.exists ? userDoc.data() : null;
+    if (!isMainSuperAdmin(decodedToken.email) && (!userData || (userData.role !== 'super_admin' && userData.role !== 'admin'))) {
       return NextResponse.json({ error: 'Solo administradores pueden gestionar permisos' }, { status: 403 });
     }
 
@@ -84,9 +81,9 @@ export async function PUT(
     }
     
     // Verificar que no se esté modificando al super admin principal
-    if (targetUserData.email === 'mar90jesus@gmail.com') {
+    if (isMainSuperAdmin(targetUserData.email)) {
       return NextResponse.json({ 
-        error: 'No se puede modificar los permisos del super administrador principal (mar90jesus@gmail.com)' 
+        error: `No se puede modificar los permisos del super administrador principal (${getSuperAdminEmail()})` 
       }, { status: 403 });
     }
 
