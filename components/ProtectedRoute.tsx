@@ -2,12 +2,11 @@
 
 import React, { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { isMainSuperAdmin, authUserIsMainSuperAdmin } from '@/lib/super-admin';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { Permission } from '@/lib/permissions';
 import { canPerformAction } from '@/lib/permissions';
-import RegistrationStatus from './RegistrationStatus';
-
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: 'visitante' | 'comunidad' | 'admin' | 'super_admin';
@@ -27,29 +26,41 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireAllPermissions = false,
   fallbackPath = '/'
 }) => {
-  const { userProfile, loading, isRegistrationPending, isRegistrationRejected } = useAuth();
+  const { user, userProfile, loading, isRegistrationPending, isRegistrationRejected } = useAuth();
   const router = useRouter();
+  const isSuperAdminAccess =
+    userProfile?.role === 'super_admin' ||
+    isMainSuperAdmin(userProfile?.email) ||
+    authUserIsMainSuperAdmin(user);
 
   useEffect(() => {
     if (loading) return;
 
     console.log('🔐 ProtectedRoute: Verificando acceso');
-    console.log('👤 Usuario:', userProfile?.email, '| Rol:', userProfile?.role);
+    console.log('👤 Usuario:', userProfile?.email || user?.email, '| Rol:', userProfile?.role);
     console.log('🎯 Permisos de usuario:', userProfile?.permissions);
     console.log('📋 Requerido - Role:', requiredRole, '| AllowedRoles:', allowedRoles);
     console.log('🔑 Permisos requeridos:', requiredPermissions);
 
-    // Si no hay usuario autenticado
-    if (!userProfile) {
+    if (isSuperAdminAccess) {
+      console.log('✅ Super Admin - Acceso total concedido (sin verificar estado de registro)');
+      return;
+    }
+
+    if (!user && !userProfile) {
       console.log('❌ No hay usuario autenticado, redirigiendo a login');
       toast.error('Debes iniciar sesión para acceder a esta sección');
       router.push('/login');
       return;
     }
 
-    // IMPORTANTE: Super admin siempre tiene acceso total - verificar PRIMERO
-    if (userProfile.role === 'super_admin') {
-      console.log('✅ Super Admin - Acceso total concedido (sin verificar estado de registro)');
+    if (user && !userProfile) {
+      console.log('⚠️ Sesión activa pero sin perfil. No se redirige a login.');
+      router.push(fallbackPath);
+      return;
+    }
+
+    if (!userProfile) {
       return;
     }
 
@@ -131,9 +142,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     }
 
     console.log('✅ Acceso concedido');
-  }, [userProfile, loading, requiredRole, allowedRoles, requiredPermission, requiredPermissions, requireAllPermissions, fallbackPath, router]);
+  }, [user, userProfile, loading, isSuperAdminAccess, requiredRole, allowedRoles, requiredPermission, requiredPermissions, requireAllPermissions, fallbackPath, router]);
 
-  // Mostrar loading mientras se verifica la autenticación
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -142,17 +152,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // Si no hay usuario, no renderizar
-  if (!userProfile) {
-    return null;
+  if (isSuperAdminAccess) {
+    return <>{children}</>;
   }
 
-  // Los usuarios pendientes o rechazados ya fueron redirigidos en useEffect
-  // No necesitamos mostrar el componente aquí
-
-  // Super admin siempre puede acceder
-  if (userProfile.role === 'super_admin') {
-    return <>{children}</>;
+  if (!userProfile) {
+    return null;
   }
 
   // Verificaciones para otros roles

@@ -39,7 +39,11 @@ service cloud.firestore {
     // Permitir creación de perfil durante el registro
     match /users/{userId} {
       allow create: if request.auth != null && request.auth.uid == userId;
-      allow read, update, delete: if request.auth != null && 
+      allow read: if request.auth != null && 
+        (request.auth.uid == userId || 
+         resource.data.email == request.auth.token.email ||
+         isAdminOrSuperAdmin());
+      allow update, delete: if request.auth != null && 
         (request.auth.uid == userId || isAdminOrSuperAdmin());
     }
     

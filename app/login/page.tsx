@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useGlobalAlert } from '@/context/GlobalAlertContext';
-import { loginUser } from '@/lib/auth';
+import { loginUser, isMainSuperAdmin } from '@/lib/auth';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import RegistrationStatusAlert from '@/components/RegistrationStatusAlert';
@@ -38,9 +38,12 @@ const LoginPage: React.FC = () => {
   React.useEffect(() => {
     if (user && profile && !loginAttempted) {
       // Solo redirigir si el usuario está activo
-      if (profile.status === 'active' && profile.isActive) {
-        // Redirigir según el rol del usuario
-        if (profile.role === 'admin' || profile.role === 'super_admin') {
+      const canUseApp = (profile.status === 'active' && profile.isActive) ||
+        profile.role === 'super_admin' ||
+        isMainSuperAdmin(profile.email);
+
+      if (canUseApp) {
+        if (profile.role === 'admin' || profile.role === 'super_admin' || isMainSuperAdmin(profile.email)) {
           router.push('/admin');
         } else {
           router.push('/');
@@ -80,7 +83,7 @@ const LoginPage: React.FC = () => {
         toast.success('¡Bienvenido de vuelta!');
         
         // Redirigir según el rol del usuario
-        if (loginResult.userProfile?.role === 'admin' || loginResult.userProfile?.role === 'super_admin') {
+        if (loginResult.userProfile?.role === 'admin' || loginResult.userProfile?.role === 'super_admin' || isMainSuperAdmin(loginResult.userProfile?.email)) {
           router.push('/admin');
         } else {
           router.push('/');

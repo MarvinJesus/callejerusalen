@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { isMainSuperAdmin } from '@/lib/super-admin';
 
 // Verificar si Firebase Admin SDK está configurado
 const isFirebaseAdminConfigured = () => {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 🔐 PROTECCIÓN: Solo el super-admin principal puede asignar el rol de super_admin
-    if (role === 'super_admin' && createdBy !== 'mar90jesus@gmail.com') {
+    if (role === 'super_admin' && !isMainSuperAdmin(createdBy)) {
       return NextResponse.json(
         { error: 'Solo el super administrador principal puede asignar el rol de Super Administrador' },
         { status: 403 }

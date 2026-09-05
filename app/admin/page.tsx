@@ -3,14 +3,26 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { useAuth } from '@/context/AuthContext';
+import { isMainSuperAdmin, authUserIsMainSuperAdmin } from '@/lib/super-admin';
 
 const AdminPage: React.FC = () => {
   const router = useRouter();
+  const { user, userProfile, loading } = useAuth();
 
   useEffect(() => {
-    // Redirigir automáticamente a /admin/admin-dashboard
-    router.replace('/admin/admin-dashboard');
-  }, [router]);
+    if (loading) return;
+
+    const canEnterAdmin =
+      userProfile?.role === 'super_admin' ||
+      userProfile?.role === 'admin' ||
+      isMainSuperAdmin(userProfile?.email) ||
+      authUserIsMainSuperAdmin(user);
+
+    if (canEnterAdmin) {
+      router.replace('/admin/admin-dashboard');
+    }
+  }, [loading, user, userProfile, router]);
 
   return (
     <ProtectedRoute allowedRoles={['admin', 'super_admin']}>

@@ -323,8 +323,8 @@ const NotificationsDropdown: React.FC = () => {
             onClick={() => setIsOpen(false)}
           />
 
-          <div className="absolute right-0 mt-2 w-96 max-w-[90vw] overflow-hidden rounded-2xl border border-gray-100/80 bg-white shadow-2xl z-[101]">
-            <div className="flex items-center justify-between gap-3 border-b border-white/20 bg-gradient-to-r from-primary-600 via-primary-500 to-primary-400 px-5 py-4 text-white">
+          <div className="notifications-dropdown absolute mt-2 w-[calc(100vw-1rem)] sm:w-96 sm:right-0 sm:left-auto left-1/2 transform -translate-x-1/2 sm:transform-none max-w-[95vw] overflow-hidden rounded-2xl border border-gray-100/80 bg-white shadow-2xl z-[101] sm:max-w-none">
+            <div className="flex items-center justify-between gap-3 border-b border-white/20 bg-gradient-to-r from-primary-600 via-primary-500 to-primary-400 px-3 sm:px-5 py-3 sm:py-4 text-white">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15">
                   <Bell className="h-5 w-5" />
@@ -340,7 +340,7 @@ const NotificationsDropdown: React.FC = () => {
                 type="button"
                 onClick={handleMarkAll}
                 disabled={!unreadCount || isMarkingAll}
-                className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-white/25 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/60"
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2 sm:px-3 py-1 text-[10px] sm:text-[11px] font-semibold text-white shadow-sm transition hover:bg-white/25 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-white/60"
               >
                 {isMarkingAll ? (
                   <>
@@ -356,9 +356,9 @@ const NotificationsDropdown: React.FC = () => {
               </button>
             </div>
 
-            <div className="max-h-96 overflow-y-auto">
+            <div className="max-h-80 sm:max-h-96 overflow-y-auto">
               {loading && (
-                <div className="space-y-3 p-5">
+                <div className="space-y-3 p-3 sm:p-5">
                   {[...Array(3)].map((_, index) => (
                     <div
                       key={index}
@@ -399,7 +399,7 @@ const NotificationsDropdown: React.FC = () => {
               )}
 
               {!loading && !error && notifications.length > 0 && (
-                <ul className="space-y-3 p-4">
+                <ul className="space-y-3 p-3 sm:p-4">
                   {notifications.map((notification) => {
                     const visuals = getNotificationVisuals(notification.type);
                     const IconComponent = visuals.icon;
@@ -420,7 +420,7 @@ const NotificationsDropdown: React.FC = () => {
                               : `border-transparent bg-white shadow-md ring-1 ${visuals.ringColor} hover:shadow-lg`
                           }`}
                         >
-                          <div className="flex items-start gap-3 px-4 py-4">
+                          <div className="flex items-start gap-3 px-3 sm:px-4 py-3 sm:py-4">
                             <div
                               className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${visuals.iconBg}`}
                             >
@@ -429,7 +429,7 @@ const NotificationsDropdown: React.FC = () => {
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                                  <p className="text-sm font-semibold text-slate-900 line-clamp-2">{notification.title}</p>
                                 </div>
                                 <div className="flex flex-col items-end gap-1 text-right">
                                   <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
@@ -442,7 +442,7 @@ const NotificationsDropdown: React.FC = () => {
                               </div>
 
                               {previewMessage && (
-                                <p className="mt-2 text-sm text-slate-600">{previewMessage}</p>
+                                <p className="mt-2 text-sm text-slate-600 line-clamp-2">{previewMessage}</p>
                               )}
 
                               <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-primary-600">
@@ -467,9 +467,10 @@ const NotificationsDropdown: React.FC = () => {
       <div
         className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 px-4"
         onClick={handleCloseModal}
+        style={{ margin: 0, padding: 0 }}
       >
         <div
-          className="relative w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+          className="relative w-full max-w-lg rounded-3xl bg-white p-4 sm:p-6 shadow-2xl mx-4 sm:mx-0"
           onClick={(event) => event.stopPropagation()}
         >
           <button
@@ -533,7 +534,7 @@ const NotificationsDropdown: React.FC = () => {
               </div>
             )}
 
-          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <div className="mt-4 sm:mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={handleCloseModal}

@@ -72,7 +72,7 @@ async function migrateUserStatus() {
     
     console.log('\n⚠️  NOTAS IMPORTANTES:');
     console.log('======================');
-    console.log('• El super admin principal (mar90jesus@gmail.com) está protegido');
+    console.log('• El super admin principal (NEXT_PUBLIC_SUPER_ADMIN_EMAIL) está protegido');
     console.log('• Los cambios de estado se registran en logs del sistema');
     console.log('• Se puede agregar una razón para cada cambio de estado');
     console.log('• El sistema es compatible con usuarios existentes');

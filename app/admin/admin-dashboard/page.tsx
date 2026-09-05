@@ -118,7 +118,7 @@ const AdminDashboard: React.FC = () => {
   const isSuperAdmin = () => {
     // Verificar múltiples fuentes para determinar si es super admin
     if (userProfile?.role === 'super_admin') return true;
-    if (userProfile?.email === 'mar90jesus@gmail.com') return true; // Email del super admin principal
+    if (isMainSuperAdmin(userProfile?.email)) return true;
     return false;
   };
 
@@ -2984,11 +2984,11 @@ const CreateUserModal: React.FC<{
             >
               <option value="comunidad">Residente</option>
               <option value="admin">Administrador</option>
-              {userProfile?.email === 'mar90jesus@gmail.com' && (
+              {isMainSuperAdmin(userProfile?.email) && (
                 <option value="super_admin">Super Administrador</option>
               )}
             </select>
-            {userProfile?.email !== 'mar90jesus@gmail.com' && (
+            {!isMainSuperAdmin(userProfile?.email) && (
               <p className="text-xs text-gray-500 mt-1">ℹ️ Solo el super administrador principal puede asignar el rol de Super Administrador</p>
             )}
           </div>
@@ -3079,14 +3079,14 @@ const EditUserModal: React.FC<{
             >
               <option value="comunidad">Residente</option>
               <option value="admin">Administrador</option>
-              {userProfile?.email === 'mar90jesus@gmail.com' && (
+              {isMainSuperAdmin(userProfile?.email) && (
                 <option value="super_admin">Super Administrador</option>
               )}
             </select>
             {isMainSuperAdmin(user.email) && (
               <p className="text-xs text-yellow-600 mt-1">⭐ El rol del super administrador principal no puede ser modificado</p>
             )}
-            {userProfile?.email !== 'mar90jesus@gmail.com' && !isMainSuperAdmin(user.email) && (
+            {!isMainSuperAdmin(userProfile?.email) && !isMainSuperAdmin(user.email) && (
               <p className="text-xs text-gray-500 mt-1">ℹ️ Solo el super administrador principal puede asignar el rol de Super Administrador</p>
             )}
           </div>

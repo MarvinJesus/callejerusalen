@@ -30,7 +30,8 @@ const colors = {
   magenta: '\x1b[35m',
 };
 
-const SUPER_ADMIN_EMAIL = 'mar90jesus@gmail.com';
+require('dotenv').config({ path: '.env.local' });
+const SUPER_ADMIN_EMAIL = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL || process.env.SUPER_ADMIN_EMAIL || 'mar90jesus@gmail.com';
 
 // Inicializar Firebase Admin
 let serviceAccount;

@@ -27,6 +27,8 @@ const AlertsPage: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [showReportForm, setShowReportForm] = useState(false);
+  const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [reportForm, setReportForm] = useState({
     title: '',
     description: '',
@@ -260,6 +262,16 @@ const AlertsPage: React.FC = () => {
     }
   };
 
+  const handleViewDetails = (alert: Alert) => {
+    setSelectedAlert(alert);
+    setShowDetailModal(true);
+  };
+
+  const closeDetailModal = () => {
+    setShowDetailModal(false);
+    setSelectedAlert(null);
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -419,7 +431,7 @@ const AlertsPage: React.FC = () => {
                   {alert.description}
                 </p>
 
-                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-4">
                   <div className="flex items-center space-x-1">
                     <MapPin className="w-4 h-4" />
                     <span>{alert.location}</span>
@@ -446,6 +458,15 @@ const AlertsPage: React.FC = () => {
                       </a>
                     </div>
                   )}
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleViewDetails(alert)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  >
+                    Ver Detalles
+                  </button>
                 </div>
               </div>
             ))}
@@ -555,6 +576,132 @@ const AlertsPage: React.FC = () => {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Detalles de Alerta */}
+        {showDetailModal && selectedAlert && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+              {/* Header del Modal */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    {getAlertIcon(selectedAlert.type)}
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">
+                        {selectedAlert.title}
+                      </h2>
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white text-gray-800 border">
+                        {getAlertTypeText(selectedAlert.type)}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={closeDetailModal}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Contenido del Modal */}
+              <div className="p-6 space-y-6">
+                {/* Estado de la Alerta */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-medium text-gray-600">Estado:</span>
+                    {selectedAlert.status === 'active' ? (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                        <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+                        Activa
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+                        Resuelta
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Descripción */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Descripción</h3>
+                  <p className="text-gray-700 leading-relaxed bg-gray-50 p-4 rounded-lg">
+                    {selectedAlert.description}
+                  </p>
+                </div>
+
+                {/* Información Detallada */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Ubicación */}
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <MapPin className="w-5 h-5 text-blue-600" />
+                      <h4 className="font-semibold text-gray-900">Ubicación</h4>
+                    </div>
+                    <p className="text-gray-700">{selectedAlert.location}</p>
+                  </div>
+
+                  {/* Reportado por */}
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <User className="w-5 h-5 text-green-600" />
+                      <h4 className="font-semibold text-gray-900">Reportado por</h4>
+                    </div>
+                    <p className="text-gray-700">{selectedAlert.reportedBy}</p>
+                  </div>
+
+                  {/* Fecha y Hora */}
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Clock className="w-5 h-5 text-purple-600" />
+                      <h4 className="font-semibold text-gray-900">Fecha y Hora</h4>
+                    </div>
+                    <p className="text-gray-700">{formatDate(selectedAlert.reportedAt)}</p>
+                  </div>
+
+                  {/* Contacto */}
+                  {selectedAlert.contactPhone && (
+                    <div className="bg-orange-50 p-4 rounded-lg">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Phone className="w-5 h-5 text-orange-600" />
+                        <h4 className="font-semibold text-gray-900">Contacto</h4>
+                      </div>
+                      <a 
+                        href={`tel:${selectedAlert.contactPhone}`}
+                        className="text-orange-600 hover:text-orange-700 font-medium"
+                      >
+                        {selectedAlert.contactPhone}
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Acciones */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200">
+                  {selectedAlert.contactPhone && (
+                    <a
+                      href={`tel:${selectedAlert.contactPhone}`}
+                      className="flex-1 bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-center font-medium flex items-center justify-center space-x-2"
+                    >
+                      <Phone className="w-4 h-4" />
+                      <span>Llamar</span>
+                    </a>
+                  )}
+                  <button
+                    onClick={closeDetailModal}
+                    className="flex-1 bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 transition-colors font-medium"
+                  >
+                    Cerrar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
