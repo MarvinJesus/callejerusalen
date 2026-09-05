@@ -97,7 +97,7 @@ export async function PUT(
     await db.collection('systemLogs').add({
       action: 'permissions_update',
       userId: decodedToken.uid,
-      userEmail: userData.email,
+      userEmail: userData?.email,
       targetUserId: params.userId,
       targetUserEmail: targetUserData.email,
       permissions: validPermissions,

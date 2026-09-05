@@ -222,57 +222,41 @@ export const loginUser = async (email: string, password: string): Promise<{
     if (registrationStatus.userProfile) {
       const userStatus = registrationStatus.userProfile.status;
       const isActive = registrationStatus.userProfile.isActive;
-      const userEmail = registrationStatus.userProfile.email;
 
-      const isSuperAdmin = registrationStatus.userProfile.role === 'super_admin' || isMainSuperAdmin(userEmail);
-      
-      if (isSuperAdmin) {
-        console.log('👑 Super Admin detectado - Acceso garantizado:', userEmail);
-        // El super admin siempre tiene acceso, sin importar el estado
-        // Continuar con el login sin verificar estado
-      } else {
-        // Para usuarios normales, verificar el estado
-        // Solo permitir login a usuarios con status='active'
-        // ⚠️ IMPORTANTE: El orden importa - verificar estados específicos primero
+      // Super admins already returned above. Remaining users must be active.
+      if (userStatus === 'deleted') {
+        await signOut(auth);
         
-        // 1. Verificar usuarios ELIMINADOS
-        if (userStatus === 'deleted') {
-          await signOut(auth);
-          
-          const error: any = new Error('🚫 Cuenta Eliminada: Esta cuenta ha sido eliminada del sistema. Si crees que esto es un error, contacta al administrador para solicitar la reactivación de tu cuenta.');
-          error.code = 'auth/user-deleted';
-          throw error;
-        }
-
-        // 2. Verificar usuarios PENDIENTES (antes de inactive porque también tienen isActive=false)
-        if (userStatus === 'pending') {
-          await signOut(auth);
-          
-          const error: any = new Error('⏳ Cuenta Pendiente de Aprobación: Tu registro ha sido recibido correctamente. Un administrador debe aprobar tu cuenta antes de que puedas iniciar sesión. Este proceso suele tomar 24-48 horas.');
-          error.code = 'auth/user-pending';
-          throw error;
-        }
-
-        // 3. Verificar usuarios INACTIVOS/DESACTIVADOS
-        if (userStatus === 'inactive' || isActive === false) {
-          await signOut(auth);
-          
-          const error: any = new Error('🚫 Cuenta Desactivada: Tu cuenta ha sido desactivada por un administrador. Esto puede deberse a inactividad o violación de políticas. Contacta al administrador para obtener más información y solicitar la reactivación.');
-          error.code = 'auth/user-disabled';
-          throw error;
-        }
-
-        // 4. Verificar que el status sea 'active' (cualquier otro estado no permitido)
-        if (userStatus !== 'active') {
-          await signOut(auth);
-          
-          const error: any = new Error(`❌ Estado de Cuenta Inválido: Tu cuenta tiene un estado no válido (${userStatus}). Contacta al administrador para resolver este problema.`);
-          error.code = 'auth/user-not-active';
-          throw error;
-        }
-        
-        console.log(`✅ Login permitido para usuario con status: ${userStatus}`);
+        const error: any = new Error('🚫 Cuenta Eliminada: Esta cuenta ha sido eliminada del sistema. Si crees que esto es un error, contacta al administrador para solicitar la reactivación de tu cuenta.');
+        error.code = 'auth/user-deleted';
+        throw error;
       }
+
+      if (userStatus === 'pending') {
+        await signOut(auth);
+        
+        const error: any = new Error('⏳ Cuenta Pendiente de Aprobación: Tu registro ha sido recibido correctamente. Un administrador debe aprobar tu cuenta antes de que puedas iniciar sesión. Este proceso suele tomar 24-48 horas.');
+        error.code = 'auth/user-pending';
+        throw error;
+      }
+
+      if (userStatus === 'inactive' || isActive === false) {
+        await signOut(auth);
+        
+        const error: any = new Error('🚫 Cuenta Desactivada: Tu cuenta ha sido desactivada por un administrador. Esto puede deberse a inactividad o violación de políticas. Contacta al administrador para obtener más información y solicitar la reactivación.');
+        error.code = 'auth/user-disabled';
+        throw error;
+      }
+
+      if (userStatus !== 'active') {
+        await signOut(auth);
+        
+        const error: any = new Error(`❌ Estado de Cuenta Inválido: Tu cuenta tiene un estado no válido (${userStatus}). Contacta al administrador para resolver este problema.`);
+        error.code = 'auth/user-not-active';
+        throw error;
+      }
+      
+      console.log(`✅ Login permitido para usuario con status: ${userStatus}`);
     }
 
     return {

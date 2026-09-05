@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     await db.collection('systemLogs').add({
       action: `permissions_${action}`,
       userId: decodedToken.uid,
-      userEmail: userData.email,
+      userEmail: userData?.email,
       targetUserId,
       targetUserEmail: targetUserData.email,
       permissions: validPermissions,
